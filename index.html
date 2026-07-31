@@ -1,0 +1,2976 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>여섯 대륙 — 기후와 무역 (3D)</title>
+<meta name="description" content="1인칭으로 대륙을 탐험하며 블록을 캐고 짓고 무역하는 초등 사회 수업용 복셀 게임.">
+<meta name="theme-color" content="#0d1319">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="여섯 대륙">
+<style>
+:root{
+  --ink:#eef5f9;--ink2:#a8bcc9;--ink3:#7b93a3;
+  --panel:#141d26e6;--panel2:#1b2733;--line:#2c3d4c;--line2:#3d5266;
+  --accent:#7cc46a;--warn:#e8a33d;--bad:#ef5f5f;--good:#5fd3a3;
+  --f:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
+  --m:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+body[data-b=temperate]{--accent:#7cc46a}body[data-b=tropical]{--accent:#1fbfa0}
+body[data-b=taiga]{--accent:#63a9ec}body[data-b=desert]{--accent:#e8a33d}
+body[data-b=tundra]{--accent:#9fd8ff}body[data-b=alpine]{--accent:#b78cf0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0d1319;color:var(--ink);font-family:var(--f);
+  overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
+.hide{display:none!important}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.mono{font-family:var(--m);font-variant-numeric:tabular-nums}
+
+/* ---------- 로딩 / 시작 ---------- */
+#boot{position:fixed;inset:0;z-index:50;background:#0d1319;overflow-y:auto;padding:24px 16px 40px;
+  display:flex;flex-direction:column;justify-content:center}
+.bwrap{max-width:620px;margin:0 auto;width:100%}
+.eyebrow{font-family:var(--m);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3)}
+h1.t{font-size:clamp(28px,8vw,44px);line-height:1.04;font-weight:800;letter-spacing:-.02em;margin-top:8px}
+h1.t span{color:var(--accent)}
+.sub{color:var(--ink2);font-size:14px;margin-top:10px;line-height:1.5}
+label.lb{display:block;font-family:var(--m);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink3);margin:18px 0 6px}
+.inp{width:100%;background:#151f29;border:1px solid var(--line);border-radius:10px;padding:11px 12px;outline:none}
+.inp:focus{border-color:var(--accent)}
+.bg6{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.bc{text-align:left;background:#151f29;border:1px solid var(--line);border-radius:10px;padding:11px;
+  display:flex;flex-direction:column;gap:4px}
+.bc[aria-pressed=true]{border-color:var(--cc);box-shadow:inset 0 0 0 1px var(--cc)}
+.bc .n{font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px}
+.bc .n i{width:9px;height:9px;border-radius:2px;background:var(--cc)}
+.bc .d{font-family:var(--m);font-size:10px;letter-spacing:.1em;color:var(--cc)}
+.bc .r{font-size:12px;color:var(--ink2);line-height:1.35}
+.go{display:block;width:100%;background:var(--accent);color:#0d1319;border-radius:10px;padding:14px;
+  font-weight:800;font-size:16px;margin-top:20px}
+.go:disabled{opacity:.4}
+.go.ghost{background:none;border:1px solid var(--line2);color:var(--ink)}
+.go.sm{padding:10px;font-size:13.5px;margin-top:8px}
+details{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+summary{font-family:var(--m);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);cursor:pointer}
+.note{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-top:10px}
+#load{position:fixed;inset:0;z-index:60;background:#0d1319;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px}
+#load .lt{font-family:var(--m);font-size:12px;color:var(--ink2);letter-spacing:.1em}
+.lbar{width:220px;height:6px;background:#1b2733;border-radius:999px;overflow:hidden}
+.lbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+#hud>*{pointer-events:auto}
+.top{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;
+  display:flex;gap:8px;align-items:flex-start}
+.stats{display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:8px 9px;backdrop-filter:blur(6px);min-width:172px}
+.st{display:flex;align-items:center;gap:6px}
+.st .k{font-size:10px;color:var(--ink2);width:34px}
+.st .track{flex:1;height:7px;background:#0e161d;border-radius:3px;overflow:hidden;display:flex;gap:1px;padding:1px}
+.st .track i{flex:1;background:#22313d;border-radius:1px}
+.st .v{font-family:var(--m);font-size:10px;width:30px;text-align:right}
+.st.alarm .k{color:var(--bad)}
+.info{margin-left:auto;text-align:right;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px;backdrop-filter:blur(6px)}
+.info .bn{font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.info .bn i{width:8px;height:8px;border-radius:2px;background:var(--accent)}
+.info .cl{font-family:var(--m);font-size:11px;color:var(--ink2);margin-top:2px}
+#cross{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);
+  pointer-events:none;opacity:.9}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross:before{left:50%;top:0;width:2px;height:100%;margin-left:-1px}
+#cross:after{top:50%;left:0;height:2px;width:100%;margin-top:-1px}
+#minering{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;pointer-events:none}
+#target{position:absolute;left:50%;bottom:calc(122px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:#0d1319cc;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12px;
+  white-space:nowrap;backdrop-filter:blur(4px)}
+/* 핫바 */
+#hotbar{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  display:flex;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;
+  backdrop-filter:blur(6px)}
+.slot{width:46px;height:46px;border-radius:8px;background:#0f1922;border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:19px}
+.slot.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.slot .cnt{position:absolute;right:3px;bottom:1px;font-family:var(--m);font-size:9.5px;color:var(--ink2)}
+.slot .nm{font-size:8px;color:var(--ink3);position:absolute;top:2px;left:0;right:0;text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 우측 버튼들 */
+#tabs{position:absolute;right:8px;top:calc(96px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:6px}
+#tabs button{width:46px;height:46px;border-radius:11px;background:var(--panel);border:1px solid var(--line);
+  font-size:19px;backdrop-filter:blur(6px);position:relative}
+#tabs button .lab{position:absolute;bottom:1px;left:0;right:0;font-size:8px;color:var(--ink3)}
+#tabs button .n{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-family:var(--m);
+  font-size:9px;border-radius:999px;padding:0 4px;font-weight:700}
+/* 모바일 조작 */
+#touch{position:absolute;inset:0;pointer-events:none}
+#stick{position:absolute;left:calc(16px + env(safe-area-inset-left));bottom:calc(76px + env(safe-area-inset-bottom));
+  width:116px;height:116px;border-radius:50%;background:#0d1319aa;border:1px solid var(--line);pointer-events:auto}
+#stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;
+  background:#ffffff2e;border:1px solid var(--line2)}
+#tbtn{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(76px + env(safe-area-inset-bottom));
+  display:grid;grid-template-columns:repeat(2,58px);gap:8px;pointer-events:auto}
+#tbtn button{height:58px;border-radius:50%;background:var(--panel);border:1px solid var(--line);font-size:20px}
+#tbtn button.big{grid-column:span 2;height:44px;border-radius:14px;font-size:14px;font-weight:700}
+#tbtn button:active{background:var(--accent);color:#0d1319}
+.hint{position:absolute;left:50%;top:calc(50% + 46px);transform:translateX(-50%);text-align:center;
+  background:#0d1319d0;border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:12.5px;
+  color:var(--ink2);line-height:1.5;max-width:290px}
+#toasts{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(170px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
+.toast{background:#0d1319e0;border:1px solid var(--line2);border-radius:999px;padding:6px 13px;font-size:12.5px;
+  animation:rise .2s ease-out}
+.toast.good{border-color:var(--good)}.toast.bad{border-color:var(--bad)}.toast.warn{border-color:var(--warn)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+/* [V4] 다른 플레이어 이름표 오버레이 */
+#peerLabels{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.peerLabel{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;
+  font-size:12px;font-weight:700;color:#fff;background:#0d1319cc;border:1px solid var(--line2);
+  border-radius:999px;padding:2px 9px;letter-spacing:.01em;text-shadow:0 1px 2px #000;
+  transition:opacity .2s}
+
+/* ---------- 게임 내 패널 ---------- */
+#panel{position:fixed;inset:0;z-index:30;background:#060a0eb8;backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;padding:12px}
+.sheet{width:100%;max-width:640px;max-height:92vh;overflow-y:auto;background:#111a23f2;border:1px solid var(--line2);
+  border-radius:16px;padding:0 0 16px;overscroll-behavior:contain}
+.ph{position:sticky;top:0;z-index:2;background:#0f1822f5;border-bottom:1px solid var(--line);
+  display:flex;gap:4px;padding:8px 10px;border-radius:16px 16px 0 0;flex-wrap:wrap;align-items:center}
+.ph button{padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.ph button[aria-current=true]{background:var(--accent);color:#0d1319}
+.ph .x{margin-left:auto;font-size:18px;padding:6px 12px;color:var(--ink2)}
+.pb{padding:14px}
+.sec{margin-bottom:18px}
+.sec h3{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sec h3 .sm{margin-left:auto;font-size:11px;color:var(--ink3);font-weight:400}
+.card{background:#16202b;border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+.card+.card{margin-top:7px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:#1b2733;border:1px solid var(--line);
+  border-radius:999px;padding:4px 10px;font-size:12.5px}
+.chip b{font-family:var(--m)}
+.chip.ok{border-color:var(--good)}.chip.no{border-color:var(--bad);color:#f3b1b1}
+.chip.t2{border-color:#3a5570}.chip.t3{border-color:#6b5a86}
+.chip.act{cursor:pointer}
+.rw{display:flex;align-items:center;gap:8px}
+.mini{background:#1b2733;border:1px solid var(--line2);border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:700}
+.mini.acc{background:var(--accent);border-color:var(--accent);color:#0d1319}
+.mini:disabled{opacity:.4}
+.why{margin-top:7px;font-size:11.5px;color:var(--warn)}
+.eff{margin-top:6px;font-size:12px;color:var(--ink2)}
+.tier{font-family:var(--m);font-size:9.5px;letter-spacing:.1em;color:var(--ink3);border:1px solid var(--line2);
+  border-radius:4px;padding:1px 5px}
+.txa{width:100%;background:#0f1822;border:1px solid var(--line);border-radius:10px;padding:10px;
+  font-family:var(--m);font-size:11.5px;word-break:break-all;resize:vertical;min-height:70px;color:var(--ink)}
+.sel{width:100%;background:#0f1822;border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.grid2{display:grid;grid-template-columns:1fr 76px;gap:8px;align-items:center}
+.bar{height:8px;background:#0f1822;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.log{max-height:190px;overflow:auto;font-size:12px}
+.log div{padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink2)}
+.log time{font-family:var(--m);font-size:10px;color:var(--ink3);margin-right:6px}
+.tchip{border:1px solid var(--accent);background:#7cc46a22;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700}
+.tchip.lock{border-color:var(--line);background:none;color:var(--ink3);font-weight:400}
+kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(--line2);
+  border-bottom-width:2px;border-radius:5px;padding:1px 5px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#visitBanner{position:absolute;left:50%;top:calc(64px + env(safe-area-inset-top));transform:translateX(-50%);
+  display:flex;align-items:center;gap:10px;background:#2a1622ee;border:1px solid var(--bad);border-radius:999px;
+  padding:6px 8px 6px 14px;font-size:12.5px;backdrop-filter:blur(6px);z-index:12;max-width:94vw}
+#visitBanner b{color:var(--warn)}
+#visitBanner button{background:var(--bad);color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px}
+.rosterRow{display:grid;grid-template-columns:1fr 118px 34px;gap:6px;align-items:center;margin:5px 0}
+.toggle{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.toggle button{padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--ink2)}
+.toggle button[aria-pressed=true]{background:var(--accent);color:#0d1319}
+</style>
+</head>
+<body data-b="temperate">
+<canvas id="c"></canvas>
+<div id="peerLabels"></div>
+
+<div id="hud" class="hide">
+  <div class="top">
+    <div class="stats" id="stats"></div>
+    <div class="info">
+      <div class="bn"><i></i><span id="ibio">온대</span></div>
+      <div class="cl"><span id="itime">06:00</span> <span id="isun">☀</span> · <span id="iday">1일차</span></div>
+      <div class="cl"><span id="itemp">22°C</span></div>
+    </div>
+  </div>
+  <div id="cross"></div>
+  <svg id="minering" viewBox="0 0 54 54" class="hide">
+    <circle cx="27" cy="27" r="22" fill="none" stroke="#0d1319aa" stroke-width="5"/>
+    <circle id="mr" cx="27" cy="27" r="22" fill="none" stroke="#7cc46a" stroke-width="5"
+      stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="138" transform="rotate(-90 27 27)"/>
+  </svg>
+  <div id="target" class="hide"></div>
+  <div id="tabs">
+    <button data-p="bag" title="가방·제작 (E)">🎒<span class="lab">가방</span></button>
+    <button data-p="trade" title="무역소 (T)">⚖️<span class="lab">무역</span></button>
+    <button data-p="record" title="기록 (R)">🏅<span class="lab">기록</span></button>
+    <button data-p="help" title="도움말 (H)">❓<span class="lab">도움</span></button>
+  </div>
+  <div id="hotbar"></div>
+  <div id="touch" class="hide">
+    <div id="stick"><i></i></div>
+    <div id="tbtn">
+      <button id="bJump" title="점프">⤴</button>
+      <button id="bUse" title="놓기">🧱</button>
+      <button id="bMine" class="big" title="캐기">⛏️ 캐기</button>
+    </div>
+  </div>
+  <div id="toasts"></div>
+  <div id="hint" class="hint hide"></div>
+</div>
+
+<div id="panel" class="hide">
+  <div class="sheet">
+    <div class="ph" id="ptabs">
+      <button data-p="bag">🎒 가방·제작</button>
+      <button data-p="trade">⚖️ 무역소</button>
+      <button data-p="record">🏅 기록</button>
+      <button data-p="help">❓ 도움말</button>
+      <button class="x" id="pclose">✕</button>
+    </div>
+    <div class="pb" id="pbody"></div>
+  </div>
+</div>
+
+<div id="boot"><div class="bwrap">
+  <p class="eyebrow">1인칭 복셀 · 기후와 무역 · 6학년 사회</p>
+  <h1 class="t">여섯 대륙,<br>하나의 <span>무역망</span></h1>
+  <p class="sub">직접 걸어다니며 캐고, 만들고, 짓습니다. 기후마다 나는 자원이 다르니 혼자서는 문명을 완성할 수 없습니다.</p>
+
+  <div class="toggle" id="modeToggle" style="margin-top:18px">
+    <button data-m="student" aria-pressed="true">🎒 학생</button>
+    <button data-m="teacher" aria-pressed="false">🧑‍🏫 선생님</button>
+  </div>
+
+  <!-- ===== 학생 모드 ===== -->
+  <div id="studentPane">
+    <label class="lb" for="s_room">방 코드 <span style="text-transform:none;letter-spacing:0">(선생님이 알려줌 · 없으면 비워도 됨)</span></label>
+    <input class="inp" id="s_room" maxlength="24" placeholder="예: class-1" autocomplete="off">
+    <label class="lb" for="nm">내 이름</label>
+    <input class="inp" id="nm" maxlength="12" placeholder="예: 김민준" autocomplete="off">
+    <div id="assignInfo" class="note hide" style="margin-top:8px"></div>
+    <div id="pickWrap">
+      <label class="lb">내 대륙 고르기 <span id="pickHint" style="text-transform:none;letter-spacing:0;color:var(--ink3)"></span></label>
+      <div class="bg6" id="bpick"></div>
+    </div>
+    <button class="go" id="start" disabled>대륙에 도착하기</button>
+    <button class="go ghost sm hide" id="cont">이어서 하기</button>
+  </div>
+
+  <!-- ===== 선생님 모드 ===== -->
+  <div id="teacherPane" class="hide">
+    <p class="sub" style="margin-top:14px">Supabase 프로젝트에 연결하고, 학생 이름과 배정할 기후를 미리 정해 두세요. 학생은 방 코드와 이름만 입력하면 지정된 기후로 바로 접속합니다.</p>
+    <label class="lb">Supabase URL</label>
+    <input class="inp" id="t_url" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    <label class="lb">anon key</label>
+    <input class="inp" id="t_key" placeholder="eyJ..." autocomplete="off">
+    <label class="lb">방 코드</label>
+    <input class="inp" id="t_room" placeholder="class-1" autocomplete="off">
+    <button class="go sm" id="t_connect">연결 확인</button>
+    <div id="t_status" class="note" style="margin-top:8px"></div>
+
+    <label class="lb" style="margin-top:20px">학생 배정 명단</label>
+    <div id="rosterList"></div>
+    <div class="rosterRow" style="margin-top:6px">
+      <input class="inp" id="r_name" placeholder="학생 이름" autocomplete="off">
+      <select class="sel" id="r_biome"></select>
+      <button class="mini acc" id="r_add" style="height:100%">추가</button>
+    </div>
+    <button class="go sm" id="t_autofill">이름들 6기후로 자동 분배</button>
+    <button class="go" id="t_save">명단 DB에 저장</button>
+    <p class="note" id="t_saveMsg"></p>
+  </div>
+
+  <details>
+    <summary>선생님용 · Supabase 설정과 SQL 스키마</summary>
+    <p class="note">무료 <b>Supabase</b> 프로젝트 하나면 반 전체가 실시간 거래·클라우드 세이브·구경 가기를 쓸 수 있습니다.
+    Project URL과 anon key를 복사해 위 '선생님' 모드에 넣고, SQL 편집기에서 아래 표를 한 번 만드세요.</p>
+    <p class="note mono" style="font-size:10.5px;color:var(--ink3);white-space:pre-wrap">-- [V4] 같은 방·같은 기후의 학생들이 하나의 월드(edits)를 공유합니다.
+create table if not exists offers (id text primary key, room text, biome text, trader text, give jsonb, want jsonb, status text default 'open', taker text, claimed boolean default false, ts timestamptz default now());
+create table if not exists roster (room text, name text, biome text, primary key (room,name));
+-- 월드: (room,biome) 단위 공유. seed/edits 를 같은 기후 학생들이 함께 씀
+create table if not exists worlds (room text, biome text, seed int8, edits jsonb, day int, snap timestamptz default now(), primary key (room,biome));
+-- 플레이어: 개인 인벤토리·스탯은 (room,name) 별도 저장
+create table if not exists players (room text, name text, biome text, inv jsonb, stat jsonb, pos jsonb, day int, snap timestamptz default now(), primary key (room,name));
+alter table offers enable row level security;
+alter table roster enable row level security;
+alter table worlds enable row level security;
+alter table players enable row level security;
+create policy anon_offers on offers for all using(true) with check(true);
+create policy anon_roster on roster for all using(true) with check(true);
+create policy anon_worlds on worlds for all using(true) with check(true);
+create policy anon_players on players for all using(true) with check(true);
+-- 실시간(블록 동기화·아바타)은 Supabase Realtime Broadcast를 씁니다. 추가 테이블/설정 불필요.</p>
+  </details>
+</div></div>
+
+<div id="load" class="hide"><div class="lt" id="ltx">대륙을 만드는 중…</div><div class="lbar"><i id="lbi"></i></div></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   여섯 대륙 — 기후와 무역 (3D 복셀) · 단일 파일
+   Part 1. 데이터
+   ========================================================================== */
+var VER="4.0", SAVE="sixcont4_"+ "v4";
+var W=96, H=44, SEA=8, CH=16;                 // 월드 크기 / 높이 / 해수면 / 청크
+
+/* 블록 정의: c=색, hard=캐는 시간(초), drop=나오는 아이템, solid, alpha */
+var BL={
+ 0:{n:"공기",solid:false},
+ 1:{n:"풀",c:0x6aa84f,hard:.45,drop:"dirt",solid:true},
+ 2:{n:"흙",c:0x8b6b43,hard:.45,drop:"dirt",solid:true},
+ 3:{n:"돌",c:0x8d949c,hard:1.5,drop:"stone",solid:true},
+ 4:{n:"모래",c:0xdcc48a,hard:.45,drop:"sand",solid:true},
+ 5:{n:"물",c:0x2f6fb5,hard:.35,drop:"water",solid:false,alpha:.72,infinite:true},
+ 6:{n:"나무",c:0x6b4a2b,hard:1.0,drop:"wood",solid:true},
+ 7:{n:"잎",c:0x4e8c3a,hard:.35,drop:"wood",solid:true},
+ 8:{n:"눈",c:0xe8f2f8,hard:.4,drop:"water",solid:true},
+ 9:{n:"얼음",c:0x9fd8ff,hard:1.1,drop:"ice",solid:true},
+ 10:{n:"점토",c:0xa9736b,hard:.7,drop:"clay",solid:true},
+ 11:{n:"석탄",c:0x3b4149,hard:1.7,drop:"coal",solid:true},
+ 12:{n:"철광석",c:0xb98b6b,hard:1.9,drop:"iron_ore",solid:true},
+ 13:{n:"구리",c:0xc98a4b,hard:1.8,drop:"copper",solid:true},
+ 14:{n:"금",c:0xe0bb3c,hard:2.0,drop:"gold",solid:true},
+ 15:{n:"원유",c:0x241f2b,hard:1.2,drop:"oil",solid:true},
+ 16:{n:"향신료 덤불",c:0xc0533c,hard:.4,drop:"spice",solid:true},
+ 17:{n:"카카오 덤불",c:0x7a4a2c,hard:.4,drop:"cacao",solid:true},
+ 18:{n:"커피 덤불",c:0x8f5b3a,hard:.4,drop:"coffee",solid:true},
+ 19:{n:"고무나무",c:0x9c7b52,hard:.9,drop:"rubber",solid:true},
+ 20:{n:"희귀원목",c:0x5a3a52,hard:1.2,drop:"hardwood",solid:true},
+ 21:{n:"모피 덤불",c:0x8a6a4a,hard:.5,drop:"fur",solid:true},
+ 22:{n:"과일 잎",c:0x63a83c,hard:.35,drop:"fruit",solid:true},
+ 23:{n:"낚시 구멍",c:0x1f4e78,hard:3.0,drop:"fish",solid:true,infinite:true},
+ 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true},
+ 30:{n:"판자",c:0xc19a63,hard:.9,drop:"plank",solid:true},
+ 31:{n:"벽돌",c:0xb2604a,hard:1.6,drop:"brick",solid:true},
+ 32:{n:"유리",c:0xbfe6f2,hard:.4,drop:"glass",solid:true,alpha:.45},
+ 33:{n:"석재 블록",c:0x9aa3ab,hard:1.5,drop:"stone",solid:true},
+ 34:{n:"철 블록",c:0xd6dbe0,hard:2.2,drop:"iron",solid:true},
+ 35:{n:"무역소",c:0xe0b84a,hard:2.5,drop:"tradepost",solid:true,special:"trade"},
+ 36:{n:"기념비",c:0xf2e2a8,hard:3,drop:null,solid:true,special:"monument"},
+ 37:{n:"모닥불",c:0xf07830,hard:.5,drop:"wood",solid:true,special:"fire",light:true}
+};
+/* 아이템 → 놓을 수 있는 블록 */
+var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:34,
+  clay:10,coal:11,snow:8,wheat:24,tradepost:35,monument:36,campfire:37};
+
+var ITEMS={
+ wheat:{n:"밀",em:"🌾",tier:1,val:1,rot:1,food:{h:18}},
+ fruit:{n:"과일",em:"🍌",tier:1,val:1.1,rot:1,food:{h:12,w:8}},
+ fish:{n:"생선",em:"🐟",tier:1,val:1.5,rot:1,food:{h:24}},
+ water:{n:"물",em:"💧",tier:1,val:.6,food:{w:26}},
+ wood:{n:"나무",em:"🪵",tier:1,val:1},
+ dirt:{n:"흙",em:"🟫",tier:1,val:.4},
+ clay:{n:"점토",em:"🟤",tier:1,val:1.2},
+ sand:{n:"모래",em:"⏳",tier:1,val:1.1},
+ fur:{n:"모피",em:"🦫",tier:1,val:2.5},
+ coal:{n:"석탄",em:"⚫",tier:1,val:2},
+ iron_ore:{n:"철광석",em:"⛏️",tier:1,val:2.2},
+ copper:{n:"구리",em:"🟠",tier:1,val:2.6},
+ stone:{n:"석재",em:"🪨",tier:1,val:1.4},
+ ice:{n:"얼음",em:"🧊",tier:2,val:2},
+ plank:{n:"판자",em:"🪚",tier:2,val:2.4},
+ brick:{n:"벽돌",em:"🧱",tier:2,val:4.6},
+ glass:{n:"유리",em:"🪟",tier:2,val:3.8},
+ iron:{n:"철괴",em:"🔩",tier:2,val:6.6},
+ fiber:{n:"섬유",em:"🧵",tier:2,val:3.2},
+ coat:{n:"방한복",em:"🧥",tier:2,val:9.5},
+ shade:{n:"햇빛막이",em:"⛱️",tier:2,val:9.5},
+ bread:{n:"빵",em:"🍞",tier:2,val:4.2,food:{h:36}},
+ campfire:{n:"모닥불",em:"🔥",tier:2,val:2},
+ oil:{n:"원유",em:"🛢️",tier:3,val:3.6},
+ gold:{n:"금",em:"🥇",tier:3,val:5.2},
+ rubber:{n:"고무",em:"🛞",tier:3,val:3},
+ cacao:{n:"카카오",em:"🫘",tier:3,val:2.8},
+ coffee:{n:"커피원두",em:"☕",tier:3,val:2.8},
+ spice:{n:"향신료",em:"🌶️",tier:3,val:3},
+ hardwood:{n:"희귀원목",em:"🌳",tier:3,val:3.2},
+ fuel:{n:"연료",em:"⛽",tier:3,val:7.6},
+ chocolate:{n:"초콜릿",em:"🍫",tier:3,val:8,food:{h:10}},
+ brew:{n:"커피",em:"🧋",tier:3,val:7.2,food:{h:4,s:35}},
+ power:{n:"전력",em:"⚡",tier:3,val:12},
+ tradepost:{n:"무역소",em:"⚖️",tier:2,val:8},
+ monument:{n:"기념비",em:"🗽",tier:3,val:99}
+};
+function iN(k){return ITEMS[k]?ITEMS[k].n:k}
+function iE(k){return ITEMS[k]?ITEMS[k].em:"❔"}
+function iV(k){return ITEMS[k]?ITEMS[k].val:1}
+function iT(k){return ITEMS[k]?ITEMS[k].tier:1}
+
+var BIOMES={
+ temperate:{n:"온대",diff:"EASY",dk:"쉬움",c:"#7cc46a",ord:0,role:"세계의 식량 창고 · 1차 산업",
+   mods:{hunger:1,hydra:1,regen:1,cost:1,rot:1},day:22,night:14,
+   sky:[0x8fc6ea,0x0b1220],fog:0xa9cfe8,grass:1,found:["밀","나무","점토","물"]},
+ tropical:{n:"열대 우림",diff:"NORMAL",dk:"보통",c:"#1fbfa0",ord:1,role:"사치재 · 특수작물",
+   mods:{hunger:1,hydra:1.3,regen:1,cost:1.5,rot:2},day:32,night:25,
+   sky:[0x7fd4c2,0x08201c],fog:0x9fd9c9,grass:1,found:["고무","카카오","커피","향신료","희귀원목","과일"]},
+ taiga:{n:"냉대",diff:"NORMAL",dk:"보통",c:"#63a9ec",ord:2,role:"보존 · 가공재",
+   mods:{hunger:1.2,hydra:.9,regen:1,cost:1.1,rot:.7},day:4,night:-8,
+   sky:[0xa8c4d8,0x0a121c],fog:0xc2d4e2,grass:8,found:["나무","석탄","모피"]},
+ desert:{n:"건조",diff:"HARD",dk:"어려움",c:"#e8a33d",ord:3,role:"산업 · 첨단재",
+   mods:{hunger:1.1,hydra:2,regen:.9,cost:1.2,rot:1.2},day:45,night:5,
+   sky:[0xf0d9a8,0x141018],fog:0xf2dcae,grass:4,found:["모래","원유","금"]},
+ tundra:{n:"한대",diff:"HARD",dk:"어려움",c:"#9fd8ff",ord:4,role:"보존 · 특수재 (농사 불가)",
+   mods:{hunger:1.3,hydra:.8,regen:.9,cost:1.2,rot:.4},day:-10,night:-25,
+   sky:[0xd6ecf8,0x0d1622],fog:0xe4f2fa,grass:8,found:["얼음","생선"]},
+ alpine:{n:"고산",diff:"HARD",dk:"어려움",c:"#b78cf0",ord:5,role:"중화학 · 광물",
+   mods:{hunger:1.2,hydra:1.1,regen:.5,cost:1.2,rot:.8},day:10,night:0,
+   sky:[0x9db6d8,0x0a0f18],fog:0xb9c8de,grass:3,found:["철광석","구리","석재"]}
+};
+var BKEYS=Object.keys(BIOMES).sort(function(a,b){return BIOMES[a].ord-BIOMES[b].ord});
+function bN(k){return BIOMES[k]?BIOMES[k].n:"?"}
+var SPECIAL={temperate:["wheat","wood","clay","bread"],tropical:["rubber","cacao","coffee","spice","hardwood","fruit"],
+ taiga:["wood","fur","coal"],desert:["sand","oil","gold","glass"],tundra:["ice","fish"],
+ alpine:["iron_ore","copper","stone","iron"]};
+var SOURCE={};
+for(var _b in SPECIAL)SPECIAL[_b].forEach(function(k){(SOURCE[k]=SOURCE[k]||[]).push(_b)});
+function whereFrom(k){
+  if(SOURCE[k])return SOURCE[k].map(bN).join("·")+" 대륙에서 납니다";
+  for(var i=0;i<RECIPES.length;i++)if(RECIPES[i].out[k])return "가방→제작에서 만들 수 있습니다";
+  return "다른 대륙에서 구해야 합니다";
+}
+var RECIPES=[
+ {id:"plank",out:{plank:2},need:{wood:1},eff:"건축의 기본 재료 · 놓을 수 있음"},
+ {id:"fiber",out:{fiber:1},need:{wheat:3},eff:"옷을 만드는 실"},
+ {id:"bread",out:{bread:2},need:{wheat:3,water:1},eff:"썩지 않는 식량 · 허기 +36"},
+ {id:"campfire",out:{campfire:1},need:{wood:3},eff:"놓으면 주변 체온을 지켜줍니다"},
+ {id:"coat",out:{coat:1},need:{fur:2,fiber:2},eff:"추위를 막아줍니다 (냉대·한대 필수)"},
+ {id:"shade",out:{shade:1},need:{plank:2,fiber:2},eff:"더위를 막아줍니다 (건조 기후 필수)"},
+ {id:"brick",out:{brick:1},need:{clay:2,coal:1},eff:"단단한 건축 블록"},
+ {id:"glass",out:{glass:1},need:{sand:2,coal:1},eff:"투명 블록 · 창문"},
+ {id:"iron",out:{iron:1},need:{iron_ore:2,coal:1},eff:"모든 기계의 재료"},
+ {id:"fuel",out:{fuel:1},need:{oil:2},eff:"전력을 만드는 연료"},
+ {id:"power",out:{power:2},need:{fuel:1,copper:2,iron:1},eff:"발전 · 기념비에 필요"},
+ {id:"chocolate",out:{chocolate:1},need:{cacao:2,ice:1},eff:"사치재 · 기념비에 필요"},
+ {id:"brew",out:{brew:1},need:{coffee:2,water:1},eff:"사치재 · 스태미나 +35"},
+ {id:"tradepost",out:{tradepost:1},need:{plank:4,stone:2},eff:"놓으면 그 자리에서 무역할 수 있습니다"},
+ {id:"monument",out:{monument:1},need:{power:3,iron:5,glass:3,brick:4,rubber:2,gold:2,spice:2,ice:2,chocolate:1,brew:1},
+  eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"}
+];
+var TITLES=[
+ {id:"first_trade",n:"첫 거래",d:"거래 1회",f:function(s){return s.stat.trades>=1}},
+ {id:"merchant",n:"글로벌 상단",d:"거래 8회",f:function(s){return s.stat.trades>=8}},
+ {id:"lifesaver",n:"생명의 은인",d:"식량 30개 수출",f:function(s){return s.stat.foodOut>=30}},
+ {id:"builder",n:"건축가",d:"블록 60개 설치",f:function(s){return s.stat.placed>=60}},
+ {id:"plenty",n:"풍요의 땅",d:"밀 60개 수확",b:"temperate",f:function(s){return (s.stat.got.wheat||0)>=60}},
+ {id:"jungle",n:"정글의 지배자",d:"사치재 40개 채집",b:"tropical",f:function(s){
+   return ["rubber","cacao","coffee","spice","hardwood"].reduce(function(a,k){return a+(s.stat.got[k]||0)},0)>=40}},
+ {id:"pioneer",n:"개척자",d:"석탄·모피 30개",b:"taiga",f:function(s){return (s.stat.got.coal||0)+(s.stat.got.fur||0)>=30}},
+ {id:"oasis",n:"사막의 기적",d:"유리 10개 제작",b:"desert",f:function(s){return (s.stat.made.glass||0)>=10}},
+ {id:"polar",n:"극지방의 생존자",d:"3일 생존 + 얼음 30개",b:"tundra",f:function(s){return s.day>=3&&(s.stat.got.ice||0)>=30}},
+ {id:"roof",n:"세계의 지붕",d:"철괴 12개 제작",b:"alpine",f:function(s){return (s.stat.made.iron||0)>=12}},
+ {id:"civil",n:"문명의 완성자",d:"기념비 건설",f:function(s){return s.stat.monument}}
+];
+
+/* ==========================================================================
+   Part 2. 월드 생성 (기후별 지형)
+   ------------------------------------------------------------------------
+   [Seamless World 관련 설계 결정]
+   PRD의 '단일 맵에 6기후를 모두 배치해 걸어서 이동' 안은, 교실 크롬북/태블릿 기준
+   지형·자원·나무를 6배로 생성하면 PRD가 우려한 퍼포먼스 문제(로딩 지연·프레임 저하)를
+   그대로 유발한다. PRD는 이 경우 "DB를 통한 다른 기후 플레이어와의 실시간 인벤토리/거래
+   동기화"를 최우선으로 적용하라고 명시했다.
+   → 따라서 이번 버전은 (1) 기후별 단일 맵을 유지하되, (2) Part 5의 Market 계층으로
+      실시간 글로벌 거래소를 구현해 '다른 기후 플레이어와 실시간 연결'이라는 핵심 목표를
+      충족한다. 추후 서버 청크 스트리밍이 준비되면 이 genWorld를 다중 바이옴 버전으로
+      교체하고 W(월드 크기)만 키우면 된다.
+   ========================================================================== */
+var world=null, S=null;
+function idx(x,y,z){return (y*W+z)*W+x}
+function inW(x,y,z){return x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<W}
+function getB(x,y,z){x|=0;y|=0;z|=0;return inW(x,y,z)?world[idx(x,y,z)]:(y<0?3:0)}
+function setB(x,y,z,v){if(inW(x,y,z))world[idx(x,y,z)]=v}
+function solidAt(x,y,z){var b=getB(x,y,z);return b&&BL[b]&&BL[b].solid}
+
+function rng32(seed){var t=seed>>>0;return function(){t+=0x6D2B79F5;var r=t;
+  r=Math.imul(r^r>>>15,r|1);r^=r+Math.imul(r^r>>>7,r|61);return ((r^r>>>14)>>>0)/4294967296}}
+function mkNoise(seed){
+  var p=new Uint8Array(512),perm=[],r=rng32(seed);
+  for(var i=0;i<256;i++)perm[i]=i;
+  for(var j=255;j>0;j--){var k=Math.floor(r()*(j+1)),t=perm[j];perm[j]=perm[k];perm[k]=t}
+  for(var m=0;m<512;m++)p[m]=perm[m&255];
+  function fade(t){return t*t*(3-2*t)}
+  function hash(xi,zi){return p[(p[xi&255]+zi)&255]/255}
+  return function(x,z){
+    var xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi;
+    var a=hash(xi,zi),b=hash(xi+1,zi),c=hash(xi,zi+1),d=hash(xi+1,zi+1);
+    var u=fade(xf),v=fade(zf);
+    return (a*(1-u)+b*u)*(1-v)+(c*(1-u)+d*u)*v;
+  };
+}
+function fbm(n,x,z,oct,sc){
+  var v=0,amp=1,f=sc,tot=0;
+  for(var i=0;i<oct;i++){v+=n(x*f,z*f)*amp;tot+=amp;amp*=.5;f*=2}
+  return v/tot;
+}
+function genWorld(biome,seed,onProg){
+  world=new Uint8Array(W*H*W);
+  var n1=mkNoise(seed),n2=mkNoise(seed+7777),r=rng32(seed+31);
+  var B=BIOMES[biome];
+  var P={temperate:{amp:6,base:11,oct:4,sc:.045},
+         tropical:{amp:7,base:11,oct:4,sc:.05},
+         taiga:{amp:7,base:11,oct:4,sc:.045},
+         desert:{amp:8,base:12,oct:3,sc:.035},
+         tundra:{amp:4,base:10,oct:3,sc:.04},
+         alpine:{amp:18,base:12,oct:5,sc:.035}}[biome];
+  var hmap=new Int16Array(W*W);
+  for(var x=0;x<W;x++)for(var z=0;z<W;z++){
+    var e=fbm(n1,x,z,P.oct,P.sc);
+    var edge=Math.min(x,z,W-1-x,W-1-z)/16;            // 가장자리는 바다로
+    e*= clamp01(edge);
+    var h=Math.round(P.base+e*P.amp*2-P.amp*0.15);
+    if(biome==="alpine")h=Math.round(P.base+Math.pow(e,1.5)*P.amp*2.2);
+    hmap[z*W+x]=Math.max(2,Math.min(H-12,h));
+  }
+  for(var x2=0;x2<W;x2++){
+    for(var z2=0;z2<W;z2++){
+      var h2=hmap[z2*W+x2], ore=fbm(n2,x2,z2,3,.09);
+      for(var y=0;y<=h2;y++){
+        var b=3;                                        // 기본 돌
+        var depth=h2-y;
+        if(biome==="desert")b=depth<4?4:3;
+        else if(biome==="tundra")b=depth<1?8:(depth<3?9:3);
+        else if(biome==="alpine")b=depth<1?(h2>22?8:3):3;
+        else if(biome==="taiga")b=depth<1?(h2>SEA+1?8:1):(depth<4?2:3);
+        else b=depth<1?1:(depth<4?2:3);
+        if(y===0)b=3;
+        setB(x2,y,z2,b);
+      }
+      /* 광물·특수 자원 */
+      var top=h2;
+      if(biome==="taiga"&&ore>.62&&r()<.22)setB(x2,top,z2,11);
+      if(biome==="alpine"){
+        if(ore>.58&&r()<.30)setB(x2,top,z2,12);
+        else if(ore<.36&&r()<.22)setB(x2,top,z2,13);
+        if(r()<.03)setB(x2,top-1,z2,11);
+      }
+      if(biome==="desert"){
+        if(ore>.68&&r()<.16)setB(x2,top,z2,14);
+        if(ore<.3&&r()<.10){for(var d=0;d<2;d++)setB(x2,top-d,z2,15)}
+      }
+      if(biome==="temperate"&&h2<=SEA+1&&r()<.30)setB(x2,top,z2,10);
+      /* 바다·호수 */
+      for(var wy=h2+1;wy<=SEA;wy++)setB(x2,wy,z2,biome==="tundra"?(wy===SEA?9:5):5);
+      if(biome==="tundra"&&h2<SEA&&r()<.06)setB(x2,SEA,z2,23);   // 낚시 구멍(상향: .012→.06)
+    }
+    if(onProg&&x2%12===0)onProg(x2/W*.7);
+  }
+  /* 나무·덤불·작물 */
+  var tries=Math.floor(W*W*(biome==="tropical"?.055:biome==="temperate"?.03:biome==="taiga"?.035:biome==="alpine"?.008:0));
+  for(var t=0;t<tries;t++){
+    var tx=2+Math.floor(r()*(W-4)),tz=2+Math.floor(r()*(W-4)),th=hmap[tz*W+tx];
+    if(th<=SEA)continue;
+    if(biome==="tropical"){
+      var kind=r();
+      if(kind<.16)tree(tx,th,tz,r,20,7,6,9);          // 희귀원목
+      else if(kind<.34)tree(tx,th,tz,r,19,7,4,6);     // 고무나무
+      else if(kind<.52)tree(tx,th,tz,r,6,22,5,8);     // 과일나무
+      else if(kind<.66)bush(tx,th,tz,17);
+      else if(kind<.78)bush(tx,th,tz,18);
+      else if(kind<.9)bush(tx,th,tz,16);
+      else tree(tx,th,tz,r,6,7,5,8);
+    }else if(biome==="taiga"){
+      if(r()<.22)bush(tx,th,tz,21); else conifer(tx,th,tz,r);
+    }else if(biome==="temperate"){
+      if(r()<.22)setB(tx,th+1,tz,24); else tree(tx,th,tz,r,6,7,4,6);
+    }else if(biome==="alpine"){ if(r()<.5)conifer(tx,th,tz,r) }
+  }
+  if(biome==="temperate")for(var q=0;q<160;q++){
+    var qx=2+Math.floor(r()*(W-4)),qz=2+Math.floor(r()*(W-4));
+    if(hmap[qz*W+qx]>SEA&&getB(qx,hmap[qz*W+qx],qz)===1)setB(qx,hmap[qz*W+qx]+1,qz,24);
+  }
+  if(biome==="tundra"){
+    /* 낚시 구멍이 너무 적게 생긴 시드에서도 굶어 죽지 않도록 최소 개수를 보장한다 */
+    var holes=0;
+    for(var hx=0;hx<W;hx++)for(var hz=0;hz<W;hz++)if(getB(hx,SEA,hz)===23)holes++;
+    var need=28-holes,guard=0;
+    while(need>0&&guard++<4000){
+      var fx=2+Math.floor(r()*(W-4)),fz=2+Math.floor(r()*(W-4)),fh=hmap[fz*W+fx];
+      if(fh<SEA&&getB(fx,SEA,fz)===9){setB(fx,SEA,fz,23);need--}   // 얼음 표면을 낚시 구멍으로
+    }
+    /* [V4 수정 5-2] 초반 아사 방지: 스폰(월드 중앙) 반경 5칸 안에 낚시 구멍 1~2개를 강제 보장.
+       이미 반경 안에 구멍이 있으면 그대로 두고, 없으면 얼음/물 표면을 구멍으로 바꾼다.
+       얼음/물이 아니면 해당 칸을 낚시 구멍이 놓일 수 있게 얼음으로 만든 뒤 구멍을 뚫는다. */
+    (function ensureSpawnHoles(){
+      var cx=Math.floor(W/2),cz=Math.floor(W/2),R=5;
+      var near=0,cells=[];
+      for(var ox=-R;ox<=R;ox++)for(var oz=-R;oz<=R;oz++){
+        if(ox*ox+oz*oz>R*R)continue;
+        var x=cx+ox,z=cz+oz;if(x<2||z<2||x>=W-2||z>=W-2)continue;
+        var b=getB(x,SEA,z);
+        if(b===23){near++;}
+        else if(b===9||b===5){cells.push([x,z]);}   // 얼음/물 표면 후보
+      }
+      if(near>=1)return;                              // 이미 있으면 통과
+      var want=1+Math.floor(r()*2);                   // 1~2개
+      /* 중앙에 가까운 후보부터 사용 */
+      cells.sort(function(a,b){
+        var da=(a[0]-cx)*(a[0]-cx)+(a[1]-cz)*(a[1]-cz);
+        var db=(b[0]-cx)*(b[0]-cx)+(b[1]-cz)*(b[1]-cz);return da-db;});
+      var made=0;
+      for(var i=0;i<cells.length&&made<want;i++){setB(cells[i][0],SEA,cells[i][1],23);made++;}
+      /* 후보(얼음/물)조차 없다면: 중앙 근처 지면을 살짝 파서라도 물+구멍을 만든다 */
+      if(made===0){
+        for(var rr=1;rr<=R&&made<want;rr++)for(var a2=-rr;a2<=rr&&made<want;a2++){
+          var x2=cx+a2,z2=cz+rr, h2b=hmap[z2*W+x2];
+          if(x2<2||z2<2||x2>=W-2||z2>=W-2)continue;
+          if(h2b<=SEA){setB(x2,SEA,z2,23);made++;}
+        }
+      }
+    })();
+  }
+  if(biome==="desert")for(var q2=0;q2<30;q2++){
+    var dx=2+Math.floor(r()*(W-4)),dz=2+Math.floor(r()*(W-4)),dh=hmap[dz*W+dx];
+    if(dh>SEA)for(var dy=1;dy<=2+Math.floor(r()*2);dy++)setB(dx,dh+dy,dz,7);
+  }
+  if(onProg)onProg(.8);
+  return hmap;
+}
+function clamp01(v){return v<0?0:v>1?1:v}
+function tree(x,h,z,r,trunk,leaf,minH,maxH){
+  var th=minH+Math.floor(r()*(maxH-minH+1));
+  for(var i=1;i<=th;i++)setB(x,h+i,z,trunk);
+  var top=h+th, rad=2;
+  for(var dx=-rad;dx<=rad;dx++)for(var dz=-rad;dz<=rad;dz++)for(var dy=-1;dy<=1;dy++){
+    if(Math.abs(dx)+Math.abs(dz)+Math.abs(dy)>rad+1)continue;
+    if(getB(x+dx,top+dy,z+dz)===0)setB(x+dx,top+dy,z+dz,leaf);
+  }
+}
+function conifer(x,h,z,r){
+  var th=4+Math.floor(r()*3);
+  for(var i=1;i<=th;i++)setB(x,h+i,z,6);
+  for(var lv=0;lv<3;lv++){
+    var rad=2-lv, y=h+th-1-lv*1;
+    for(var dx=-rad;dx<=rad;dx++)for(var dz=-rad;dz<=rad;dz++){
+      if(Math.abs(dx)+Math.abs(dz)>rad)continue;
+      if(getB(x+dx,y+lv,z+dz)===0)setB(x+dx,y+lv,z+dz,7);
+    }
+  }
+  setB(x,h+th+1,z,7);
+}
+function bush(x,h,z,b){if(getB(x,h+1,z)===0)setB(x,h+1,z,b)}
+
+/* ==========================================================================
+   Part 3. 복셀 렌더러 — 외부 라이브러리 없는 순수 WebGL
+   ========================================================================== */
+var gl=null,prog=null,U={},A={},chunks={},hiBuf=null,VP=new Float32Array(16),PJ=new Float32Array(16),VW=new Float32Array(16);
+var skyRGB=[.5,.7,.9], tintV=[1,1,1];
+var VS="attribute vec3 aPos;attribute vec3 aCol;uniform mat4 uMVP;uniform vec3 uCam;uniform vec3 uTint;"+
+ "uniform float uNear,uFar;varying vec3 vCol;varying float vFog;"+
+ "void main(){gl_Position=uMVP*vec4(aPos,1.0);float d=distance(aPos,uCam);"+
+ "vFog=clamp((d-uNear)/(uFar-uNear),0.0,1.0);vCol=aCol*uTint;}";
+var FS="precision mediump float;uniform vec3 uFog;uniform float uAlpha;varying vec3 vCol;varying float vFog;"+
+ "void main(){gl_FragColor=vec4(mix(vCol,uFog,vFog),uAlpha);}";
+/* --- 4x4 행렬 (열 우선) --- */
+function m4persp(fov,asp,n,f,o){
+  var t=1/Math.tan(fov/2);
+  for(var i=0;i<16;i++)o[i]=0;
+  o[0]=t/asp;o[5]=t;o[10]=(f+n)/(n-f);o[11]=-1;o[14]=2*f*n/(n-f);return o;
+}
+function m4mul(a,b,o){
+  for(var c=0;c<4;c++)for(var r=0;r<4;r++){
+    var v=0;for(var k=0;k<4;k++)v+=a[r+k*4]*b[k+c*4];
+    o[r+c*4]=v;
+  }
+  return o;
+}
+function m4view(px,py,pz,yaw,pitch,o){
+  var cp=Math.cos(pitch),sp=Math.sin(pitch),cy=Math.cos(yaw),sy=Math.sin(yaw);
+  var fx=-sy*cp, fy=sp, fz=-cy*cp;                 // 앞
+  var rx=cy, ry=0, rz=-sy;                          // 오른쪽
+  var ux=ry*fz-rz*fy, uy=rz*fx-rx*fz, uz=rx*fy-ry*fx; // 위
+  o[0]=rx;o[4]=ry;o[8]=rz; o[1]=ux;o[5]=uy;o[9]=uz; o[2]=-fx;o[6]=-fy;o[10]=-fz;
+  o[3]=0;o[7]=0;o[11]=0;
+  o[12]=-(rx*px+ry*py+rz*pz);
+  o[13]=-(ux*px+uy*py+uz*pz);
+  o[14]=fx*px+fy*py+fz*pz;
+  o[15]=1;return o;
+}
+function shader(type,src){
+  var sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(sh));
+  return sh;
+}
+function initGL(){
+  var cv=$("c");
+  gl=cv.getContext("webgl",{antialias:false,alpha:false})||cv.getContext("experimental-webgl");
+  if(!gl)throw new Error("WebGL 없음");
+  prog=gl.createProgram();
+  gl.attachShader(prog,shader(gl.VERTEX_SHADER,VS));
+  gl.attachShader(prog,shader(gl.FRAGMENT_SHADER,FS));
+  gl.bindAttribLocation(prog,0,"aPos");gl.bindAttribLocation(prog,1,"aCol");
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  A.pos=0;A.col=1;
+  ["uMVP","uCam","uTint","uNear","uFar","uFog","uAlpha"].forEach(function(n){U[n]=gl.getUniformLocation(prog,n)});
+  gl.enableVertexAttribArray(0);gl.enableVertexAttribArray(1);
+  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
+  gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.frontFace(gl.CCW);
+  gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  hiBuf=gl.createBuffer();
+  resizeGL();
+  window.addEventListener("resize",resizeGL);
+}
+function resizeGL(){
+  if(!gl)return;
+  var cv=$("c"),dpr=Math.min(window.devicePixelRatio||1,isTouch?1:2);
+  cv.width=Math.floor(window.innerWidth*dpr);cv.height=Math.floor(window.innerHeight*dpr);
+  cv.style.width=window.innerWidth+"px";cv.style.height=window.innerHeight+"px";
+  gl.viewport(0,0,cv.width,cv.height);
+}
+/* --- 면 정의 --- */
+var FACES=[
+ {d:[1,0,0], v:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]], s:.84},
+ {d:[-1,0,0],v:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]], s:.84},
+ {d:[0,1,0], v:[[0,1,1],[1,1,1],[1,1,0],[0,1,0]], s:1},
+ {d:[0,-1,0],v:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]], s:.5},
+ {d:[0,0,1], v:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]], s:.72},
+ {d:[0,0,-1],v:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]], s:.72}
+];
+function hash3(x,y,z){var h=(x*73856093)^(y*19349663)^(z*83492791);h=(h^(h>>>13))>>>0;return (h%1000)/1000}
+function faceVisible(b,nb){
+  if(nb===0)return true;
+  var B=BL[nb];if(!B)return true;
+  if(B.plant)return true;
+  if(!B.solid&&b!==nb)return true;
+  if(B.alpha&&b!==nb)return true;
+  return false;
+}
+function freeChunk(rec){
+  if(!rec)return;
+  ["op","pl","wa","gl"].forEach(function(k){
+    if(rec[k]){gl.deleteBuffer(rec[k].p);gl.deleteBuffer(rec[k].c)}
+  });
+}
+function buildChunk(cx,cz){
+  var key=cx+","+cz;
+  freeChunk(chunks[key]);
+  var P={op:{p:[],c:[]},pl:{p:[],c:[]},wa:{p:[],c:[]},gl:{p:[],c:[]}};
+  var x0=cx*CH,z0=cz*CH;
+  for(var x=x0;x<x0+CH;x++)for(var z=z0;z<z0+CH;z++)for(var y=0;y<H;y++){
+    var b=getB(x,y,z);if(!b)continue;
+    var B=BL[b];if(!B)continue;
+    var hx=B.c>>16&255,hy=B.c>>8&255,hz=B.c&255;
+    var vary=.92+hash3(x,y,z)*.16;
+    var bucket=B.plant?P.pl:(b===5?P.wa:(B.alpha?P.gl:P.op));
+    if(B.plant){
+      var r0=Math.min(255,hx*vary)|0,g0=Math.min(255,hy*vary)|0,b0=Math.min(255,hz*vary)|0;
+      [[.15,.15,.85,.85],[.85,.15,.15,.85]].forEach(function(q){
+        var p=[[x+q[0],y,z+q[1]],[x+q[2],y,z+q[3]],[x+q[2],y+.92,z+q[3]],
+               [x+q[0],y,z+q[1]],[x+q[2],y+.92,z+q[3]],[x+q[0],y+.92,z+q[1]]];
+        for(var i=0;i<6;i++){bucket.p.push(p[i][0],p[i][1],p[i][2]);bucket.c.push(r0,g0,b0)}
+      });
+      continue;
+    }
+    for(var f=0;f<6;f++){
+      var F=FACES[f],nb=getB(x+F.d[0],y+F.d[1],z+F.d[2]);
+      if(!faceVisible(b,nb))continue;
+      var sh=F.s*vary;
+      var rr=Math.min(255,hx*sh)|0,gg=Math.min(255,hy*sh)|0,bb=Math.min(255,hz*sh)|0;
+      var v=F.v,ord=[0,1,2,0,2,3];
+      for(var i2=0;i2<6;i2++){var q2=v[ord[i2]];
+        bucket.p.push(x+q2[0],y+q2[1],z+q2[2]);bucket.c.push(rr,gg,bb)}
+    }
+  }
+  var rec={cx:x0+CH/2,cz:z0+CH/2,cy:H/2,r:Math.sqrt(CH*CH/2+H*H/4)+1};
+  var ylo=H,yhi=0;
+  ["op","pl","wa","gl"].forEach(function(k){
+    var d=P[k];if(!d.p.length)return;
+    for(var q=1;q<d.p.length;q+=3){if(d.p[q]<ylo)ylo=d.p[q];if(d.p[q]>yhi)yhi=d.p[q]}
+    var pb=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(d.p),gl.STATIC_DRAW);
+    var cb=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.bufferData(gl.ARRAY_BUFFER,new Uint8Array(d.c),gl.STATIC_DRAW);
+    rec[k]={p:pb,c:cb,n:d.p.length/3};
+  });
+  if(yhi>=ylo){rec.cy=(ylo+yhi)/2;rec.r=Math.sqrt(CH*CH/2+Math.pow((yhi-ylo)/2,2))+1}
+  chunks[key]=rec;
+}
+function markDirty(x,z){
+  var cx=Math.floor(x/CH),cz=Math.floor(z/CH),n=W/CH;
+  buildChunk(cx,cz);
+  if(x%CH===0&&cx>0)buildChunk(cx-1,cz);
+  if(x%CH===CH-1&&cx<n-1)buildChunk(cx+1,cz);
+  if(z%CH===0&&cz>0)buildChunk(cx,cz-1);
+  if(z%CH===CH-1&&cz<n-1)buildChunk(cx,cz+1);
+}
+function buildAll(onProg,done){
+  var list=[],n=W/CH;
+  for(var cx=0;cx<n;cx++)for(var cz=0;cz<n;cz++)list.push([cx,cz]);
+  var i=0;
+  (function next(){
+    var t0=Date.now();
+    while(i<list.length&&Date.now()-t0<26){buildChunk(list[i][0],list[i][1]);i++}
+    if(onProg)onProg(.8+.2*(i/list.length));
+    if(i<list.length)setTimeout(next,0);else done&&done();
+  })();
+}
+/* --- 낮밤 하늘 --- */
+var lightF=1;
+function skyUpdate(){
+  var B=BIOMES[S.biome],h=clockOf(S).h;
+  lightF=clamp(Math.sin((h-6)/24*Math.PI*2)*1.5+.45,.24,1);
+  var d=[(B.sky[0]>>16&255)/255,(B.sky[0]>>8&255)/255,(B.sky[0]&255)/255];
+  var n=[(B.sky[1]>>16&255)/255,(B.sky[1]>>8&255)/255,(B.sky[1]&255)/255];
+  for(var i=0;i<3;i++)skyRGB[i]=n[i]+(d[i]-n[i])*lightF;
+  var t=.3+.7*lightF;
+  tintV[0]=t;tintV[1]=t;tintV[2]=t*(1+.05*(1-lightF));
+}
+/* --- 시야 밖 청크 건너뛰기 --- */
+var PL=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+function extractPlanes(m){
+  for(var i=0;i<6;i++){
+    var sgn=i%2?-1:1,r=(i/2)|0;
+    PL[i][0]=m[3]+sgn*m[r];PL[i][1]=m[7]+sgn*m[4+r];PL[i][2]=m[11]+sgn*m[8+r];PL[i][3]=m[15]+sgn*m[12+r];
+    var L=Math.hypot(PL[i][0],PL[i][1],PL[i][2])||1;
+    PL[i][0]/=L;PL[i][1]/=L;PL[i][2]/=L;PL[i][3]/=L;
+  }
+}
+function sphereIn(x,y,z,r){
+  for(var i=0;i<6;i++)if(PL[i][0]*x+PL[i][1]*y+PL[i][2]*z+PL[i][3]<-r)return false;
+  return true;
+}
+/* --- 한 프레임 그리기 --- */
+function drawScene(){
+  var cv=$("c");
+  m4persp(74*Math.PI/180,cv.width/cv.height,.1,300,PJ);
+  m4view(S.pos.x,S.pos.y+EYE,S.pos.z,look.yaw,look.pitch,VW);
+  m4mul(PJ,VW,VP);
+  gl.clearColor(skyRGB[0],skyRGB[1],skyRGB[2],1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.uMVP,false,VP);
+  gl.uniform3f(U.uCam,S.pos.x,S.pos.y+EYE,S.pos.z);
+  gl.uniform3f(U.uTint,tintV[0],tintV[1],tintV[2]);
+  gl.uniform3f(U.uFog,skyRGB[0],skyRGB[1],skyRGB[2]);
+  gl.uniform1f(U.uNear,42);gl.uniform1f(U.uFar,132);
+  extractPlanes(VP);
+  function drawGroup(k,alpha,cull,depthWrite){
+    gl.uniform1f(U.uAlpha,alpha);
+    cull?gl.enable(gl.CULL_FACE):gl.disable(gl.CULL_FACE);
+    gl.depthMask(depthWrite);
+    for(var key in chunks){
+      var C=chunks[key],r=C[k];if(!r)continue;
+      if(!sphereIn(C.cx,C.cy,C.cz,C.r))continue;
+      gl.bindBuffer(gl.ARRAY_BUFFER,r.p);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+      gl.bindBuffer(gl.ARRAY_BUFFER,r.c);gl.vertexAttribPointer(1,3,gl.UNSIGNED_BYTE,true,0,0);
+      gl.drawArrays(gl.TRIANGLES,0,r.n);
+    }
+  }
+  gl.disable(gl.BLEND);
+  drawGroup("op",1,true,true);
+  drawGroup("pl",1,false,true);
+  gl.enable(gl.BLEND);
+  drawGroup("gl",.55,true,true);
+  drawGroup("wa",.72,true,false);
+  gl.depthMask(true);
+  drawPeers();                       // [V4] 다른 플레이어 아바타(큐브 조합)
+  if(target)drawHighlight(target.x,target.y,target.z);
+  gl.disable(gl.BLEND);
+  updatePeerLabels();                // [V4] 아바타 위 이름표(HTML 오버레이) 위치 갱신
+}
+var HI_E=[[0,0,0,1,0,0],[1,0,0,1,0,1],[1,0,1,0,0,1],[0,0,1,0,0,0],
+          [0,1,0,1,1,0],[1,1,0,1,1,1],[1,1,1,0,1,1],[0,1,1,0,1,0],
+          [0,0,0,0,1,0],[1,0,0,1,1,0],[1,0,1,1,1,1],[0,0,1,0,1,1]];
+var hiArr=new Float32Array(72),hiCol=new Uint8Array(72);
+function drawHighlight(x,y,z){
+  /* 캐는 중이면 진행도에 따라 붉게 깜빡이며 테두리를 키워 타격감을 준다 */
+  var isMining=mining&&mining.key===(x+","+y+","+z);
+  var prog=isMining?clamp(mining.t/mining.need,0,1):0;
+  var pulse=isMining?(.55+.45*Math.abs(Math.sin(performance.now()*.018))):0;
+  var pad=isMining?(.006+.02*pulse):.003;       // 살짝 커졌다 작아졌다
+  var span=1+pad*2;
+  var k=0;
+  for(var i=0;i<12;i++){var e=HI_E[i];
+    hiArr[k++]=x-pad+e[0]*span;hiArr[k++]=y-pad+e[1]*span;hiArr[k++]=z-pad+e[2]*span;
+    hiArr[k++]=x-pad+e[3]*span;hiArr[k++]=y-pad+e[4]*span;hiArr[k++]=z-pad+e[5]*span;
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER,hiBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,hiArr,gl.DYNAMIC_DRAW);
+  gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+  gl.disableVertexAttribArray(1);
+  if(isMining){
+    /* 진행될수록·박자에 맞춰 더 붉고 진하게 */
+    var r=.6+.4*pulse, g=.12*(1-prog)*pulse, b=.12*(1-prog)*pulse;
+    gl.vertexAttrib3f(1,r,g,b);
+  }else{
+    gl.vertexAttrib3f(1,.05,.05,.06);
+  }
+  gl.uniform1f(U.uAlpha,1);
+  gl.drawArrays(gl.LINES,0,24);
+  gl.enableVertexAttribArray(1);
+}
+
+/* ==========================================================================
+   [V4] 다른 플레이어 아바타 렌더링 (마인크래프트식 박스 조합)
+   ------------------------------------------------------------------------
+   각 피어(peers[id])의 보간된 좌표(x,y,z)·시점(yaw)을 받아, 머리·몸통·두 다리
+   4개의 박스를 CPU에서 월드 좌표로 펼쳐 하나의 동적 버퍼로 그린다.
+   셰이더가 model 행렬을 받지 않으므로(uMVP 하나뿐), yaw 회전도 CPU에서 적용한다.
+   플레이어 수가 적어(한 반 규모) 프레임마다 새로 쌓아도 부담이 없다.
+   ========================================================================== */
+var peerBuf=null, peerPos=null, peerCol=null;
+/* 각 파츠: [중심오프셋x,y,z(피벗 기준), 반너비x, 반높이y, 반깊이z, 색] — 발끝(y=0) 기준 */
+function avatarParts(){
+  return [
+    /* 다리 왼 */ {ox:-0.14,oy:0.42,oz:0, hx:0.12,hy:0.42,hz:0.14, c:[60,70,120]},
+    /* 다리 오 */ {ox: 0.14,oy:0.42,oz:0, hx:0.12,hy:0.42,hz:0.14, c:[60,70,120]},
+    /* 몸통    */ {ox:0,oy:1.18,oz:0,     hx:0.26,hy:0.34,hz:0.16, c:[90,150,110]},
+    /* 머리    */ {ox:0,oy:1.72,oz:0,     hx:0.22,hy:0.22,hz:0.22, c:[224,196,150]}
+  ];
+}
+/* 축정렬 박스의 24삼각형(6면) 정점을 yaw 회전 후 월드 좌표로 push */
+function pushBox(P,C,cx,cy,cz,hx,hy,hz,col,yaw,shadeBase){
+  var s=Math.sin(yaw),co=Math.cos(yaw);
+  /* 8꼭짓점(로컬) → 회전(수평면 x,z) → 월드 이동 */
+  function V(lx,ly,lz){
+    var wx=lx*co - lz*s, wz=lx*s + lz*co;   // yaw 회전
+    return [cx+wx, cy+ly, cz+wz];
+  }
+  var c0=V(-hx,-hy,-hz),c1=V(hx,-hy,-hz),c2=V(hx,hy,-hz),c3=V(-hx,hy,-hz);
+  var c4=V(-hx,-hy,hz),c5=V(hx,-hy,hz),c6=V(hx,hy,hz),c7=V(-hx,hy,hz);
+  var faces=[
+    [c5,c4,c7,c6, .72],  // +z 앞
+    [c0,c1,c2,c3, .72],  // -z 뒤
+    [c1,c5,c6,c2, .84],  // +x
+    [c4,c0,c3,c7, .84],  // -x
+    [c3,c2,c6,c7, 1.0],  // +y 위
+    [c4,c5,c1,c0, .5 ]   // -y 아래
+  ];
+  for(var f=0;f<faces.length;f++){
+    var q=faces[f],sh=q[4]*shadeBase;
+    var r=Math.min(255,col[0]*sh)|0,g=Math.min(255,col[1]*sh)|0,b=Math.min(255,col[2]*sh)|0;
+    var ord=[0,1,2,0,2,3];
+    for(var i=0;i<6;i++){var v=q[ord[i]];P.push(v[0],v[1],v[2]);C.push(r,g,b)}
+  }
+}
+function drawPeers(){
+  var ids=Object.keys(peers);
+  if(!ids.length)return;
+  var P=[],C=[];
+  var parts=avatarParts();
+  for(var n=0;n<ids.length;n++){
+    var q=peers[ids[n]];
+    /* 이름 색을 몸통에 살짝 반영해 서로 구분되게(이름 해시) */
+    var shade=.3+.7*lightF;
+    var px=q.x,py=q.y,pz=q.z,yaw=q.yaw||0;
+    for(var pi=0;pi<parts.length;pi++){var pt=parts[pi];
+      /* 파츠 오프셋도 yaw로 회전시켜 몸이 함께 돌게 */
+      var s=Math.sin(yaw),co=Math.cos(yaw);
+      var wox=pt.ox*co - pt.oz*s, woz=pt.ox*s + pt.oz*co;
+      pushBox(P,C,px+wox,py+pt.oy,pz+woz,pt.hx,pt.hy,pt.hz,pt.c,yaw,shade);
+    }
+  }
+  if(!P.length)return;
+  if(!peerBuf)peerBuf=gl.createBuffer();
+  var fa=new Float32Array(P), ca=new Uint8Array(C);
+  gl.disable(gl.BLEND);
+  gl.enable(gl.CULL_FACE);
+  gl.depthMask(true);
+  gl.uniform1f(U.uAlpha,1);
+  /* 위치 */
+  gl.bindBuffer(gl.ARRAY_BUFFER,peerBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,fa,gl.DYNAMIC_DRAW);
+  gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+  /* 색: 임시 버퍼 */
+  if(!peerColBuf)peerColBuf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,peerColBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,ca,gl.DYNAMIC_DRAW);
+  gl.vertexAttribPointer(1,3,gl.UNSIGNED_BYTE,true,0,0);
+  gl.drawArrays(gl.TRIANGLES,0,fa.length/3);
+}
+var peerColBuf=null;
+
+/* ── 아바타 위 이름표(HTML 오버레이) ──
+   각 피어 머리 위 월드좌표를 화면 좌표로 투영(VP 행렬)해 <div>를 배치한다. */
+var peerLabelWrap=null;
+function updatePeerLabels(){
+  if(!peerLabelWrap){
+    peerLabelWrap=document.getElementById("peerLabels");
+    if(!peerLabelWrap)return;
+  }
+  var ids=Object.keys(peers), used={};
+  var cv=$("c"), Wp=cv.clientWidth, Hp=cv.clientHeight;
+  for(var n=0;n<ids.length;n++){
+    var id=ids[n],q=peers[id];
+    var el=document.getElementById("plbl_"+id);
+    if(!el){
+      el=document.createElement("div");el.id="plbl_"+id;el.className="peerLabel";
+      peerLabelWrap.appendChild(el);
+    }
+    el.textContent=q.name||"친구";
+    used[id]=1;
+    /* 머리 꼭대기(y+2.05) 월드좌표를 클립좌표로 변환 */
+    var wx=q.x, wy=q.y+2.15, wz=q.z;
+    var cx=VP[0]*wx+VP[4]*wy+VP[8]*wz+VP[12];
+    var cyv=VP[1]*wx+VP[5]*wy+VP[9]*wz+VP[13];
+    var cw=VP[3]*wx+VP[7]*wy+VP[11]*wz+VP[15];
+    if(cw<=0.01){el.style.display="none";continue;}   // 카메라 뒤
+    var sx=(cx/cw*.5+.5)*Wp, sy=(-cyv/cw*.5+.5)*Hp;
+    /* 너무 멀면 숨김 */
+    var dx=q.x-S.pos.x,dz=q.z-S.pos.z,dist=Math.hypot(dx,dz);
+    if(dist>80){el.style.display="none";continue;}
+    el.style.display="block";
+    el.style.left=sx+"px";el.style.top=sy+"px";
+    el.style.opacity=dist>50?"0.4":"1";
+  }
+  /* 사라진 피어의 라벨 제거 */
+  var labels=peerLabelWrap.children;
+  for(var i=labels.length-1;i>=0;i--){
+    var lid=labels[i].id.slice(5);
+    if(!used[lid])peerLabelWrap.removeChild(labels[i]);
+  }
+}
+
+/* ==========================================================================
+   Part 4. 플레이어 · 조작 · 물리 · 채집/설치
+   ========================================================================== */
+var keys={},PW=.62,PH=1.78,EYE=1.62,GRAV=26,JUMP=8.3;
+var mining=null, target=null, isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+var look={yaw:0,pitch:0}, moveVec={f:0,s:0}, wantJump=false, sprint=false;
+var DAYSEC=600, SUNRISE=6;
+
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function ri(a,b){return a+Math.floor(Math.random()*(b-a+1))}
+function uuid(){return (Date.now().toString(36)+Math.random().toString(36).slice(2,8))}
+function qty(s,k){return s.inv[k]||0}
+function add(s,k,n){if(n>0)s.inv[k]=(s.inv[k]||0)+n}
+function take(s,k,n){var h=qty(s,k);if(h<n)return false;s.inv[k]=h-n;if(s.inv[k]<=0)delete s.inv[k];return true}
+function canPay(s,nd){for(var k in nd)if(qty(s,k)<nd[k])return false;return true}
+function payFor(s,nd){if(!canPay(s,nd))return false;for(var k in nd)take(s,k,nd[k]);return true}
+function logAdd(s,t){s.log.unshift({t:Date.now(),x:t});if(s.log.length>90)s.log.pop()}
+function clockOf(s){var f=(s.sec%DAYSEC)/DAYSEC,h=f*24;
+  return{h:h,hh:String(Math.floor(h)).padStart(2,"0"),mm:String(Math.floor(h%1*60)).padStart(2,"0")}}
+function ambient(s){var B=BIOMES[s.biome],h=clockOf(s).h;
+  var w=.5-.5*Math.cos((h-4)/24*Math.PI*2);return B.night+(B.day-B.night)*w}
+
+/* --- 충돌 --- */
+function blocked(x,y,z){
+  var x0=Math.floor(x-PW/2),x1=Math.floor(x+PW/2);
+  var z0=Math.floor(z-PW/2),z1=Math.floor(z+PW/2);
+  var y0=Math.floor(y),y1=Math.floor(y+PH-.001);
+  for(var xi=x0;xi<=x1;xi++)for(var zi=z0;zi<=z1;zi++)for(var yi=y0;yi<=y1;yi++)
+    if(solidAt(xi,yi,zi))return true;
+  return false;
+}
+function inWater(p){var b=getB(Math.floor(p.x),Math.floor(p.y+.4),Math.floor(p.z));return b===5}
+function movePlayer(dt){
+  var p=S.pos,v=S.vel;
+  /* 혹시 블록 안에 끼었다면 위로 밀어 올려 스스로 빠져나오게 함 */
+  for(var g=0;g<10&&blocked(p.x,p.y,p.z);g++){p.y+=1;v.y=0}
+  var speed=(sprint&&S.stam>5?6.4:4.3)*(inWater(p)?.55:1);
+  var sy=Math.sin(look.yaw),cy=Math.cos(look.yaw);
+  var f=moveVec.f,st=moveVec.s,len=Math.hypot(f,st);
+  if(len>1){f/=len;st/=len}
+  /* 앞 = (-sinθ,0,-cosθ), 오른쪽 = (cosθ,0,-sinθ) */
+  var wx=(-sy*f+cy*st)*speed, wz=(-cy*f-sy*st)*speed;
+  v.y-=GRAV*dt*(inWater(p)?.35:1);
+  if(inWater(p))v.y=Math.max(v.y,-2.4);
+  if(wantJump){
+    if(S.onGround){v.y=JUMP;S.onGround=false}
+    else if(inWater(p))v.y=Math.min(v.y+18*dt,4.2);
+    wantJump=false;
+  }
+  var nx=p.x+wx*dt;if(!blocked(nx,p.y,p.z))p.x=nx;
+  var nz=p.z+wz*dt;if(!blocked(p.x,p.y,nz))p.z=nz;
+  var ny=p.y+v.y*dt;
+  if(!blocked(p.x,ny,p.z)){p.y=ny;S.onGround=false}
+  else{
+    if(v.y<0){p.y=Math.floor(ny)+1.0001;S.onGround=true}   // 딛고 선 블록 윗면으로 정확히 올림
+    else p.y=Math.floor(ny+PH)-PH-.0001;                    // 천장에 머리를 부딪힘
+    v.y=0;
+  }
+  if(sprint&&len>.2&&S.onGround)S.stam=clamp(S.stam-2.4*dt,0,100);
+  if(p.y<-6){p.x=W/2;p.z=W/2;p.y=findGround(W/2,W/2);v.y=0}
+  p.x=clamp(p.x,1.2,W-1.2);p.z=clamp(p.z,1.2,W-1.2);
+}
+/* 시작 지점을 평평하게 정리 (나무 속에서 시작하는 일 방지) */
+function clearSpawn(cx,cz){
+  var ground=0;
+  for(var y=H-2;y>1;y--)if(solidAt(cx,y,cz)&&BL[getB(cx,y,cz)].solid&&getB(cx,y,cz)!==7&&getB(cx,y,cz)!==22){ground=y;break}
+  if(ground<SEA)ground=SEA+1;
+  for(var dx=-2;dx<=2;dx++)for(var dz=-2;dz<=2;dz++){
+    var x=cx+dx,z=cz+dz;
+    for(var y2=ground+1;y2<=ground+5;y2++){setB(x,y2,z,0);S.edits[x+","+y2+","+z]=0}
+    if(!solidAt(x,ground,z)){var fill=BIOMES[S.biome].grass||1;setB(x,ground,z,fill);S.edits[x+","+ground+","+z]=fill}
+  }
+  for(var cx2=0;cx2<W/CH;cx2++)for(var cz2=0;cz2<W/CH;cz2++){
+    var inx=cx>=cx2*CH-2&&cx<=cx2*CH+CH+2, inz=cz>=cz2*CH-2&&cz<=cz2*CH+CH+2;
+    if(inx&&inz)buildChunk(cx2,cz2);
+  }
+}
+function findGround(x,z){for(var y=H-2;y>1;y--)if(solidAt(Math.floor(x),y,Math.floor(z)))return y+1.05;return SEA+2}
+
+/* --- 시선 레이캐스트 (DDA) --- */
+function raycast(maxD){
+  var cp=Math.cos(look.pitch);
+  var o={x:S.pos.x,y:S.pos.y+EYE,z:S.pos.z};
+  var d={x:-Math.sin(look.yaw)*cp,y:Math.sin(look.pitch),z:-Math.cos(look.yaw)*cp};
+  var x=Math.floor(o.x),y=Math.floor(o.y),z=Math.floor(o.z);
+  var sx=d.x>0?1:-1,sy=d.y>0?1:-1,sz=d.z>0?1:-1;
+  var tdx=Math.abs(1/d.x),tdy=Math.abs(1/d.y),tdz=Math.abs(1/d.z);
+  var tmx=((d.x>0?x+1-o.x:o.x-x))*tdx,tmy=((d.y>0?y+1-o.y:o.y-y))*tdy,tmz=((d.z>0?z+1-o.z:o.z-z))*tdz;
+  var t=0,face=[0,0,0];
+  while(t<maxD){
+    var b=getB(x,y,z);
+    if(b&&BL[b]&&(BL[b].solid||BL[b].plant||b===5)&&!(b===5&&t<0.7))
+      return {x:x,y:y,z:z,b:b,face:face,dist:t};
+    if(tmx<tmy&&tmx<tmz){x+=sx;t=tmx;tmx+=tdx;face=[-sx,0,0]}
+    else if(tmy<tmz){y+=sy;t=tmy;tmy+=tdy;face=[0,-sy,0]}
+    else{z+=sz;t=tmz;tmz+=tdz;face=[0,0,-sz]}
+    if(!inW(x,y,z)&&y>H)return null;
+    if(y<-2)return null;
+  }
+  return null;
+}
+/* --- 캐기 --- */
+/* [V6 수정 2] Target Lock: 채집 중 마우스가 미세하게 흔들려 조준이 잠깐 빗나가도
+   진행도를 즉시 버리지 않고 MINE_TOLER(0.3초) 동안 기존 대상을 붙잡아 둔다.
+   유예 시간 안에 다시 같은 블록을 조준하면 이어서 캐지고, 넘기면 그때 초기화한다. */
+var MINE_TOLER=0.3;
+function tryMine(dt){
+  if(S.isVisiting){mining=null;return}          // 관전 중에는 채집 불가
+  var mod=BIOMES[S.biome].mods.cost;
+
+  /* 현재 조준하고 있는 유효한(캘 수 있는) 블록의 키를 구한다 */
+  var aimKey=null,aimB=null;
+  if(target){var tb=BL[target.b];if(tb&&tb.drop!==null){aimKey=target.x+","+target.y+","+target.z;aimB=tb}}
+
+  if(!mining){
+    /* 진행 중인 채집이 없으면 새로 시작(유효 대상이 있을 때만) */
+    if(!aimKey){return}
+    if(S.stam<3){toast("스태미나가 없습니다. 잠시 쉬세요","bad");return}
+    mining={key:aimKey,t:0,need:aimB.hard*(1+(mod-1)*.5),grace:0};
+  }else if(aimKey===mining.key){
+    /* 여전히 같은 블록을 조준 → 정상 진행, 유예 타이머 리셋 */
+    mining.grace=0;
+  }else{
+    /* 조준이 잠깐 빗나감(다른 블록이거나 허공) → 진행도를 버리지 말고 유예 시간을 센다 */
+    mining.grace=(mining.grace||0)+dt;
+    if(mining.grace>MINE_TOLER){mining=null;return}   // 유예 초과 시에만 포기
+    return;                                            // 유예 중엔 진행·스태미나 소모 정지(대기)
+  }
+
+  if(S.stam<3){toast("스태미나가 없습니다. 잠시 쉬세요","bad");mining=null;return}
+  mining.t+=dt;
+  S.stam=clamp(S.stam-aimB.hard*3.2*mod*dt,0,100);
+  if(mining.t>=mining.need){
+    breakBlock(target.x,target.y,target.z);
+    mining=null;
+  }
+}
+function breakBlock(x,y,z){
+  var b=getB(x,y,z),B=BL[b];if(!B||B.drop===null)return;
+  yieldBlock(x,y,z,b,B);                        // 대상 블록 파괴 + 드롭
+  S.hunger=clamp(S.hunger-.25,0,100);
+  if(B.special==="trade")S.hasPost=false;
+  /* 나무 기둥을 캐면 위/주변의 뜬 기둥·잎이 연쇄 파괴된다(마인크래프트식) */
+  if(b===6)chainBreakTree(x,y,z);
+  refreshHotbar();
+  cloudDirty();                                 // 클라우드 세이브 반영
+}
+/* 한 블록을 실제로 부수고 드롭을 인벤토리에 넣는다 */
+function yieldBlock(x,y,z,b,B){
+  B=B||BL[b];
+  var item=B.drop,n=1;
+  if(b===24)n=ri(1,3);
+  if(b===7||b===22)n=Math.random()<.5?1:0;
+  if(b===11||b===12||b===13)n=ri(1,2);
+  if(!B.infinite){setB(x,y,z,0);S.edits[x+","+y+","+z]=0;markDirty(x,z);
+    netBroadcastEdit(x,y,z,0);}     // [V4] 캐기 실시간 동기화
+  if(n>0&&item){add(S,item,n);S.stat.got[item]=(S.stat.got[item]||0)+n;
+    toast(iE(item)+" "+iN(item)+" +"+n)}
+}
+/* 연쇄 파괴: 시작 기둥에서 위쪽·인접으로 이어진 나무(6)·잎(7,22)을 훑어 부순다.
+   옆에 붙어 자란 '다른 나무'까지 번지지 않도록, 땅까지 기둥으로 이어진(=뿌리내린) 기둥은 건드리지 않는다. */
+/* [V4 수정 5-1] 연쇄 파괴 시 부순 블록 수에 비례해 기력을 소모한다.
+   기둥(6) 1칸당 STAM_PER_LOG, 잎(7·22) 1칸당 STAM_PER_LEAF 를 깎고,
+   기력이 바닥나면 연쇄를 즉시 중단(Limit)해 무한 벌목을 막는다. */
+var STAM_PER_LOG=2.2, STAM_PER_LEAF=0.5;
+function chainBreakTree(sx,sy,sz){
+  var TREE={6:1,7:1,22:1};
+  var seen={}, stack=[], broke=0, MAX=400, stoppedByStam=false;
+  function push(x,y,z){var k=x+","+y+","+z;if(!seen[k]){seen[k]=1;stack.push([x,y,z])}}
+  /* 이 기둥이 땅(흙/풀)까지 통짜 기둥으로 이어져 서 있으면 '뿌리내린 나무'로 보고 보호한다 */
+  function rooted(x,y,z){
+    for(var yy=y-1;yy>1;yy--){
+      var b=getB(x,yy,z);
+      if(b===6)continue;                 // 기둥이 계속 내려감
+      /* [V6 수정 3] 돌산·타이가에서 돌(3)·눈(8)·점토(10) 위에 자란 나무도 '뿌리내림'으로 인식
+         (기존엔 흙/풀/모래만 지면으로 봐서 숲 전체가 연쇄 파괴되는 버그가 있었음) */
+      return (b===1||b===2||b===4||b===3||b===8||b===10);
+    }
+    return false;
+  }
+  push(sx,sy+1,sz);
+  while(stack.length&&broke<MAX){
+    var c=stack.pop(),x=c[0],y=c[1],z=c[2],bb=getB(x,y,z);
+    if(!TREE[bb])continue;
+    if(bb===6&&rooted(x,y,z))continue;   // 옆에 뿌리내린 다른 나무 기둥은 보호
+    /* 이 블록을 부수기 전에 기력 체크 → 부족하면 연쇄 중단 */
+    var cost=(bb===6)?STAM_PER_LOG:STAM_PER_LEAF;
+    if(S.stam<cost){stoppedByStam=true;break}
+    S.stam=clamp(S.stam-cost,0,100);
+    yieldBlock(x,y,z,bb,BL[bb]);broke++;
+    /* 26방향 확장(위주로) */
+    for(var dx=-1;dx<=1;dx++)for(var dy=0;dy<=1;dy++)for(var dz=-1;dz<=1;dz++){
+      if(dx===0&&dy===0&&dz===0)continue;
+      push(x+dx,y+dy,z+dz);
+    }
+    /* 잎은 옆·아래로도 살짝 번지게 */
+    if(bb===7||bb===22){push(x,y-1,z);push(x+1,y,z);push(x-1,y,z);push(x,y,z+1);push(x,y,z-1)}
+  }
+  if(stoppedByStam)toast("기력이 부족해 벌목을 멈췄습니다","bad");
+}
+/* --- 놓기 --- */
+function tryPlace(){
+  if(S.isVisiting){toast("구경 중에는 설치할 수 없습니다","bad");return}
+  var sel=hotbar[hotIdx];
+  if(!sel){toast("놓을 블록이 없습니다. 핫바에서 블록을 고르세요","bad");return}
+  if(!target){toast("설치할 면을 조준하세요","bad");return}
+  var bx=target.x+target.face[0],by=target.y+target.face[1],bz=target.z+target.face[2];
+  if(!inW(bx,by,bz)){toast("여기에는 설치할 수 없습니다","bad");return}
+  var cur=getB(bx,by,bz);
+  if(cur!==0&&cur!==5){toast("이미 블록이 있는 곳입니다","bad");return}
+  /* 플레이어 몸(발끝~머리)과 겹치는 칸이면 막고 안내 */
+  if(overlapsPlayer(bx,by,bz)){toast("캐릭터와 겹치는 곳에는 설치할 수 없습니다","bad");return}
+  var id=PLACE[sel];
+  if(!id){toast(iN(sel)+"은(는) 설치할 수 없는 아이템입니다","bad");return}
+  if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
+  setB(bx,by,bz,id);S.edits[bx+","+by+","+bz]=id;markDirty(bx,bz);
+  netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
+  S.stat.placed++;
+  toast(iE(sel)+" "+iN(sel)+" 설치","good");
+  if(id===35){S.hasPost=true;toast("무역소를 세웠습니다. 가까이서 무역할 수 있어요","good")}
+  if(id===36){S.stat.monument=true;setTimeout(winScreen,300)}
+  refreshHotbar();
+  cloudDirty();
+}
+/* 대상 칸이 플레이어 몸이 차지한 복셀과 겹치는지 (발끝/허리/머리 3칸 검사) */
+function overlapsPlayer(bx,by,bz){
+  var px0=Math.floor(S.pos.x-PW/2),px1=Math.floor(S.pos.x+PW/2);
+  var pz0=Math.floor(S.pos.z-PW/2),pz1=Math.floor(S.pos.z+PW/2);
+  var py0=Math.floor(S.pos.y),py1=Math.floor(S.pos.y+PH-.001);
+  return bx>=px0&&bx<=px1&&bz>=pz0&&bz<=pz1&&by>=py0&&by<=py1;
+}
+/* --- 핫바 --- */
+var hotbar=[],hotIdx=0;
+function refreshHotbar(){
+  var pri=["plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","tradepost","monument"];
+  var arr=Object.keys(S.inv).filter(function(k){return PLACE[k]&&S.inv[k]>0});
+  arr.sort(function(a,b){var ia=pri.indexOf(a),ib=pri.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib)});
+  hotbar=arr.slice(0,9);
+  if(hotIdx>=hotbar.length)hotIdx=Math.max(0,hotbar.length-1);
+  var h="";
+  for(var i=0;i<9;i++){
+    var k=hotbar[i];
+    h+="<button class='slot"+(i===hotIdx?" on":"")+"' data-i='"+i+"'>"+
+      (k?"<span class='nm'>"+iN(k)+"</span>"+iE(k)+"<span class='cnt'>"+S.inv[k]+"</span>":"")+"</button>";
+  }
+  document.getElementById("hotbar").innerHTML=h;
+}
+/* --- 스탯 시뮬레이션 --- */
+function nearFire(){
+  var p=S.pos,px=Math.floor(p.x),py=Math.floor(p.y),pz=Math.floor(p.z);
+  for(var dx=-3;dx<=3;dx++)for(var dy=-2;dy<=2;dy++)for(var dz=-3;dz<=3;dz++)
+    if(getB(px+dx,py+dy,pz+dz)===37)return true;
+  return false;
+}
+var fireCheck=0,fireOn=false;
+function tempTarget(){
+  var a=ambient(S),t=36.5+clamp((a-20)*.055,-3.4,2.6);
+  if(a<12&&qty(S,"coat")>0)t=Math.min(36.5,t+Math.min(2.8,(12-a)*.115));
+  if(a>30&&qty(S,"shade")>0)t=Math.max(36.5,t-Math.min(2.2,(a-30)*.11));
+  if(a<20&&fireOn)t=Math.min(36.9,t+1.1);
+  if(inWater(S.pos)&&a<15)t-=.6;
+  return t;
+}
+/* --- 식량 부패: 아이템 종류별 개별 타이머 --- */
+/* ITEMS[k].rot 이 있는 '신선 식품'만 부패한다.
+   빵·초콜릿·커피 같은 가공식품은 rot 속성이 없어 절대 썩지 않는다.
+   각 종류마다 자기 타이머(S.rotT[k])가 차오르고, 기준을 넘으면 그 식품 1개가 상한다. */
+var ROT_BASE=140;   // 신선식품 1개가 상하기까지 걸리는 기준 틱(초 * rot계수). rot값이 클수록 빨리 상함
+function updateRot(dt,rotMod,quiet){
+  if(!S.rotT)S.rotT={};
+  var spoiledMsg=[];
+  for(var k in S.inv){
+    var it=ITEMS[k];
+    if(!it||!it.rot||S.inv[k]<=0){S.rotT[k]=0;continue}   // 안 썩는 것은 타이머 리셋
+    S.rotT[k]=(S.rotT[k]||0)+dt*rotMod*it.rot;
+    var life=ROT_BASE;                                     // 이 식품 한 개의 수명
+    while(S.rotT[k]>=life&&S.inv[k]>0){
+      S.rotT[k]-=life;
+      take(S,k,1);
+      var last=spoiledMsg[spoiledMsg.length-1];
+      if(last&&last.k===k)last.n++;
+      else spoiledMsg.push({k:k,n:1});
+    }
+    if(S.inv[k]<=0)S.rotT[k]=0;
+  }
+  if(spoiledMsg.length&&!quiet){
+    var txt=spoiledMsg.map(function(s){return iE(s.k)+iN(s.k)+" "+s.n}).join(", ");
+    toast(txt+" 상함","bad");refreshHotbar();
+    if(panelTab==="bag")drawPanel();
+  }
+}
+/* --- 사망(탈진) 페널티 --- */
+/* 티어1 생존 자원 위주로 일정 비율을 잃는다. 가공식품/고급재는 지킨다. */
+function applyDeathPenalty(){
+  var lost=[];
+  var t1=Object.keys(S.inv).filter(function(k){return S.inv[k]>0&&iT(k)===1});
+  /* 티어1이 하나도 없으면 가장 흔한 아이템 중 하나를 대신 잃는다 */
+  if(!t1.length){
+    var all=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
+    if(all.length)t1=[all.sort(function(a,b){return S.inv[b]-S.inv[a]})[0]];
+  }
+  t1.forEach(function(k){
+    var have=S.inv[k];
+    var loss=Math.max(1,Math.ceil(have*.30));   // 보유량의 30%(최소 1개)
+    if(loss>have)loss=have;
+    take(S,k,loss);
+    lost.push(iE(k)+iN(k)+" "+loss);
+  });
+  return lost;
+}
+function simulate(dt,quiet){
+  var m=BIOMES[S.biome].mods,prev=S.day;
+  S.sec+=dt;S.day=1+Math.floor(S.sec/DAYSEC);
+  if(S.day>prev){logAdd(S,S.day+"일차 아침이 밝았습니다.");if(!quiet)toast("☀ "+S.day+"일차")}
+  S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
+  S.hydra=clamp(S.hydra-.10*m.hydra*dt,0,100);
+  S.stam=clamp(S.stam+1.25*m.regen*(mining?.25:1)*dt,0,100);
+  if(!quiet){fireCheck-=dt;if(fireCheck<=0){fireCheck=1.5;fireOn=nearFire()}}
+  S.temp+=(tempTarget()-S.temp)*Math.min(1,.02*dt);
+  var d=0;
+  if(S.hunger<=0)d+=.32;
+  if(S.hydra<=0)d+=.45;
+  if(S.temp<35.4)d+=(35.4-S.temp)*.9;
+  if(S.temp>37.6)d+=(S.temp-37.6)*.9;
+  if(d===0&&S.hunger>35&&S.hydra>35)d=-.3;
+  S.hp=clamp(S.hp-d*dt,0,100);
+  if(quiet)S.hp=Math.max(S.hp,25);
+  updateRot(dt,m.rot,quiet);
+  if(S.hp<=0&&!quiet){
+    S.hp=55;S.hunger=Math.max(S.hunger,45);S.hydra=Math.max(S.hydra,45);S.temp=36.5;S.faint++;
+    S.pos.x=S.spawn.x;S.pos.z=S.spawn.z;S.pos.y=findGround(S.spawn.x,S.spawn.z);S.vel.y=0;
+    var dropped=applyDeathPenalty();
+    logAdd(S,"탈진해서 쓰러졌습니다. 처음 도착한 곳에서 깨어났습니다."+
+      (dropped.length?" 급히 나오느라 "+dropped.join(", ")+"을(를) 잃었습니다.":""));
+    toast(dropped.length?"탈진! "+dropped.join(", ")+" 소실":"탈진! 겨우 살아남았습니다","bad");
+    refreshHotbar();drawPanel();
+  }
+  aiTrade(dt,quiet);
+  checkTitles();
+}
+function eat(k){
+  var it=ITEMS[k];if(!it||!it.food)return;
+  if(!take(S,k,1))return;
+  var f=it.food;
+  S.hunger=clamp(S.hunger+(f.h||0),0,100);
+  S.hydra=clamp(S.hydra+(f.w||0),0,100);
+  if(f.s)S.stam=clamp(S.stam+f.s,0,100);
+  toast(it.em+" "+it.n+" 섭취");refreshHotbar();drawPanel();
+}
+function craft(id){
+  var r=null;RECIPES.forEach(function(x){if(x.id===id)r=x});
+  if(!r||!canPay(S,r.need)){toast("재료가 부족합니다","bad");return}
+  payFor(S,r.need);
+  for(var k in r.out){add(S,k,r.out[k]);S.stat.made[k]=(S.stat.made[k]||0)+r.out[k];
+    toast(iE(k)+" "+iN(k)+" +"+r.out[k],"good")}
+  refreshHotbar();drawPanel();
+}
+function checkTitles(){
+  TITLES.forEach(function(t){
+    if(t.b&&t.b!==S.biome)return;
+    if(S.titles.indexOf(t.id)>=0)return;
+    if(t.f(S)){S.titles.push(t.id);logAdd(S,"칭호 획득: "+t.n);toast("🏅 "+t.n,"good")}
+  });
+}
+
+/* ==========================================================================
+   Part 5. 무역
+   ------------------------------------------------------------------------
+   [2차 구조 변경] 예전의 Base64 텍스트 '거래 코드'(보안 취약·수동 복붙)를 폐기하고,
+   실시간 글로벌 거래소(Global Market)를 위한 어댑터 계층으로 교체했다.
+
+     Market  … 공통 인터페이스 (listOffers / postOffer / acceptOffer / cancelOffer / poll)
+     ├─ LocalMarket    … 백엔드 없이 동작하는 오프라인 폴백.
+     │                    같은 기기의 여러 탭은 BroadcastChannel로 실시간 동기화된다(교실 1대 시연용).
+     └─ SupabaseMarket … Supabase(Postgres+REST)로 진짜 DB 기반 글로벌 거래소를 구현.
+                          선생님이 URL+anon key만 넣으면 켜진다. WebSocket/Firebase로 교체할 때도
+                          이 인터페이스만 맞추면 게임 로직은 손대지 않는다.
+
+   거래 로직은 전부 이 Market.*를 호출하는 'API 통신' 형태로 분리되어 있으므로,
+   백엔드를 붙이면 여섯 대륙의 학생들이 실시간으로 같은 거래소를 공유하게 된다.
+   ========================================================================== */
+
+/* ---- 백엔드 설정 (저장 데이터와 분리해 기기에 보관) ---- */
+var MKT_CFG_KEY="sixcont_market_cfg";
+var MarketCfg=(function(){
+  try{var r=localStorage.getItem(MKT_CFG_KEY);if(r)return JSON.parse(r)}catch(e){}
+  return{mode:"local",url:"",key:"",room:"class-1"};
+})();
+function saveMarketCfg(){try{localStorage.setItem(MKT_CFG_KEY,JSON.stringify(MarketCfg))}catch(e){}}
+
+/* ---- 공통 거래 레코드 형태 ----
+   {id, room, from(biome), name, give:{item:n}, want:{item:n}, status:'open'|'taken', taker, ts} */
+
+/* ---- 오프라인 폴백: BroadcastChannel + localStorage 기반 로컬 거래소 ---- */
+function LocalMarket(){
+  this.name="local";
+  this.KEY="sixcont_local_market";
+  this.bc=null;
+  try{this.bc=new BroadcastChannel("sixcont_market")}catch(e){this.bc=null}
+  var self=this;
+  if(this.bc)this.bc.onmessage=function(){ if(Market.onChange)Market.onChange() };
+}
+LocalMarket.prototype._all=function(){
+  try{return JSON.parse(localStorage.getItem(this.KEY)||"[]")}catch(e){return[]}
+};
+LocalMarket.prototype._save=function(list){
+  try{localStorage.setItem(this.KEY,JSON.stringify(list.slice(-200)))}catch(e){}
+  if(this.bc)try{this.bc.postMessage(1)}catch(e){}
+};
+LocalMarket.prototype.listOffers=function(room,cb){
+  var now=Date.now();
+  var list=this._all().filter(function(o){return o.room===room&&o.status==="open"&&now-o.ts<20*60000});
+  cb(null,list);
+};
+LocalMarket.prototype.postOffer=function(o,cb){
+  var list=this._all();list.push(o);this._save(list);cb&&cb(null,o);
+};
+LocalMarket.prototype.acceptOffer=function(id,taker,cb){
+  var list=this._all(),found=null;
+  for(var i=0;i<list.length;i++)if(list[i].id===id){
+    if(list[i].status!=="open"){cb&&cb("taken");return}
+    list[i].status="taken";list[i].taker=taker;found=list[i];break;
+  }
+  if(!found){cb&&cb("gone");return}
+  this._save(list);cb&&cb(null,found);
+};
+LocalMarket.prototype.cancelOffer=function(id,owner,cb){
+  var list=this._all().filter(function(o){return !(o.id===id&&o.name===owner&&o.status==="open")});
+  this._save(list);cb&&cb(null);
+};
+LocalMarket.prototype.myTaken=function(owner,room,cb){
+  /* 내가 올린 글 중 남이 가져간 것(=팔린 것)을 회수 */
+  var list=this._all(),sold=[];
+  for(var i=0;i<list.length;i++){var o=list[i];
+    if(o.room===room&&o.name===owner&&o.status==="taken"&&!o.claimed){o.claimed=true;sold.push(o)}}
+  if(sold.length)this._save(list);
+  cb(null,sold);
+};
+
+/* ---- Supabase REST 어댑터 (진짜 글로벌 DB) ----
+   테이블 스키마(선생님이 1회 생성):
+     create table offers (
+       id text primary key, room text, biome text, trader text,
+       give jsonb, want jsonb, status text default 'open',
+       taker text, claimed boolean default false,
+       ts timestamptz default now()
+     );
+     alter table offers enable row level security;
+     create policy anon_all on offers for all using (true) with check (true);
+*/
+function SupabaseMarket(url,key){
+  this.name="supabase";
+  this.base=url.replace(/\/+$/,"")+"/rest/v1/offers";
+  this.key=key;
+}
+SupabaseMarket.prototype._h=function(extra){
+  var h={"apikey":this.key,"Authorization":"Bearer "+this.key,"Content-Type":"application/json"};
+  if(extra)for(var k in extra)h[k]=extra[k];
+  return h;
+};
+SupabaseMarket.prototype.listOffers=function(room,cb){
+  var u=this.base+"?room=eq."+encodeURIComponent(room)+"&status=eq.open&order=ts.desc&limit=60";
+  fetch(u,{headers:this._h()}).then(function(r){return r.json()}).then(function(rows){
+    cb(null,(rows||[]).map(rowToOffer));
+  }).catch(function(e){cb(e)});
+};
+SupabaseMarket.prototype.postOffer=function(o,cb){
+  fetch(this.base,{method:"POST",headers:this._h({Prefer:"return=representation"}),
+    body:JSON.stringify(offerToRow(o))
+  }).then(function(r){return r.json()}).then(function(){cb&&cb(null,o)}).catch(function(e){cb&&cb(e)});
+};
+SupabaseMarket.prototype.acceptOffer=function(id,taker,cb){
+  /* 낙관적 동시성: status=open 인 경우에만 taken 으로 바꾼다(먼저 누른 사람이 이김) */
+  var u=this.base+"?id=eq."+encodeURIComponent(id)+"&status=eq.open";
+  fetch(u,{method:"PATCH",headers:this._h({Prefer:"return=representation"}),
+    body:JSON.stringify({status:"taken",taker:taker})
+  }).then(function(r){return r.json()}).then(function(rows){
+    if(!rows||!rows.length){cb&&cb("taken");return}
+    cb&&cb(null,rowToOffer(rows[0]));
+  }).catch(function(e){cb&&cb(e)});
+};
+SupabaseMarket.prototype.cancelOffer=function(id,owner,cb){
+  var u=this.base+"?id=eq."+encodeURIComponent(id)+"&trader=eq."+encodeURIComponent(owner)+"&status=eq.open";
+  fetch(u,{method:"DELETE",headers:this._h()}).then(function(){cb&&cb(null)}).catch(function(e){cb&&cb(e)});
+};
+SupabaseMarket.prototype.myTaken=function(owner,room,cb){
+  var u=this.base+"?room=eq."+encodeURIComponent(room)+"&trader=eq."+encodeURIComponent(owner)+
+        "&status=eq.taken&claimed=eq.false";
+  var self=this;
+  fetch(u,{headers:this._h()}).then(function(r){return r.json()}).then(function(rows){
+    rows=rows||[];if(!rows.length){cb(null,[]);return}
+    var ids=rows.map(function(r){return "\""+r.id+"\""}).join(",");
+    fetch(self.base+"?id=in.("+ids+")",{method:"PATCH",headers:self._h(),body:JSON.stringify({claimed:true})})
+      .then(function(){cb(null,rows.map(rowToOffer))}).catch(function(){cb(null,rows.map(rowToOffer))});
+  }).catch(function(e){cb(e)});
+};
+function offerToRow(o){return{id:o.id,room:o.room,biome:o.from,trader:o.name,give:o.give,want:o.want,
+  status:o.status||"open",taker:o.taker||null,claimed:!!o.claimed}}
+function rowToOffer(r){return{id:r.id,room:r.room,from:r.biome,name:r.trader,give:r.give,want:r.want,
+  status:r.status,taker:r.taker,claimed:r.claimed,ts:r.ts?Date.parse(r.ts):Date.now()}}
+
+/* ---- 현재 활성 어댑터 선택 ---- */
+var Market=null;
+function initMarket(){
+  if(MarketCfg.mode==="supabase"&&MarketCfg.url&&MarketCfg.key){
+    try{Market=new SupabaseMarket(MarketCfg.url,MarketCfg.key)}
+    catch(e){Market=new LocalMarket()}
+  }else{
+    Market=new LocalMarket();
+  }
+  Market.online=(Market.name==="supabase");
+  Market.onChange=function(){ if(panelTab==="trade")pollMarket() };
+}
+function marketRoom(){return MarketCfg.room||"class-1"}
+function marketLabel(){return Market&&Market.name==="supabase"?"글로벌 거래소(온라인)":"로컬 거래소(오프라인)"}
+
+/* ==========================================================================
+   Part 5b. 클라우드 서비스 (교사 배정 roster + 클라우드 세이브 worlds)
+   ------------------------------------------------------------------------
+   Market 와 같은 Supabase 프로젝트(URL+anon key)를 재사용한다.
+   온라인이 아니면 Cloud.online=false 이고, 게임은 기존처럼 localStorage 세이브로 동작한다.
+
+   ▼▼▼ [V4] 선생님이 SQL 편집기에서 1회 실행할 전체 스키마 ▼▼▼
+
+   핵심 변경: worlds 의 Primary Key 가 (room,name) → (room,biome) 로 바뀌었다.
+   같은 방·같은 기후 학생들은 하나의 월드(seed+edits)를 공유해 함께 건축한다.
+   개인 인벤토리/스탯은 새 players 테이블에 (room,name) 으로 따로 저장한다.
+   실시간 블록 동기화·아바타 위치 공유는 Supabase Realtime Broadcast(WebSocket)로 처리한다.
+
+   ── 거래소 ──────────────────────────────────────────────
+   create table if not exists offers (
+     id text primary key, room text, biome text, trader text,
+     give jsonb, want jsonb, status text default 'open',
+     taker text, claimed boolean default false, ts timestamptz default now()
+   );
+   ── 교사 사전 배정 명단 ─────────────────────────────────
+   create table if not exists roster (
+     room text, name text, biome text,
+     primary key (room, name)
+   );
+   ── 공유 월드(같은 기후끼리 하나의 건축 공간) ───────────
+   create table if not exists worlds (
+     room text, biome text, seed int8,
+     edits jsonb,              -- {"x,y,z":blockId, ...}  건축 변경분만 저장(용량 최적화)
+     day int, snap timestamptz default now(),
+     primary key (room, biome)
+   );
+   ── 개인 저장(인벤토리·스탯·마지막 위치) ────────────────
+   create table if not exists players (
+     room text, name text, biome text,
+     inv jsonb, stat jsonb, pos jsonb, day int,
+     snap timestamptz default now(),
+     primary key (room, name)
+   );
+   ── 권한(교실 시연용, 익명 접근 허용) ───────────────────
+   alter table offers  enable row level security;
+   alter table roster  enable row level security;
+   alter table worlds  enable row level security;
+   alter table players enable row level security;
+   create policy anon_offers  on offers  for all using (true) with check (true);
+   create policy anon_roster  on roster  for all using (true) with check (true);
+   create policy anon_worlds  on worlds  for all using (true) with check (true);
+   create policy anon_players on players for all using (true) with check (true);
+   ▲▲▲ 여기까지 ▲▲▲
+
+   ── Supabase Realtime Broadcast 채널 ──────────────────────
+   채널명: "sixcont:{room}:{biome}" 하나를 같은 기후 학생들이 공유한다.
+     event "edit"  {x,y,z,b, by}      … 블록 캐기/설치 즉시 전파 → S.edits 갱신 + 청크 재빌드
+     event "pos"   {id,name,x,y,z,yaw} … 100ms 주기 내 좌표/시점 방송 → 다른 플레이어 아바타
+     event "bye"   {id}               … 퇴장 알림 → 아바타 제거
+   Realtime 은 순수 WebSocket(Phoenix 프로토콜)로 직접 구현했다(외부 라이브러리 없음).
+   ========================================================================== */
+function Cloud(url,key){
+  this.online=!!(url&&key);
+  if(this.online){this.url=url.replace(/\/+$/,"");this.key=key}
+}
+Cloud.prototype._h=function(extra){
+  var h={"apikey":this.key,"Authorization":"Bearer "+this.key,"Content-Type":"application/json"};
+  if(extra)for(var k in extra)h[k]=extra[k];return h;
+};
+Cloud.prototype._rest=function(path){return this.url+"/rest/v1/"+path};
+/* --- roster: 교사 배정 --- */
+Cloud.prototype.saveRoster=function(room,rows,cb){
+  /* rows: [{name,biome}] → upsert (room,name) */
+  var body=rows.map(function(r){return{room:room,name:r.name,biome:r.biome}});
+  fetch(this._rest("roster"),{method:"POST",
+    headers:this._h({Prefer:"resolution=merge-duplicates,return=minimal"}),
+    body:JSON.stringify(body)
+  }).then(function(r){cb&&cb(r.ok?null:"http "+r.status)}).catch(function(e){cb&&cb(e)});
+};
+Cloud.prototype.listRoster=function(room,cb){
+  fetch(this._rest("roster?room=eq."+encodeURIComponent(room)+"&order=name.asc"),
+    {headers:this._h()}).then(function(r){return r.json()}).then(function(rows){cb(null,rows||[])})
+    .catch(function(e){cb(e)});
+};
+Cloud.prototype.lookupStudent=function(room,name,cb){
+  fetch(this._rest("roster?room=eq."+encodeURIComponent(room)+"&name=eq."+encodeURIComponent(name)+"&limit=1"),
+    {headers:this._h()}).then(function(r){return r.json()}).then(function(rows){
+      cb(null,rows&&rows[0]?rows[0]:null);
+  }).catch(function(e){cb(e)});
+};
+Cloud.prototype.deleteRosterRow=function(room,name,cb){
+  fetch(this._rest("roster?room=eq."+encodeURIComponent(room)+"&name=eq."+encodeURIComponent(name)),
+    {method:"DELETE",headers:this._h()}).then(function(){cb&&cb(null)}).catch(function(e){cb&&cb(e)});
+};
+/* --- [V4] worlds: (room,biome) 공유 월드. 같은 기후 학생들이 seed+edits 를 함께 씀 --- */
+Cloud.prototype.saveWorld=function(room,rec,cb){
+  var body=[{room:room,biome:rec.biome,seed:rec.seed,edits:rec.edits,day:rec.day}];
+  fetch(this._rest("worlds"),{method:"POST",
+    headers:this._h({Prefer:"resolution=merge-duplicates,return=minimal"}),
+    body:JSON.stringify(body)
+  }).then(function(r){cb&&cb(r.ok?null:"http "+r.status)}).catch(function(e){cb&&cb(e)});
+};
+Cloud.prototype.loadWorld=function(room,biome,cb){
+  fetch(this._rest("worlds?room=eq."+encodeURIComponent(room)+"&biome=eq."+encodeURIComponent(biome)+"&limit=1"),
+    {headers:this._h()}).then(function(r){return r.json()}).then(function(rows){
+      cb(null,rows&&rows[0]?rows[0]:null);
+  }).catch(function(e){cb(e)});
+};
+/* --- [V4] players: 개인 인벤토리·스탯·마지막 위치를 (room,name) 로 저장 --- */
+Cloud.prototype.savePlayer=function(room,rec,cb){
+  var body=[{room:room,name:rec.name,biome:rec.biome,inv:rec.inv,stat:rec.stat,pos:rec.pos,day:rec.day}];
+  fetch(this._rest("players"),{method:"POST",
+    headers:this._h({Prefer:"resolution=merge-duplicates,return=minimal"}),
+    body:JSON.stringify(body)
+  }).then(function(r){cb&&cb(r.ok?null:"http "+r.status)}).catch(function(e){cb&&cb(e)});
+};
+Cloud.prototype.loadPlayer=function(room,name,cb){
+  fetch(this._rest("players?room=eq."+encodeURIComponent(room)+"&name=eq."+encodeURIComponent(name)+"&limit=1"),
+    {headers:this._h()}).then(function(r){return r.json()}).then(function(rows){
+      cb(null,rows&&rows[0]?rows[0]:null);
+  }).catch(function(e){cb(e)});
+};
+Cloud.prototype.listWorlds=function(room,cb){
+  /* 관전 목록: 같은 방 학생들(players)을 이름·기후 기준으로 나열 */
+  fetch(this._rest("players?room=eq."+encodeURIComponent(room)+"&select=name,biome,day,snap&order=snap.desc&limit=60"),
+    {headers:this._h()}).then(function(r){return r.json()}).then(function(rows){cb(null,rows||[])})
+    .catch(function(e){cb(e)});
+};
+
+var CloudSvc=null;
+function initCloud(){
+  CloudSvc=new Cloud(MarketCfg.url,MarketCfg.key);
+}
+
+/* ==========================================================================
+   [V5 수정 4] edits 압축/해제
+   ------------------------------------------------------------------------
+   기존: S.edits 는 {"x,y,z": id} 맵. 건축이 많아지면 키마다 좌표 문자열·따옴표·
+   콜론이 반복되어 JSON 페이로드가 급격히 비대해짐 → DB 저장/로딩 병목.
+   개선: 좌표를 1차원 정수 배열로 눕혀 [x,y,z,id, x,y,z,id, ...] 형태로 압축한다.
+   구조 마커 {v:1,d:[...]} 로 감싸 신·구 포맷을 자동 판별(하위 호환)한다.
+   외부 라이브러리(LZString) 의존 없이 오프라인에서도 동작. ========================= */
+function packEdits(edits){
+  var d=[];
+  for(var k in edits){
+    if(!edits.hasOwnProperty(k))continue;
+    var a=k.split(","); if(a.length!==3)continue;
+    d.push(+a[0],+a[1],+a[2],edits[k]|0);
+  }
+  return {v:1,d:d};   // 압축 포맷
+}
+function unpackEdits(rec){
+  if(!rec)return {};
+  /* 압축 포맷 {v:1,d:[...]} */
+  if(rec.v===1&&rec.d&&rec.d.length!==undefined){
+    var out={},d=rec.d;
+    for(var i=0;i+3<d.length;i+=4){ out[d[i]+","+d[i+1]+","+d[i+2]]=d[i+3]; }
+    return out;
+  }
+  /* 구 포맷: 이미 {"x,y,z":id} 맵이면 그대로 사용(하위 호환) */
+  return rec;
+}
+
+/* ==========================================================================
+   Part 5c. [V4] 실시간 멀티플레이 (Supabase Realtime Broadcast · 순수 WebSocket)
+   ------------------------------------------------------------------------
+   Supabase Realtime 은 Phoenix Channels 프로토콜을 WebSocket 으로 노출한다.
+   외부 라이브러리 없이 아래 최소 구현으로 broadcast 이벤트를 주고받는다.
+     · 접속:  wss://<proj>.supabase.co/realtime/v1/websocket?apikey=<anon>&vsn=1.0.0
+     · 채널:  topic "realtime:sixcont:{room}:{biome}" 로 phx_join
+     · 송신:  event "broadcast", payload {type:'broadcast', event, payload}
+     · 수신:  서버가 같은 채널의 다른 클라이언트에게 그대로 되쏴 준다
+   heartbeat(15초)로 연결을 유지하고, 끊기면 지수 backoff 로 재접속한다.
+   ========================================================================== */
+function Realtime(url,key){
+  this.url=url.replace(/^http/,"ws").replace(/\/+$/,"")+"/realtime/v1/websocket?apikey="+encodeURIComponent(key)+"&vsn=1.0.0";
+  this.key=key;
+  this.topic=null;          // "sixcont:{room}:{biome}"
+  this.ws=null; this.ref=0; this.joined=false;
+  this.hb=null; this.retry=0; this.closed=false;
+  this.onEvent=null;        // (event, payload) => {}
+  this.onJoin=null;
+}
+Realtime.prototype._send=function(msg){
+  try{ if(this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(msg)); }catch(e){}
+};
+Realtime.prototype.connect=function(room,biome){
+  this.topic="sixcont:"+room+":"+biome;
+  this.closed=false;
+  this._open();
+};
+Realtime.prototype._open=function(){
+  var self=this;
+  try{ this.ws=new WebSocket(this.url); }catch(e){ this._scheduleRetry(); return; }
+  this.ws.onopen=function(){
+    self.retry=0;
+    /* 채널 join */
+    self.joinRef=++self.ref;
+    self._send({topic:"realtime:"+self.topic,event:"phx_join",
+      payload:{config:{broadcast:{self:false,ack:false},presence:{key:""}}},ref:String(self.joinRef)});
+    /* heartbeat */
+    if(self.hb)clearInterval(self.hb);
+    self.hb=setInterval(function(){
+      self._send({topic:"phoenix",event:"heartbeat",payload:{},ref:String(++self.ref)});
+    },15000);
+  };
+  this.ws.onmessage=function(ev){
+    var m;try{m=JSON.parse(ev.data)}catch(e){return}
+    if(m.event==="phx_reply"&&String(m.ref)===String(self.joinRef)){
+      if(m.payload&&m.payload.status==="ok"){self.joined=true;if(self.onJoin)self.onJoin()}
+      return;
+    }
+    if(m.event==="broadcast"&&m.payload){
+      var p=m.payload;
+      if(self.onEvent)self.onEvent(p.event,p.payload);
+    }
+  };
+  this.ws.onclose=function(){ self.joined=false; if(!self.closed)self._scheduleRetry(); };
+  this.ws.onerror=function(){ try{self.ws.close()}catch(e){} };
+};
+Realtime.prototype._scheduleRetry=function(){
+  var self=this;
+  if(this.closed)return;
+  this.retry=Math.min(this.retry+1,6);
+  var wait=Math.min(1000*Math.pow(1.7,this.retry),12000);
+  setTimeout(function(){ if(!self.closed)self._open(); },wait);
+};
+/* 브로드캐스트 송신: 같은 채널의 다른 학생들에게 event/payload 전달 */
+Realtime.prototype.broadcast=function(event,payload){
+  if(!this.joined)return;
+  this._send({topic:"realtime:"+this.topic,event:"broadcast",
+    payload:{type:"broadcast",event:event,payload:payload},ref:String(++this.ref)});
+};
+Realtime.prototype.close=function(){
+  this.closed=true;
+  if(this.hb){clearInterval(this.hb);this.hb=null}
+  try{ if(this.ws)this.ws.close(); }catch(e){}
+  this.ws=null;this.joined=false;
+};
+
+/* ---- 실시간 세션 상태 ---- */
+var Net=null;                        // 현재 Realtime 인스턴스
+var myNetId="p_"+Math.random().toString(36).slice(2,9);   // 이 세션의 고유 id(동명이인 대비)
+var peers={};                        // { id: {name,x,y,z,yaw, tx,ty,tz,tyaw, last} }  다른 플레이어
+var posAcc=0;                        // 좌표 방송 누적 타이머
+var NET_POS_MS=400;                  // [V5 수정 3] 좌표 방송 주기 100→400ms (30명 접속 트래픽 1/4로 감소; 보간이 매끄럽게 커버)
+var PEER_TIMEOUT=6000;               // 이 시간 이상 소식 없으면 아바타 제거
+
+/* 실시간 채널 시작: 같은 방·기후 학생들과 연결 */
+function netStart(room,biome){
+  if(!(MarketCfg.url&&MarketCfg.key))return;      // 온라인 설정 없으면 스킵
+  netStop();
+  peers={};
+  Net=new Realtime(MarketCfg.url,MarketCfg.key);
+  Net.onEvent=onNetEvent;
+  Net.onJoin=function(){ /* join 직후 첫 좌표를 즉시 한 번 알림 */ broadcastPos(true); };
+  Net.connect(room,biome);
+}
+function netStop(){
+  if(Net){ try{flushEditQueue()}catch(e){}; try{Net.broadcast("bye",{id:myNetId})}catch(e){}; Net.close(); Net=null; }
+  editQueue.length=0; editAcc=0;
+  peers={};
+}
+/* 수신 라우팅 */
+function onNetEvent(event,p){
+  if(!p)return;
+  if(event==="edit"){
+    /* 다른 학생의 블록 변경을 내 월드에 반영 */
+    if(p.by===myNetId)return;                      // 내가 쏜 것은 무시
+    /* [V5 수정 2] 배치 페이로드(edits 배열) 우선 처리. 단일 {x,y,z,b} 도 호환. */
+    if(p.edits&&p.edits.length){
+      for(var i=0;i<p.edits.length;i++){var e=p.edits[i];applyRemoteEdit(e[0],e[1],e[2],e[3]);}
+    }else{
+      applyRemoteEdit(p.x,p.y,p.z,p.b);
+    }
+  }else if(event==="pos"){
+    if(p.id===myNetId)return;
+    var q=peers[p.id];
+    if(!q){ q=peers[p.id]={name:p.name,x:p.x,y:p.y,z:p.z,yaw:p.yaw||0,tx:p.x,ty:p.y,tz:p.z,tyaw:p.yaw||0}; }
+    q.name=p.name;                                 // 목표값만 갱신(렌더에서 부드럽게 보간)
+    q.tx=p.x;q.ty=p.y;q.tz=p.z;q.tyaw=p.yaw||0;
+    q.last=performance.now();
+  }else if(event==="bye"){
+    if(p.id&&peers[p.id])delete peers[p.id];
+  }
+}
+/* 원격 블록 변경 적용: edits 갱신 + 청크 재빌드(설치=blockId>0, 캐기=0) */
+function applyRemoteEdit(x,y,z,b){
+  if(!inW(x,y,z))return;
+  setB(x,y,z,b);
+  S.edits[x+","+y+","+z]=b;
+  markDirty(x,z);
+}
+/* [V5 수정 2] 블록 변경을 즉시 쏘지 않고 버퍼에 모았다가 배치로 전송한다.
+   chainBreakTree 가 수십 칸을 부술 때 broadcast 를 연속 호출해 Supabase Realtime
+   Rate Limit(플러딩)에 걸려 연결이 끊기던 문제를 해결. NET_EDIT_MS(50ms)마다,
+   또는 버퍼가 커지면 한 번의 페이로드로 압축 전송한다. */
+var NET_EDIT_MS=50;                  // 편집 배치 전송 주기
+var NET_EDIT_MAXBATCH=64;            // 이 개수를 넘으면 주기와 무관하게 즉시 flush
+var editQueue=[], editAcc=0;
+function netBroadcastEdit(x,y,z,b){
+  if(!(Net&&Net.joined)||S.isVisiting)return;
+  editQueue.push([x,y,z,b]);
+  if(editQueue.length>=NET_EDIT_MAXBATCH)flushEditQueue();   // 대량 변경은 곧바로 비움
+}
+/* 모인 변경분을 한 번의 broadcast 로 압축 전송 */
+function flushEditQueue(){
+  if(!editQueue.length)return;
+  if(!(Net&&Net.joined)){editQueue.length=0;return;}
+  var batch=editQueue;editQueue=[];
+  try{Net.broadcast("edit",{edits:batch,by:myNetId});}catch(e){}
+}
+/* 내 좌표/시점을 방송(주기 제한: NET_POS_MS) */
+function broadcastPos(force){
+  if(!(Net&&Net.joined))return;
+  if(S.isVisiting)return;                          // 관전 중엔 내 아바타를 남에게 안 보냄
+  Net.broadcast("pos",{id:myNetId,name:S.name,
+    x:+S.pos.x.toFixed(2),y:+S.pos.y.toFixed(2),z:+S.pos.z.toFixed(2),yaw:+look.yaw.toFixed(3)});
+}
+/* 매 프레임: 좌표 방송 타이밍 + 만료된 피어 정리 + 보간 */
+function netTick(dt){
+  if(Net&&Net.joined){
+    posAcc+=dt*1000;
+    if(posAcc>=NET_POS_MS){ posAcc=0; broadcastPos(false); }
+    /* [V5 수정 2] 모인 블록 변경분을 50ms마다 배치 전송 */
+    editAcc+=dt*1000;
+    if(editAcc>=NET_EDIT_MS){ editAcc=0; flushEditQueue(); }
+  }
+  var now=performance.now();
+  for(var id in peers){
+    var q=peers[id];
+    if(now-(q.last||0)>PEER_TIMEOUT){ delete peers[id]; continue; }
+    /* 목표 좌표로 부드럽게 보간(네트워크 100ms 간격을 매끄럽게) */
+    var k=Math.min(1,dt*12);
+    q.x+=(q.tx-q.x)*k; q.y+=(q.ty-q.y)*k; q.z+=(q.tz-q.z)*k;
+    var dy=q.tyaw-q.yaw; while(dy>Math.PI)dy-=Math.PI*2; while(dy<-Math.PI)dy+=Math.PI*2;
+    q.yaw+=dy*k;
+  }
+}
+
+var AI_NAMES={temperate:["초원 상단","밀밭 마을","강가 농장"],tropical:["정글 시장","우림 상단","향신료 배"],
+ taiga:["침엽수 캠프","모피 상인","숯가마"],desert:["오아시스 대상","모래 유리방","유전 캠프"],
+ tundra:["빙하 기지","얼음 창고","심해 어선"],alpine:["산맥 광산","대장간 마을","돌산 캠프"]};
+var WANTS={temperate:["iron","glass","ice","rubber","spice","gold","coal"],
+ tropical:["wheat","bread","ice","iron","coat","stone"],
+ taiga:["wheat","bread","water","glass","iron","spice"],
+ desert:["wheat","bread","water","wood","ice","fur"],
+ tundra:["wheat","bread","wood","coal","fur","iron"],
+ alpine:["wheat","bread","fruit","coal","water","spice"]};
+function valOf(bag){var v=0;for(var k in bag)v+=iV(k)*bag[k];return v}
+function bagLine(bag){var o=[];for(var k in bag)o.push(iE(k)+" "+iN(k)+" "+bag[k]);return o.join(", ")}
+function mkOffer(){
+  var others=BKEYS.filter(function(b){return b!==S.biome});
+  var from=others[Math.floor(Math.random()*others.length)];
+  var give=SPECIAL[from][Math.floor(Math.random()*SPECIAL[from].length)];
+  var pool=WANTS[from].filter(function(k){return SPECIAL[S.biome].indexOf(k)>=0||["wheat","bread","water","wood"].indexOf(k)>=0});
+  if(!pool.length)pool=WANTS[from];
+  var want=pool[Math.floor(Math.random()*pool.length)];
+  if(want===give)return null;
+  var gn=ri(2,5),fair=.85+Math.random()*.5;
+  var wn=Math.max(1,Math.round(iV(give)*gn/iV(want)*fair));
+  var g={},w={};g[give]=gn;w[want]=wn;
+  return{id:"ai_"+uuid().slice(0,8),ai:true,from:from,name:AI_NAMES[from][Math.floor(Math.random()*3)],give:g,want:w,age:0};
+}
+/* AI 상인은 오프라인/온라인 상관없이 시장을 마르지 않게 하는 보조 역할.
+   온라인일 때는 빈도를 낮춰 실제 플레이어 거래가 우선되게 한다. */
+function aiTrade(dt,quiet){
+  S.aiAcc+=dt;
+  var every=(Market&&Market.online)?55:30;
+  var cap=(Market&&Market.online)?3:6;
+  var aiCount=S.offers.filter(function(o){return o.ai}).length;
+  if(S.aiAcc>=every){
+    S.aiAcc=0;
+    if(aiCount<cap){var o=mkOffer();if(o){S.offers.unshift(o);S.newOffers++;
+      if(!quiet&&panelTab!=="trade")toast("⚖️ "+bN(o.from)+" 상인 제안");updateTabBadge()}}
+  }
+  /* AI 제안만 노화·정리 */
+  S.offers.forEach(function(o){if(o.ai)o.age=(o.age||0)+dt});
+  S.offers=S.offers.filter(function(o){return !o.ai||o.age<330});
+  /* 오프라인일 때만: 내가 올린 물건을 AI가 사주는 보조 정산
+     (온라인이면 실제 상대가 사가므로 이 경로는 끈다) */
+  if(!(Market&&Market.online)){
+    S.pending.forEach(function(p){
+      if(p.sold)return;
+      p.age=(p.age||0)+dt;if(p.age<25)return;p.age=0;
+      var ratio=valOf(p.give)/Math.max(.1,valOf(p.want));
+      if(Math.random()<clamp((ratio-.55)*.5,0,.45)){
+        p.sold=true;
+        var buyers=BKEYS.filter(function(b){return b!==S.biome});
+        p.buyer=bN(buyers[Math.floor(Math.random()*buyers.length)])+" 상단";
+        Market.cancelOffer(p.id,S.name,function(){});   // 로컬 거래소에서도 내려준다
+        for(var k in p.want){add(S,k,p.want[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+p.want[k]}
+        S.stat.trades++;
+        for(var g in p.give)if(ITEMS[g]&&ITEMS[g].food)S.stat.foodOut+=p.give[g];
+        logAdd(S,p.buyer+"이(가) 내 물건을 사갔습니다.");
+        if(!quiet){toast("💰 "+p.buyer+" 거래 성사","good");refreshHotbar();if(panelTab==="trade")drawPanel()}
+      }
+    });
+  }
+  /* 온라인이면 주기적으로 거래소 폴링 */
+  if(Market&&Market.online){pollAcc+=dt;if(pollAcc>=6){pollAcc=0;pollMarket()}}
+}
+/* ---- 거래 수락: AI 제안이든 실 플레이어 글로벌 제안이든 동일 경로 ----
+   S.offers 에는 AI 제안(o.ai=true)과 글로벌 거래소 제안이 함께 들어온다. */
+function acceptOffer(id){
+  var o=null;S.offers.forEach(function(x){if(x.id===id)o=x});
+  if(!o)return;
+  if(!canPay(S,o.want)){toast("내줄 물건이 부족합니다","bad");return}
+
+  if(o.ai){                                   // AI 상인: 즉시 정산
+    settleBuy(o);return;
+  }
+  /* 실제 플레이어 글로벌 제안: 서버에 '내가 가져간다'고 예약(동시성 처리) */
+  toast("거래 확인 중…");
+  Market.acceptOffer(o.id,S.name+"("+S.biome+")",function(err,taken){
+    if(err){
+      toast(err==="taken"?"방금 다른 사람이 가져갔습니다":"거래 연결에 실패했습니다","bad");
+      S.offers=S.offers.filter(function(x){return x.id!==o.id});
+      pollMarket();return;
+    }
+    settleBuy(o);                              // 성공 → 정산
+    pollMarket();
+  });
+}
+/* 구매 정산: want를 내주고 give를 받는다 */
+function settleBuy(o){
+  if(!canPay(S,o.want)){toast("내줄 물건이 부족합니다","bad");return}
+  payFor(S,o.want);
+  for(var k in o.give){add(S,k,o.give[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+o.give[k]}
+  for(var w in o.want)if(ITEMS[w]&&ITEMS[w].food)S.stat.foodOut+=o.want[w];
+  S.stat.trades++;
+  S.offers=S.offers.filter(function(x){return x.id!==o.id});
+  logAdd(S,(o.name||bN(o.from))+"와(과) 거래했습니다.");
+  toast("🤝 거래 성사!","good");refreshHotbar();drawPanel();updateTabBadge();
+}
+/* ---- 내 물건을 글로벌 거래소에 등록 ---- */
+function postOffer(gi,gn,wi,wn){
+  if(!gi||!wi||gi===wi){toast("서로 다른 물건을 골라주세요","bad");return}
+  gn=Math.max(1,gn|0);wn=Math.max(1,wn|0);
+  if(qty(S,gi)<gn){toast(iN(gi)+"이(가) 부족합니다","bad");return}
+  take(S,gi,gn);                               // 등록하는 순간 창고에서 빠진다(에스크로)
+  var g={},w={};g[gi]=gn;w[wi]=wn;
+  var o={id:uuid(),room:marketRoom(),from:S.biome,name:S.name,give:g,want:w,
+    status:"open",claimed:false,ts:Date.now()};
+  var p={id:o.id,give:g,want:w,sold:false};
+  S.pending.unshift(p);
+  refreshHotbar();drawPanel();
+  Market.postOffer(o,function(err){
+    if(err){                                   // 등록 실패 시 물건 반환
+      for(var k in g)add(S,k,g[k]);
+      S.pending=S.pending.filter(function(x){return x.id!==p.id});
+      toast("거래소 등록에 실패했습니다. 물건을 돌려받았습니다","bad");refreshHotbar();drawPanel();
+    }else{
+      toast(marketLabel()+"에 등록했습니다","good");
+    }
+  });
+}
+/* ---- 내 등록 취소(회수) ---- */
+function cancelPending(id){
+  var p=null;S.pending.forEach(function(x){if(x.id===id)p=x});
+  if(!p||p.sold)return;
+  Market.cancelOffer(p.id,S.name,function(){});
+  for(var k in p.give)add(S,k,p.give[k]);
+  S.pending=S.pending.filter(function(x){return x.id!==id});
+  toast("등록을 취소하고 물건을 돌려받았습니다");refreshHotbar();drawPanel();
+}
+/* ---- 거래소 폴링: 남의 열린 제안 목록 + 내가 판 물건 정산 ---- */
+var pollAcc=0,pollBusy=false;
+function pollMarket(force){
+  if(!Market||pollBusy)return;
+  pollBusy=true;
+  var room=marketRoom();
+  Market.listOffers(room,function(err,list){
+    pollBusy=false;
+    if(err||!list){return}
+    /* 내 것/이미 처리한 것 제외, 최신 20개 */
+    var mine=S.pending.map(function(p){return p.id});
+    var live=list.filter(function(o){
+      return o.name!==S.name && mine.indexOf(o.id)<0 && o.from!==S.biome;
+    }).slice(0,20).map(function(o){o.player=true;return o});
+    /* 새 제안 알림 */
+    var prevIds={};S.offers.forEach(function(o){if(o.player)prevIds[o.id]=1});
+    var fresh=live.filter(function(o){return !prevIds[o.id]}).length;
+    /* AI 제안은 그대로 두고 플레이어 제안만 교체 */
+    var ai=S.offers.filter(function(o){return o.ai});
+    S.offers=live.concat(ai);
+    if(fresh>0){S.newOffers+=fresh;if(panelTab!=="trade")toast("🌐 새 글로벌 거래 "+fresh+"건");updateTabBadge()}
+    if(panelTab==="trade")drawPanel();
+  });
+  /* 내가 올린 물건이 팔렸는지 확인 → 대금 수령 */
+  Market.myTaken(S.name,room,function(err,sold){
+    if(err||!sold||!sold.length)return;
+    sold.forEach(function(o){
+      var p=null;S.pending.forEach(function(x){if(x.id===o.id)p=x});
+      if(!p||p.sold)return;
+      p.sold=true;p.buyer=o.taker||"다른 대륙";
+      for(var k in p.want){add(S,k,p.want[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+p.want[k]}
+      for(var g in p.give)if(ITEMS[g]&&ITEMS[g].food)S.stat.foodOut+=p.give[g];
+      S.stat.trades++;
+      logAdd(S,p.buyer+"이(가) 내 물건을 사갔습니다.");
+      toast("💰 "+p.buyer+" 거래 성사","good");
+    });
+    refreshHotbar();if(panelTab==="trade")drawPanel();
+  });
+}
+function copyBox(id){
+  var el=document.getElementById(id);if(!el)return;
+  el.removeAttribute("readonly");el.select();el.setSelectionRange(0,99999);
+  var done=false;try{done=document.execCommand("copy")}catch(e){}
+  el.setAttribute("readonly","readonly");
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(el.value).then(function(){toast("복사했습니다","good")},function(){toast(done?"복사했습니다":"길게 눌러 복사하세요")});
+  else toast(done?"복사했습니다":"길게 눌러 복사하세요");
+}
+function shareBox(id){
+  var el=document.getElementById(id);if(!el)return;
+  if(navigator.share)navigator.share({title:"여섯 대륙 거래",text:el.value}).catch(function(){});
+  else copyBox(id);
+}
+/* ==========================================================================
+   Part 6. 게임 내 UI (HUD · 패널)
+   ========================================================================== */
+var $=function(i){return document.getElementById(i)};
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function toast(m,k){
+  var b=$("toasts"),e=document.createElement("div");
+  e.className="toast"+(k?" "+k:"");e.textContent=m;b.appendChild(e);
+  setTimeout(function(){e.remove()},2100);
+  while(b.children.length>4)b.firstChild.remove();
+}
+function bars(pct,color){
+  var on=Math.round(clamp(pct,0,100)/10),h="";
+  for(var i=0;i<10;i++)h+="<i style='background:"+(i<on?color:"#22313d")+"'></i>";
+  return h;
+}
+function drawHUD(){
+  var c=clockOf(S),amb=ambient(S);
+  var tp=clamp((S.temp-34.5)/4*100,0,100);
+  var tc=S.temp<35.4?"#9fd8ff":(S.temp>37.6?"#ef5f5f":"#5fd3a3");
+  $("stats").innerHTML=
+   row("체력",S.hp,Math.round(S.hp),S.hp<30?"#ef5f5f":"#5fd3a3",S.hp<30)+
+   row("기력",S.stam,Math.round(S.stam),"#e8d24d",false)+
+   row("허기",S.hunger,Math.round(S.hunger),S.hunger<25?"#ef5f5f":"#e8a33d",S.hunger<25)+
+   row("수분",S.hydra,Math.round(S.hydra),S.hydra<25?"#ef5f5f":"#63a9ec",S.hydra<25)+
+   row("체온",tp,S.temp.toFixed(1)+"°",tc,S.temp<35.4||S.temp>37.6);
+  $("ibio").textContent=BIOMES[S.biome].n;
+  $("itime").textContent=c.hh+":"+c.mm;
+  $("isun").textContent=(c.h>=6&&c.h<18)?"☀":"🌙";
+  $("iday").textContent=S.day+"일차";
+  $("itemp").textContent=Math.round(amb)+"°C"+(fireOn?" 🔥":"");
+  function row(k,v,txt,col,al){
+    return "<div class='st"+(al?" alarm":"")+"'><span class='k'>"+k+"</span>"+
+      "<span class='track'>"+bars(v,col)+"</span><span class='v' style='color:"+col+"'>"+txt+"</span></div>";
+  }
+  var t=$("target");
+  if(target&&BL[target.b]){
+    t.classList.remove("hide");
+    var B=BL[target.b];
+    t.innerHTML=B.n+(B.drop?" → "+iE(B.drop)+" "+iN(B.drop):" (캘 수 없음)");
+  }else t.classList.add("hide");
+  var ring=$("minering"),mr=$("mr");
+  if(mining){ring.classList.remove("hide");mr.style.strokeDashoffset=138*(1-mining.t/mining.need)}
+  else ring.classList.add("hide");
+}
+function updateTabBadge(){
+  var b=document.querySelector("#tabs button[data-p=trade]");if(!b)return;
+  var old=b.querySelector(".n");if(old)old.remove();
+  if(S.newOffers>0){var s=document.createElement("span");s.className="n";s.textContent=S.newOffers;b.appendChild(s)}
+}
+/* ---------- 패널 ---------- */
+var panelTab=null;
+function openPanel(tab){
+  panelTab=tab;S.paused=true;
+  if(document.pointerLockElement)document.exitPointerLock();
+  $("panel").classList.remove("hide");
+  var bs=$("ptabs").querySelectorAll("button[data-p]");
+  for(var i=0;i<bs.length;i++)bs[i].setAttribute("aria-current",bs[i].dataset.p===tab?"true":"false");
+  if(tab==="trade"){S.newOffers=0;updateTabBadge();pollMarket()}
+  drawPanel();
+}
+function closePanel(){panelTab=null;S.paused=false;$("panel").classList.add("hide")}
+function drawPanel(){
+  if(!panelTab)return;
+  var h="";
+  if(panelTab==="bag")h=uiBag();
+  else if(panelTab==="trade")h=uiTrade();
+  else if(panelTab==="record")h=uiRecord();
+  else h=uiHelp();
+  $("pbody").innerHTML=h;
+}
+function invChips(){
+  var ks=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
+  if(!ks.length)return "<p class='eff'>가진 물건이 없습니다. 밖에 나가 블록을 캐 보세요.</p>";
+  ks.sort(function(a,b){return iT(a)-iT(b)});
+  return "<div class='chips'>"+ks.map(function(k){
+    var f=ITEMS[k]&&ITEMS[k].food;
+    return "<button class='chip t"+iT(k)+(f?" act":"")+"'"+(f?" onclick=\"eat('"+k+"')\"":"")+">"+
+      iE(k)+" "+iN(k)+" <b>"+S.inv[k]+"</b>"+(f?" · 먹기":"")+"</button>"}).join("")+"</div>";
+}
+function uiBag(){
+  var h="<div class='sec'><h3>가방 <span class='sm'>식량은 눌러서 바로 먹을 수 있어요</span></h3>"+invChips()+"</div>";
+  h+="<div class='sec'><h3>제작</h3>";
+  RECIPES.forEach(function(r){
+    var ok=canPay(S,r.need),cost="",miss="";
+    for(var k in r.need){
+      var have=qty(S,k),o=have>=r.need[k];
+      cost+="<span class='chip "+(o?"ok":"no")+"'>"+iE(k)+" "+iN(k)+" <b>"+have+"/"+r.need[k]+"</b></span>";
+      if(!o&&!miss)miss=iN(k)+" 부족 · "+whereFrom(k);
+    }
+    var out=Object.keys(r.out)[0];
+    h+="<div class='card'><div class='rw'><span style='font-size:19px'>"+iE(out)+"</span>"+
+      "<b>"+iN(out)+" ×"+r.out[out]+"</b><span class='tier'>TIER "+iT(out)+"</span>"+
+      "<span style='flex:1'></span><button class='mini "+(ok?"acc":"")+"' onclick=\"craft('"+r.id+"')\""+(ok?"":" disabled")+">만들기</button></div>"+
+      "<div class='chips' style='margin-top:8px'>"+cost+"</div><div class='eff'>"+r.eff+"</div>"+
+      (miss?"<div class='why'>⚠ "+miss+"</div>":"")+"</div>";
+  });
+  h+="</div>";
+  return h;
+}
+function uiTrade(){
+  var h="";
+  var online=Market&&Market.online;
+  /* 거래소 상태 배너 */
+  h+="<div class='sec'><div class='card' style='border-color:"+(online?"var(--good)":"var(--line2)")+"'>"+
+    "<div class='rw'><span style='font-size:19px'>"+(online?"🌐":"📶")+"</span>"+
+    "<b>"+marketLabel()+"</b><span class='tier'>방 "+esc(marketRoom())+"</span><span style='flex:1'></span>"+
+    "<button class='mini' onclick='pollMarket()'>새로고침</button></div>"+
+    "<div class='eff' style='margin-top:6px'>"+(online?
+      "여섯 대륙의 실제 친구들과 같은 거래소를 공유합니다. 올린 물건은 DB에 저장되어 다른 대륙 친구에게 실시간으로 보입니다."
+      :"백엔드가 연결되지 않아 오프라인 거래소로 동작합니다(같은 기기의 다른 탭끼리는 실시간 동기화). 아래에서 글로벌 거래소를 켤 수 있습니다.")+
+    "</div></div></div>";
+
+  /* 들어온 제안 (AI + 실 플레이어) */
+  h+="<div class='sec'><h3>들어온 거래 제안 <span class='sm'>다른 대륙</span></h3>";
+  if(!S.offers.length)h+="<div class='card'><p class='eff'>아직 제안이 없습니다. 잠시 기다리면 상인과 친구들의 제안이 올라옵니다.</p></div>";
+  S.offers.forEach(function(o){
+    var ok=canPay(S,o.want),gk=Object.keys(o.give)[0];
+    var tag=o.ai?"🤖 상인":"🧑 "+esc(o.name||"친구");
+    h+="<div class='card'><div style='font-family:var(--m);font-size:10px;color:"+(BIOMES[o.from]?BIOMES[o.from].c:"var(--ink3)")+"'>"+
+      tag+" · "+bN(o.from)+" 대륙</div><div class='rw' style='margin-top:7px;flex-wrap:wrap'>"+
+      "<span class='chip t"+iT(gk)+"'>"+bagLine(o.give)+"</span><span style='color:var(--ink3)'>받고 →</span>"+
+      "<span class='chip "+(ok?"ok":"no")+"'>"+bagLine(o.want)+"</span><span style='flex:1'></span>"+
+      "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+o.id+"')\""+(ok?"":" disabled")+">거래</button></div></div>";
+  });
+  h+="</div><div class='sec'><h3>내가 내놓은 물건 <span class='sm'>거래소 등록</span></h3>";
+  if(!S.pending.length)h+="<div class='card'><p class='eff'>아래에서 등록하면 다른 대륙 사람들이 살펴봅니다. 등록하는 순간 물건은 창고에서 잠깁니다.</p></div>";
+  S.pending.forEach(function(p){
+    h+="<div class='card'><div style='font-family:var(--m);font-size:10px;color:var(--ink3)'>"+
+      (p.sold?"거래 완료 · "+esc(p.buyer||""):"거래소 등록 중… (다른 대륙의 수락 대기)")+"</div>"+
+      "<div class='rw' style='margin-top:7px;flex-wrap:wrap'><span class='chip'>"+bagLine(p.give)+"</span>"+
+      "<span style='color:var(--ink3)'>주고 →</span><span class='chip'>"+bagLine(p.want)+"</span><span style='flex:1'></span>"+
+      (!p.sold?"<button class='mini' onclick=\"cancelPending('"+p.id+"')\">회수</button>":"")+"</div></div>";
+  });
+  h+="</div>";
+  var f=S.form||(S.form={gi:Object.keys(S.inv)[0]||"wheat",gn:5,wi:"iron",wn:3});
+  function opts(sel,owned){
+    var ks=owned?Object.keys(S.inv).filter(function(k){return S.inv[k]>0}):Object.keys(ITEMS);
+    ks.sort(function(a,b){return iT(a)-iT(b)});
+    return ks.map(function(k){return "<option value='"+k+"'"+(k===sel?" selected":"")+">"+iE(k)+" "+iN(k)+
+      (owned?" ("+S.inv[k]+")":"")+"</option>"}).join("");
+  }
+  h+="<div class='sec'><h3>새 거래 만들기</h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:9px'>정해진 가격은 없습니다. 서로 필요한 만큼이 곧 값입니다.</p>"+
+    "<div class='eff'>줄 물건</div><div class='grid2' style='margin:5px 0 10px'>"+
+    "<select class='sel' id='f_gi'>"+opts(f.gi,true)+"</select><input class='sel' id='f_gn' type='number' min='1' value='"+f.gn+"'></div>"+
+    "<div class='eff'>받을 물건</div><div class='grid2' style='margin:5px 0 12px'>"+
+    "<select class='sel' id='f_wi'>"+opts(f.wi,false)+"</select><input class='sel' id='f_wn' type='number' min='1' value='"+f.wn+"'></div>"+
+    "<button class='mini acc' style='width:100%' onclick='submitOffer()'>"+(online?"🌐 글로벌 거래소에 등록":"거래소에 등록")+"</button></div></div>";
+
+  /* 백엔드 설정 (예전 '거래 코드 붙여넣기' 자리) */
+  h+="<div class='sec'><h3>글로벌 거래소 연결 <span class='sm'>선생님용</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:9px'>Supabase 프로젝트 하나면 반 전체가 실시간으로 거래할 수 있습니다. URL과 anon key, 반 코드를 넣고 저장하세요. (자세한 설정은 도움말 참고)</p>"+
+    "<div class='eff'>Supabase URL</div><input class='sel' id='m_url' style='margin:5px 0 8px' placeholder='https://xxxx.supabase.co' value='"+esc(MarketCfg.url||"")+"'>"+
+    "<div class='eff'>anon key</div><input class='sel' id='m_key' style='margin:5px 0 8px' placeholder='eyJ...' value='"+esc(MarketCfg.key||"")+"'>"+
+    "<div class='eff'>반 코드(같은 반끼리 같은 값)</div><input class='sel' id='m_room' style='margin:5px 0 10px' placeholder='class-1' value='"+esc(MarketCfg.room||"class-1")+"'>"+
+    "<div class='rw'><button class='mini acc' style='flex:1' onclick='saveMarketFromUI(true)'>온라인으로 연결</button>"+
+    "<button class='mini' style='flex:1' onclick='saveMarketFromUI(false)'>오프라인으로</button></div></div></div>";
+
+  h+="<div class='sec'><h3>대륙별 특산물</h3>";
+  BKEYS.forEach(function(b){
+    h+="<div class='card'><div style='font-family:var(--m);font-size:10px;color:"+BIOMES[b].c+"'>"+
+      BIOMES[b].n+" · "+BIOMES[b].dk+(b===S.biome?" · 나":"")+"</div><div class='chips' style='margin-top:6px'>"+
+      SPECIAL[b].map(function(k){return "<span class='chip t"+iT(k)+"'>"+iE(k)+" "+iN(k)+"</span>"}).join("")+"</div></div>";
+  });
+  h+="</div>";
+  return h;
+}
+function submitOffer(){
+  var gi=$("f_gi").value,gn=parseInt($("f_gn").value||"1",10),wi=$("f_wi").value,wn=parseInt($("f_wn").value||"1",10);
+  S.form={gi:gi,gn:gn,wi:wi,wn:wn};
+  postOffer(gi,gn,wi,wn);
+}
+function saveMarketFromUI(online){
+  MarketCfg.url=($("m_url").value||"").trim();
+  MarketCfg.key=($("m_key").value||"").trim();
+  MarketCfg.room=($("m_room").value||"class-1").trim()||"class-1";
+  if(online&&(!MarketCfg.url||!MarketCfg.key)){toast("URL과 anon key를 모두 입력하세요","bad");return}
+  MarketCfg.mode=online?"supabase":"local";
+  saveMarketCfg();
+  initMarket();initCloud();
+  toast(marketLabel()+" 로 전환했습니다",online?"good":"");
+  pollMarket();drawPanel();
+}
+function uiRecord(){
+  var h="<div class='sec'><h3>칭호 <span class='sm'>"+S.titles.length+"개</span></h3><div class='chips'>";
+  TITLES.forEach(function(t){
+    if(t.b&&t.b!==S.biome)return;
+    var g=S.titles.indexOf(t.id)>=0;
+    h+="<span class='tchip"+(g?"":" lock")+"'>"+(g?"🏅 ":"🔒 ")+t.n+" · "+t.d+"</span>";
+  });
+  h+="</div></div>";
+  var need=null;RECIPES.forEach(function(r){if(r.id==="monument")need=r.need});
+  var done=0,tot=0,rows="";
+  for(var k in need){tot++;var have=qty(S,k),ok=have>=need[k];if(ok)done++;
+    rows+="<span class='chip "+(ok?"ok":"no")+"'>"+iE(k)+" "+iN(k)+" <b>"+have+"/"+need[k]+"</b></span>"}
+  h+="<div class='sec'><h3>세계문명 기념비 <span class='sm'>"+done+"/"+tot+"</span></h3><div class='card'>"+
+    "<p class='eff'>여섯 대륙의 자원이 모두 필요합니다. 재료를 모아 가방에서 만들고, 땅에 놓으면 문명 완성!</p>"+
+    "<div class='bar' style='margin:10px 0'><i style='width:"+Math.round(done/tot*100)+"%'></i></div>"+
+    "<div class='chips'>"+rows+"</div></div></div>";
+  var st=S.stat,imp=Object.keys(st.imp).length;
+  h+="<div class='sec'><h3>기록</h3><div class='card'><div class='chips'>"+
+    "<span class='chip'>거래 <b>"+st.trades+"</b>회</span><span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
+    "<span class='chip'>식량 수출 <b>"+st.foodOut+"</b></span><span class='chip'>설치한 블록 <b>"+st.placed+"</b></span>"+
+    "<span class='chip'>생존 <b>"+S.day+"</b>일차</span><span class='chip'>탈진 <b>"+S.faint+"</b>회</span></div>";
+  if(imp)h+="<div class='chips' style='margin-top:8px'>"+Object.keys(st.imp).map(function(k){
+    return "<span class='chip t"+iT(k)+"'>수입 "+iE(k)+" "+iN(k)+" <b>"+st.imp[k]+"</b></span>"}).join("")+"</div>";
+  h+="</div></div>";
+  h+="<div class='sec'><h3>일지</h3><div class='card log'>"+S.log.map(function(l){
+    var d=new Date(l.t);return "<div><time>"+String(d.getHours()).padStart(2,"0")+":"+
+      String(d.getMinutes()).padStart(2,"0")+"</time>"+esc(l.x)+"</div>"}).join("")+"</div></div>";
+  /* 구경 가기 + 클라우드 상태 */
+  var cloudOn=CloudSvc&&CloudSvc.online;
+  h+="<div class='sec'><h3>구경 가기 <span class='sm'>다른 학생 월드</span></h3><div class='card'>"+
+    "<p class='eff'>"+(cloudOn?
+      "같은 방 친구의 월드를 비동기로 구경할 수 있습니다. 구경 중에는 캐기·설치가 잠겨 남의 작품을 훼손할 수 없습니다."
+      :"온라인(글로벌 거래소)으로 연결되어 있어야 구경 가기가 켜집니다. 무역 탭에서 Supabase에 연결하세요.")+"</p>"+
+    (S.isVisiting?
+      "<button class='mini acc' style='margin-top:8px' onclick='endVisit()'>내 월드로 복귀</button>":
+      "<button class='mini "+(cloudOn?"acc":"")+"' style='margin-top:8px'"+(cloudOn?"":" disabled")+" onclick='openVisitList()'>다른 학생 월드 구경 가기</button>")+
+    "</div></div>";
+  h+="<div class='sec'><div class='card'><p class='eff'><b>"+esc(S.name)+"</b> · "+bN(S.biome)+" 대륙 · "+
+    (cloudOn?"클라우드(방 "+esc(S.room||"")+")에 자동 저장됩니다.":"이 기기에 자동 저장됩니다.")+"</p>"+
+    (cloudOn?"<button class='mini' style='margin-top:8px' onclick='cloudSaveWorld(true,function(){toast(\"클라우드에 저장했습니다\",\"good\")})'>지금 클라우드에 저장</button> ":"")+
+    "<button class='mini' style='margin-top:8px' onclick='askReset()'>처음부터 다시</button></div></div>";
+  return h;
+}
+function uiHelp(){
+  var B=BIOMES[S.biome];
+  return "<div class='sec'><h3>조작</h3><div class='card'>"+
+    (isTouch?
+     "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다."
+     :"<p class='eff'><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>Shift</kbd> 달리기 · 마우스로 둘러보기<br>"+
+      "<b>왼쪽 버튼 꾹</b> 캐기 · <b>오른쪽 버튼</b> 놓기 · <kbd>1</kbd>~<kbd>9</kbd> 블록 고르기<br>"+
+      "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기</p>")+
+    "</div></div>"+
+    "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
+    "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
+    "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>이 게임의 규칙</h3><div class='card'><p class='eff'>"+
+    "1. 기후마다 나는 자원이 다릅니다. 내 대륙에 없는 것은 <b>반드시 무역</b>으로 구해야 합니다.<br>"+
+    "2. 온대는 식량이 넘치지만 철·유리·얼음이 없고, 사막·한대는 먹을 것이 없지만 특별한 자원이 있습니다.<br>"+
+    "3. 마지막 목표인 <b>세계문명 기념비</b>는 여섯 대륙 자원이 모두 있어야 만들어집니다.</p></div></div>"+
+    "<div class='sec'><h3>함께 짓기 <span class='sm'>실시간 협동</span></h3><div class='card'><p class='eff'>"+
+    "온라인으로 연결되면 <b>같은 방·같은 기후</b> 친구들과 <b>하나의 대륙</b>을 공유합니다.<br>"+
+    "누가 블록을 캐거나 놓으면 <b>실시간</b>으로 모두의 화면에 반영되고, 친구들이 <b>움직이는 아바타</b>로 보입니다(머리 위에 이름표).<br>"+
+    "가방·자원·칭호는 <b>각자 따로</b> 저장되니 안심하고 함께 건축하세요.</p></div></div>"+
+    "<div class='sec'><h3>살아남기</h3><div class='card'><p class='eff'>"+
+    "허기·수분이 0이 되거나 체온이 무너지면 체력이 깎입니다.<br>"+
+    "<b>탈진하면</b> 처음 도착한 곳에서 깨어나지만, 급히 나오느라 <b>티어1 생존 자원의 일부를 잃습니다</b>.<br>"+
+    "신선 식품(밀·과일·생선)은 시간이 지나면 <b>종류별로 하나씩 상합니다</b>. 빵·초콜릿·커피 같은 <b>가공식품은 썩지 않으니</b> 오래 두려면 가공하세요.<br>"+
+    "추운 곳: 모피+섬유로 <b>방한복</b>, 또는 <b>모닥불</b>을 놓으세요.<br>"+
+    "더운 곳: 판자+섬유로 <b>햇빛막이</b>를 만드세요.<br>"+
+    "물 블록을 캐면 물이 무한히 나옵니다.</p></div></div>"+
+    "<div class='sec'><h3>글로벌 거래소 켜기 <span class='sm'>선생님용</span></h3><div class='card'><p class='eff'>"+
+    "반 전체가 실시간으로 거래하려면 무료 <b>Supabase</b> 프로젝트 하나만 있으면 됩니다.<br>"+
+    "1. supabase.com에서 프로젝트를 만들고 <b>Project URL</b>과 <b>anon key</b>를 복사합니다.<br>"+
+    "2. SQL 편집기에 아래 표를 한 번 만듭니다:<br>"+
+    "<span class='mono' style='font-size:10.5px;color:var(--ink3)'>create table offers(id text primary key, room text, biome text, trader text, give jsonb, want jsonb, status text default 'open', taker text, claimed boolean default false, ts timestamptz default now()); alter table offers enable row level security; create policy anon_all on offers for all using(true) with check(true);</span><br>"+
+    "3. 무역 탭 아래 <b>글로벌 거래소 연결</b>에 URL·anon key·같은 <b>반 코드</b>를 넣고 저장하면 끝입니다.<br>"+
+    "설정이 없으면 자동으로 오프라인 거래소와 AI 상인으로 동작합니다.</p></div></div>";
+}
+function askReset(){
+  $("pbody").innerHTML="<div class='card'><h3>정말 다시 시작할까요?</h3>"+
+    "<p class='eff'>지은 건물, 모은 자원, 칭호가 모두 사라집니다.</p>"+
+    "<div class='rw' style='margin-top:10px'><button class='mini acc' onclick='doReset()'>네, 처음부터</button>"+
+    "<button class='mini' onclick='drawPanel()'>아니요</button></div></div>";
+}
+function doReset(){try{localStorage.removeItem(SAVE)}catch(e){}location.reload()}
+function winScreen(){
+  openPanel("record");
+  setTimeout(function(){
+    $("pbody").insertAdjacentHTML("afterbegin","<div class='card' style='border-color:var(--accent);margin-bottom:12px'>"+
+      "<h3>🗽 문명 완성!</h3><p class='eff'>"+esc(S.name)+"의 "+bN(S.biome)+" 대륙이 세계문명 기념비를 세웠습니다. "+
+      "이 기념비에는 여섯 대륙에서 온 자원이 모두 들어 있습니다. 혼자였다면 불가능했습니다.</p></div>");
+  },30);
+}
+
+/* ==========================================================================
+   Part 7. 조작 입력 · 저장 · 시작 · 메인 루프
+   ========================================================================== */
+function newState(name,biome,seed){
+  return{ver:VER,name:name,biome:biome,seed:seed,
+    pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
+    hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
+    inv:{},edits:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
+    isVisiting:false,room:marketRoom(),
+    stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
+}
+function startKit(s){
+  var kit={temperate:{wheat:6,wood:4,water:4,plank:4,stone:2},
+    tropical:{fruit:6,wood:4,water:4,plank:4,stone:2},
+    taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2},
+    desert:{sand:6,water:6,plank:4,stone:2,glass:1},
+    tundra:{fish:5,ice:4,water:4,coat:1,plank:4,stone:2},
+    alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4}}[s.biome];
+  for(var k in kit)add(s,k,kit[k]);
+}
+/* ---------- 클라우드 세이브 ---------- */
+var cloudDirtyFlag=false, cloudAcc=0, cloudBusy=false;
+function cloudDirty(){cloudDirtyFlag=true}          // 건축/채집 후 호출 → 다음 주기에 업로드
+function cloudActive(){return CloudSvc&&CloudSvc.online&&S&&!S.isVisiting}
+/* [V4] 저장이 두 갈래로 나뉘었다:
+     · worlds(room,biome)  … 공유 월드(seed+edits). 같은 기후 학생 모두가 함께 씀
+     · players(room,name)  … 개인 인벤토리·스탯·위치
+   edits 는 '변경분만' 담긴 얕은 맵이라 그대로 올려 용량을 최소화한다. */
+function cloudSaveWorld(force,cb){
+  if(!cloudActive()){cb&&cb();return}
+  if(cloudBusy&&!force){cb&&cb();return}
+  cloudBusy=true;
+  var done=0,err0=null;
+  function fin(err){ if(err)err0=err; if(++done>=2){cloudBusy=false;cloudDirtyFlag=false;
+    if(err0)console.warn("cloud save fail",err0); cb&&cb(err0);} }
+  /* [V5 수정 4] 업로드 직전 edits 를 압축해 페이로드 용량을 최소화한다 */
+  CloudSvc.saveWorld(S.room,{biome:S.biome,seed:S.seed,edits:packEdits(S.edits),day:S.day},fin);
+  CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:S.stat,
+    pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},fin);
+}
+function save(){
+  if(!S)return;
+  if(S.isVisiting)return;                           // 관전 중에는 저장하지 않음
+  S.yaw=look.yaw;S.pitch=look.pitch;S.seen=Date.now();
+  try{localStorage.setItem(SAVE,JSON.stringify(S))}catch(e){}
+}
+function loadSave(){
+  try{var r=localStorage.getItem(SAVE);if(!r)return null;var s=JSON.parse(r);
+    if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
+    if(!s.rotT)s.rotT={};
+    if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
+    s.isVisiting=false;if(!s.room)s.room=marketRoom();
+    /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
+    s.pending=s.pending.filter(function(p){
+      if(p.code&&!p.sold){for(var k in p.give)s.inv[k]=(s.inv[k]||0)+p.give[k];return false}
+      delete p.code;delete p.codeText;return true;
+    });
+    return s;
+  }catch(e){return null}
+}
+function catchUp(){
+  var gap=Math.min((Date.now()-(S.seen||Date.now()))/1000,4*3600);
+  if(gap<10)return 0;
+  var left=gap;while(left>0){var d=Math.min(5,left);simulate(d,true);left-=d}
+  logAdd(S,"자리를 비운 "+Math.round(gap/60)+"분이 흘렀습니다.");
+  return gap;
+}
+/* ---------- 입력 ---------- */
+function bindInput(){
+  var cv=$("c");
+  document.addEventListener("keydown",function(e){
+    if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+    keys[e.code]=true;
+    if(e.code==="Escape"&&panelTab){closePanel();return}
+    if(e.code==="KeyE"){e.preventDefault();panelTab==="bag"?closePanel():openPanel("bag")}
+    if(e.code==="KeyT"){e.preventDefault();panelTab==="trade"?closePanel():openPanel("trade")}
+    if(e.code==="KeyR"){e.preventDefault();panelTab==="record"?closePanel():openPanel("record")}
+    if(e.code==="KeyH"){e.preventDefault();panelTab==="help"?closePanel():openPanel("help")}
+    if(e.code==="Space")e.preventDefault();
+    if(/^Digit[1-9]$/.test(e.code)){hotIdx=parseInt(e.code.slice(5),10)-1;refreshHotbar()}
+  });
+  document.addEventListener("keyup",function(e){keys[e.code]=false});
+  /* ── [V4 수정 3·4] PC는 순수 PointerLock(FPS)로 롤백. 드래그-투-룩 완전 제거 ──
+     · 포인터락이 안 걸린 상태의 '최초 클릭'은 락 요청만 하고 tryMine/tryPlace를 발동하지 않는다(오발 방지).
+     · 락이 걸린 뒤의 좌클릭=캐기, 우클릭=설치. 모바일 터치 조작은 별도 경로라 영향 없음. */
+  cv.addEventListener("mousedown",function(e){
+    if(isTouch)return;                          // 모바일은 터치 핸들러가 담당
+    if(panelTab)return;
+    /* [V5 수정 1] 최초 클릭으로 락을 요청하되, 좌클릭이면 그와 동시에 채집을 시작한다.
+       (기존엔 return 으로 씹혀 첫 클릭 꾹 눌러도 파밍이 안 되는 UX 버그가 있었음)
+       우클릭은 최초 클릭 시 오발 설치를 막기 위해 설치하지 않고 락 요청만 한다. */
+    if(document.pointerLockElement!==cv){
+      cv.requestPointerLock&&cv.requestPointerLock();
+      e.preventDefault();
+      if(e.button===0){mineHold=true;mineDownT=performance.now()}   // ← 좌클릭: 락 요청과 동시에 캐기 시작
+      return;                                    // 우클릭은 최초 클릭 시 설치 오발 차단
+    }
+    if(e.button===0){mineHold=true;mineDownT=performance.now()}    // 좌클릭: 캐기 시작
+    else if(e.button===2){e.preventDefault();tryPlace()}   // 우클릭: 설치
+  });
+  window.addEventListener("mouseup",function(e){
+    if(isTouch)return;
+    if(e.button===0)releaseMine();
+  });
+  cv.addEventListener("contextmenu",function(e){e.preventDefault()});
+  document.addEventListener("mousemove",function(e){
+    if(isTouch||panelTab)return;
+    if(document.pointerLockElement===cv){
+      /* 포인터락 모드에서만 시점 회전(순수 FPS) */
+      look.yaw-=e.movementX*.0022;
+      look.pitch=clamp(look.pitch-e.movementY*.0022,-1.5,1.5);
+    }
+  });
+  document.addEventListener("pointerlockchange",function(){
+    var lk=document.pointerLockElement===cv;
+    $("hint").classList.toggle("hide",lk||!!panelTab||isTouch);
+    if(!lk){mineHold=false;mining=null;mineDownT=0}
+  });
+  /* 핫바 클릭 */
+  $("hotbar").addEventListener("click",function(e){
+    var b=e.target.closest(".slot");if(!b)return;
+    hotIdx=parseInt(b.dataset.i,10);refreshHotbar();
+  });
+  /* 패널 버튼 */
+  $("tabs").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-p]");if(!b)return;
+    panelTab===b.dataset.p?closePanel():openPanel(b.dataset.p);
+  });
+  $("ptabs").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-p]");if(b){openPanel(b.dataset.p);return}
+    if(e.target.id==="pclose")closePanel();
+  });
+  $("panel").addEventListener("click",function(e){if(e.target===this)closePanel()});
+  /* 터치 */
+  if(isTouch){
+    $("touch").classList.remove("hide");
+    var st=$("stick"),knob=st.querySelector("i"),sid=null,sc={x:0,y:0};
+    st.addEventListener("touchstart",function(e){
+      var t=e.changedTouches[0];sid=t.identifier;
+      var r=st.getBoundingClientRect();sc.x=r.left+r.width/2;sc.y=r.top+r.height/2;
+      e.stopPropagation();e.preventDefault();
+    },{passive:false});
+    window.addEventListener("touchmove",function(e){
+      for(var i=0;i<e.changedTouches.length;i++){
+        var t=e.changedTouches[i];
+        if(sid!==null&&t.identifier===sid){
+          var dx=clamp((t.clientX-sc.x)/46,-1,1),dy=clamp((t.clientY-sc.y)/46,-1,1);
+          moveVec.s=dx;moveVec.f=-dy;
+          knob.style.transform="translate("+dx*30+"px,"+dy*30+"px)";
+        }else if(lookId!==null&&t.identifier===lookId){
+          look.yaw-=(t.clientX-lookLast.x)*.006;
+          look.pitch=clamp(look.pitch-(t.clientY-lookLast.y)*.006,-1.5,1.5);
+          lookLast.x=t.clientX;lookLast.y=t.clientY;
+        }
+      }
+    },{passive:false});
+    function endTouch(e){
+      for(var i=0;i<e.changedTouches.length;i++){
+        var t=e.changedTouches[i];
+        if(t.identifier===sid){sid=null;moveVec.f=moveVec.s=0;knob.style.transform=""}
+        if(t.identifier===lookId)lookId=null;
+      }
+    }
+    window.addEventListener("touchend",endTouch);window.addEventListener("touchcancel",endTouch);
+    /* 시점 이동은 '캔버스에서 시작한 터치'로만 잡는다.
+       UI(핫바·탭·조이스틱·버튼) 위에서 시작한 터치는 시점을 돌리지 않게 분리한다. */
+    function onUI(el){
+      while(el&&el!==document.body){
+        if(el.id==="hotbar"||el.id==="tabs"||el.id==="stick"||el.id==="tbtn"||
+           el.id==="panel"||el.id==="hint"||(el.classList&&el.classList.contains("slot")))return true;
+        el=el.parentNode;
+      }
+      return false;
+    }
+    $("c").addEventListener("touchstart",function(e){
+      if(panelTab)return;                       // 패널 열려 있으면 시점 이동 금지
+      var t=e.changedTouches[0];
+      if(onUI(t.target))return;                 // UI 위에서 시작한 터치는 무시 → UI 클릭이 정상 동작
+      if(lookId===null){lookId=t.identifier;lookLast.x=t.clientX;lookLast.y=t.clientY}
+      e.preventDefault();                        // 캔버스 위에서만 기본 동작(스크롤/확대) 차단
+    },{passive:false});
+    /* UI 버튼: 각자 preventDefault 하여 캔버스로 이벤트가 새지 않도록 함 */
+    function uiTap(el,fn){
+      el.addEventListener("touchstart",function(e){e.stopPropagation();e.preventDefault();fn(e)},{passive:false});
+    }
+    uiTap($("bJump"),function(){wantJump=true});
+    uiTap($("bUse"),function(){tryPlace()});
+    var bm=$("bMine");
+    bm.addEventListener("touchstart",function(e){e.stopPropagation();e.preventDefault();mineHold=true},{passive:false});
+    bm.addEventListener("touchend",function(e){e.preventDefault();mineHold=false;mining=null},{passive:false});
+    bm.addEventListener("touchcancel",function(){mineHold=false;mining=null});
+    /* 핫바 슬롯을 탭으로도 선택 가능 (click 지연/씹힘 방지) */
+    $("hotbar").addEventListener("touchstart",function(e){
+      var b=e.target.closest(".slot");if(!b)return;
+      e.stopPropagation();e.preventDefault();
+      hotIdx=parseInt(b.dataset.i,10)||0;refreshHotbar();
+    },{passive:false});
+  }
+}
+var mineHold=false, lookId=null, lookLast={x:0,y:0};
+/* [V6 수정 1] 좌클릭을 '딸깍'(0.2초 이내) 떼서 채집이 취소되면 조작법을 안내한다.
+   블록이 완성되어 캐진 경우(mining===null 상태로 정리됨)엔 안내하지 않는다. */
+var mineDownT=0, MINE_TAP=200;
+function releaseMine(){
+  var quick = mineHold && mineDownT && (performance.now()-mineDownT < MINE_TAP);
+  /* 아직 다 캐지 못한 블록이 진행 중이었는지: mining 이 남아있으면 미완성 취소 */
+  var wasMiningIncomplete = !!mining;
+  mineHold=false;mining=null;mineDownT=0;
+  if(quick && wasMiningIncomplete && S && !S.isVisiting){
+    toast("블록을 캘 때는 마우스를 길게 꾹 누르세요!","warn");
+  }
+}
+function readKeys(){
+  if(panelTab){moveVec.f=moveVec.s=0;return}
+  var f=0,s=0;
+  if(keys.KeyW||keys.ArrowUp)f+=1;
+  if(keys.KeyS||keys.ArrowDown)f-=1;
+  if(keys.KeyD||keys.ArrowRight)s+=1;
+  if(keys.KeyA||keys.ArrowLeft)s-=1;
+  if(!isTouch){moveVec.f=f;moveVec.s=s}
+  if(keys.Space)wantJump=true;
+  sprint=!!(keys.ShiftLeft||keys.ShiftRight);
+}
+/* ---------- 시작 ---------- */
+var picked=null, assignedBiome=null, teacherRoster=[];
+function buildBoot(){
+  /* 대륙 선택 카드 */
+  var box=$("bpick"),h="";
+  BKEYS.forEach(function(b){var d=BIOMES[b];
+    h+="<button class='bc' data-b='"+b+"' style='--cc:"+d.c+"' aria-pressed='false'>"+
+      "<span class='n'><i></i>"+d.n+"</span><span class='d'>"+d.diff+" · "+d.dk+"</span>"+
+      "<span class='r'>"+d.role+"</span></button>";
+  });
+  box.innerHTML=h;
+  box.addEventListener("click",function(e){
+    var b=e.target.closest(".bc");if(!b)return;
+    if(assignedBiome)return;                 // 교사 배정이 있으면 선택 잠금
+    picked=b.dataset.b;document.body.dataset.b=picked;
+    box.querySelectorAll(".bc").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    refreshStartBtn();
+  });
+
+  /* 기존 저장(로컬) 이어하기 */
+  var sv=loadSave();
+  if(sv){
+    var c=$("cont");c.classList.remove("hide");
+    c.textContent="이어서 하기 — "+sv.name+" · "+bN(sv.biome)+" "+sv.day+"일차";
+    c.addEventListener("click",function(){S=sv;document.body.dataset.b=S.biome;beginWorld(true)});
+    // 방 코드 기본값 복원
+    if(sv.room)$("s_room").value=sv.room;
+  }
+  if(MarketCfg.room)$("s_room").value=$("s_room").value||MarketCfg.room;
+
+  /* 모드 토글 */
+  $("modeToggle").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-m]");if(!b)return;
+    var m=b.dataset.m;
+    this.querySelectorAll("button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    $("studentPane").classList.toggle("hide",m!=="student");
+    $("teacherPane").classList.toggle("hide",m!=="teacher");
+    if(m==="teacher")initTeacherPane();
+  });
+
+  /* 학생 입력 변화 → 이름 확정 시 명단 조회 */
+  var lookupTimer=null;
+  function scheduleLookup(){
+    clearTimeout(lookupTimer);
+    lookupTimer=setTimeout(studentRosterLookup,450);
+  }
+  $("nm").addEventListener("input",function(){assignedBiome=null;refreshStartBtn();scheduleLookup()});
+  $("s_room").addEventListener("input",function(){assignedBiome=null;refreshStartBtn();scheduleLookup()});
+
+  $("start").addEventListener("click",startAsStudent);
+  refreshStartBtn();
+}
+function refreshStartBtn(){
+  var nameOk=$("nm").value.trim().length>0;
+  var bio=assignedBiome||picked;
+  $("start").disabled=!(nameOk&&bio);
+  $("pickHint").textContent=assignedBiome?"· 선생님이 "+bN(assignedBiome)+"(으)로 배정":"";
+}
+/* 방 코드+이름으로 교사 배정 조회 → 있으면 기후 강제·선택 숨김 */
+function studentRosterLookup(){
+  var room=$("s_room").value.trim(),name=$("nm").value.trim();
+  var info=$("assignInfo"),pick=$("pickWrap");
+  assignedBiome=null;
+  if(!room||!name){info.classList.add("hide");pick.classList.remove("hide");refreshStartBtn();return}
+  /* 온라인 설정이 있으면 그 URL/key로, 없으면 저장된 MarketCfg로 임시 Cloud 생성 */
+  var url=MarketCfg.url,key=MarketCfg.key;
+  if(!(url&&key)){info.classList.add("hide");pick.classList.remove("hide");refreshStartBtn();return}
+  var c=new Cloud(url,key);
+  info.classList.remove("hide");info.textContent="명단 확인 중…";
+  c.lookupStudent(room,name,function(err,row){
+    if(err){info.textContent="⚠ 명단 서버에 연결하지 못했습니다. 대륙을 직접 골라 시작할 수 있어요.";pick.classList.remove("hide");refreshStartBtn();return}
+    if(row&&row.biome&&BIOMES[row.biome]){
+      assignedBiome=row.biome;document.body.dataset.b=row.biome;
+      info.innerHTML="✅ <b>"+esc(name)+"</b> 학생은 <b style='color:"+BIOMES[row.biome].c+"'>"+bN(row.biome)+"</b> 대륙으로 배정되었습니다.";
+      pick.classList.add("hide");
+    }else{
+      info.textContent="이 방 명단에 없는 이름입니다. 대륙을 직접 골라 시작하세요.";
+      pick.classList.remove("hide");
+    }
+    refreshStartBtn();
+  });
+}
+function startAsStudent(){
+  var name=$("nm").value.trim()||"개척자";
+  var room=$("s_room").value.trim();
+  var bio=assignedBiome||picked;
+  if(!bio)return;
+  /* 방 코드가 있으면 MarketCfg에 반영(온라인 설정이 이미 있으면 그 URL/key 유지) */
+  if(room){MarketCfg.room=room;if(MarketCfg.url&&MarketCfg.key)MarketCfg.mode="supabase";saveMarketCfg();initMarket();initCloud()}
+
+  if(CloudSvc&&CloudSvc.online){
+    $("start").disabled=true;$("start").textContent="불러오는 중…";
+    /* [V4] ① 같은 기후의 공유 월드(seed+edits)를 먼저 불러온다 */
+    CloudSvc.loadWorld(MarketCfg.room,bio,function(werr,wrec){
+      /* ② 내 개인 데이터(인벤토리·스탯·위치)를 불러온다 */
+      CloudSvc.loadPlayer(MarketCfg.room,name,function(perr,prec){
+        var haveShared=wrec&&wrec.edits;
+        var seed=haveShared?(wrec.seed||Math.floor(Math.random()*99999)):Math.floor(Math.random()*99999);
+        S=newState(name,bio,seed);
+        S.room=MarketCfg.room;
+        document.body.dataset.b=S.biome;
+        /* 공유 월드가 이미 있으면 그 건축(edits)을 그대로 이어받는다 */
+        if(haveShared){S.edits=unpackEdits(wrec.edits);S.day=wrec.day||1;}   // [V5 수정 4] 내려받은 직후 해제
+        /* 개인 데이터 복원 or 신규 지급 */
+        if(prec){
+          S.inv=prec.inv||{};if(prec.stat)S.stat=prec.stat;
+          if(prec.day)S.day=Math.max(S.day,prec.day);
+          if(prec.pos&&typeof prec.pos.x==="number")S.pos=prec.pos;
+          logAdd(S,"클라우드에서 데이터를 불러왔습니다.");
+        }else{
+          startKit(S);
+          logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
+        }
+        /* 공유 월드가 아예 없던 첫 학생이면 새 월드로 취급(스폰 정리 등) */
+        beginWorld(haveShared||!!prec);
+      });
+    });
+  }else{
+    newStudentWorld(name,bio);   // 오프라인: 기존과 동일(로컬 단독 월드)
+  }
+}
+function newStudentWorld(name,bio){
+  S=newState(name,bio,Math.floor(Math.random()*99999));
+  S.room=MarketCfg.room;
+  startKit(S);
+  logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
+  beginWorld(false);
+}
+/* ---------- 선생님 대시보드 ---------- */
+var teacherInited=false;
+function initTeacherPane(){
+  /* 기후 select 채우기 */
+  var sel=$("r_biome");
+  if(!sel.options.length){
+    BKEYS.forEach(function(b){var o=document.createElement("option");o.value=b;o.textContent=bN(b);sel.appendChild(o)});
+  }
+  if(!teacherInited){
+    teacherInited=true;
+    $("t_url").value=MarketCfg.url||"";
+    $("t_key").value=MarketCfg.key||"";
+    $("t_room").value=MarketCfg.room||"class-1";
+    $("t_connect").addEventListener("click",teacherConnect);
+    $("r_add").addEventListener("click",function(){
+      var nm=$("r_name").value.trim(),b=$("r_biome").value;
+      if(!nm){toast("학생 이름을 입력하세요","bad");return}
+      if(teacherRoster.some(function(r){return r.name===nm})){toast("이미 있는 이름입니다","bad");return}
+      teacherRoster.push({name:nm,biome:b});$("r_name").value="";renderRoster();
+    });
+    $("t_autofill").addEventListener("click",function(){
+      if(!teacherRoster.length){toast("먼저 학생 이름을 추가하세요","bad");return}
+      teacherRoster.forEach(function(r,i){r.biome=BKEYS[i%BKEYS.length]});renderRoster();
+      toast("6기후로 고르게 분배했습니다","good");
+    });
+    $("t_save").addEventListener("click",teacherSaveRoster);
+  }
+  renderRoster();
+}
+function teacherConnect(){
+  var url=$("t_url").value.trim(),key=$("t_key").value.trim(),room=$("t_room").value.trim()||"class-1";
+  var st=$("t_status");
+  if(!url||!key){st.textContent="URL과 anon key를 모두 입력하세요.";return}
+  MarketCfg.url=url;MarketCfg.key=key;MarketCfg.room=room;MarketCfg.mode="supabase";
+  saveMarketCfg();initMarket();initCloud();
+  st.textContent="연결 확인 중…";
+  CloudSvc.listRoster(room,function(err,rows){
+    if(err){st.innerHTML="⚠ 연결 실패. URL·key·표(roster)가 만들어졌는지 확인하세요.";return}
+    st.innerHTML="✅ 방 <b>"+esc(room)+"</b> 연결됨. 기존 명단 "+rows.length+"명.";
+    teacherRoster=rows.map(function(r){return{name:r.name,biome:r.biome}});
+    renderRoster();
+  });
+}
+function renderRoster(){
+  var box=$("rosterList");
+  if(!teacherRoster.length){box.innerHTML="<p class='note'>아직 배정된 학생이 없습니다. 아래에서 이름과 기후를 추가하세요.</p>";return}
+  box.innerHTML=teacherRoster.map(function(r,i){
+    var optS=BKEYS.map(function(b){return "<option value='"+b+"'"+(b===r.biome?" selected":"")+">"+bN(b)+"</option>"}).join("");
+    return "<div class='rosterRow'><span class='chip' style='color:"+(BIOMES[r.biome]?BIOMES[r.biome].c:"var(--ink)")+"'>"+esc(r.name)+"</span>"+
+      "<select class='sel' onchange='teacherRoster["+i+"].biome=this.value'>"+optS+"</select>"+
+      "<button class='mini' onclick='teacherRoster.splice("+i+",1);renderRoster()'>✕</button></div>";
+  }).join("");
+}
+function teacherSaveRoster(){
+  var msg=$("t_saveMsg");
+  if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 '연결 확인'으로 Supabase에 연결하세요.";return}
+  if(!teacherRoster.length){msg.textContent="저장할 명단이 없습니다.";return}
+  msg.textContent="저장 중…";
+  CloudSvc.saveRoster(MarketCfg.room,teacherRoster,function(err){
+    msg.textContent=err?"⚠ 저장 실패: "+err:"✅ "+teacherRoster.length+"명을 방 '"+MarketCfg.room+"'에 저장했습니다. 학생들은 방 코드와 이름만 입력하면 됩니다.";
+  });
+}
+function beginWorld(isLoad){
+  $("boot").classList.add("hide");
+  $("load").classList.remove("hide");
+  $("ltx").textContent=bN(S.biome)+" 대륙을 만드는 중…";
+  setTimeout(function(){
+    initGL();
+    genWorld(S.biome,S.seed,function(p){$("lbi").style.width=Math.round(p*100)+"%"});
+    for(var k in S.edits){var a=k.split(",");setB(+a[0],+a[1],+a[2],S.edits[k])}
+    buildAll(function(p){$("lbi").style.width=Math.round(p*100)+"%"},function(){
+      look.yaw=S.yaw||0;look.pitch=S.pitch||0;
+      if(!isLoad){
+        clearSpawn(Math.floor(W/2),Math.floor(W/2));
+        S.pos.x=W/2+.5;S.pos.z=W/2+.5;S.pos.y=findGround(S.pos.x,S.pos.z);
+        S.spawn={x:S.pos.x,z:S.pos.z};
+        var gx=Math.floor(S.pos.x)+2,gz=Math.floor(S.pos.z),gy=Math.floor(findGround(gx,gz));
+        setB(gx,gy,gz,35);                                   // 스폰 옆 무역소
+        S.edits[gx+","+gy+","+gz]=35;markDirty(gx,gz);
+        S.hasPost=true;
+        if(cloudActive())cloudSaveWorld(true);               // 새 월드 첫 스냅샷
+      }else{
+        /* 위치가 비었거나 공중이면 지면으로 내려 세운다(클라우드 로드 대응) */
+        if(!S.pos||typeof S.pos.x!=="number"){S.pos={x:W/2+.5,y:20,z:W/2+.5,};}
+        S.pos.y=findGround(S.pos.x,S.pos.z);
+        if(!S.spawn)S.spawn={x:S.pos.x,z:S.pos.z};
+        if(catchUp&&!S.isVisiting&&catchUp()>60)toast("자리를 비운 사이 시간이 흘렀습니다");
+      }
+      $("load").classList.add("hide");
+      $("hud").classList.remove("hide");
+      refreshHotbar();updateTabBadge();updateVisitBanner();
+      $("hint").classList.toggle("hide",isTouch);
+      $("hint").innerHTML=isTouch?"":"화면을 <b>클릭</b>하면 시작합니다<br>WASD 이동 · 마우스 둘러보기 · 왼쪽 버튼 꾹 눌러 캐기";
+      if(isTouch)setTimeout(function(){openPanel("help")},400);
+      /* [V4] 같은 방·같은 기후 학생들과 실시간 채널 연결(온라인일 때만) */
+      if(CloudSvc&&CloudSvc.online&&!S.isVisiting)netStart(S.room,S.biome);
+      loop();
+    });
+  },60);
+}
+/* 주어진 biome/seed/edits로 월드를 다시 생성해 렌더 준비까지 마친다(방문·복귀 공용) */
+function rebuildWorldFrom(biome,seed,edits,onDone){
+  genWorld(biome,seed,function(p){$("lbi").style.width=Math.round(p*100)+"%"});
+  for(var k in (edits||{})){var a=k.split(",");setB(+a[0],+a[1],+a[2],edits[k])}
+  buildAll(function(p){$("lbi").style.width=Math.round(p*100)+"%"},onDone);
+}
+/* ---------- 구경 가기(비동기 관전) ---------- */
+var myState=null;   // 방문 중 내 실제 상태를 보관
+function openVisitList(){
+  if(!(CloudSvc&&CloudSvc.online)){toast("온라인(글로벌 거래소)일 때만 구경할 수 있습니다","bad");return}
+  var box=$("pbody");
+  box.insertAdjacentHTML("afterbegin","<div class='card' id='visitPanel' style='border-color:var(--line2);margin-bottom:12px'>"+
+    "<h3>다른 학생 월드 구경 가기 <span class='sm'>같은 방</span></h3><p class='eff'>불러오는 중…</p></div>");
+  CloudSvc.listWorlds(S.room,function(err,rows){
+    var el=$("visitPanel");if(!el)return;
+    if(err){el.querySelector(".eff").textContent="목록을 불러오지 못했습니다.";return}
+    rows=(rows||[]).filter(function(r){return r.name!==S.name});
+    if(!rows.length){el.querySelector(".eff").textContent="아직 구경할 수 있는 다른 학생이 없습니다.";return}
+    var h="<h3>다른 학생 월드 구경 가기 <span class='sm'>같은 방</span></h3>"+
+      "<p class='eff' style='margin-bottom:8px'>구경 중에는 캐기·설치가 잠깁니다. 언제든 복귀할 수 있어요.</p>";
+    rows.forEach(function(r){
+      h+="<div class='rw' style='margin:6px 0'><span class='chip' style='color:"+(BIOMES[r.biome]?BIOMES[r.biome].c:"var(--ink)")+"'>"+
+        esc(r.name)+" · "+bN(r.biome)+" · "+(r.day||1)+"일차</span><span style='flex:1'></span>"+
+        "<button class='mini acc' onclick=\"startVisit('"+encodeURIComponent(r.name)+"','"+r.biome+"')\">구경</button></div>";
+    });
+    el.innerHTML=h;
+  });
+}
+function startVisit(nameEnc,biome){
+  var name=decodeURIComponent(nameEnc);
+  if(S.isVisiting){toast("이미 구경 중입니다","bad");return}
+  toast(name+"의 대륙을 불러오는 중…");
+  /* [V4] 공유 월드는 (room,biome) 이므로 그 학생의 기후로 월드를 불러온다 */
+  CloudSvc.loadWorld(S.room,biome,function(err,rec){
+    if(err||!rec){toast("불러오기에 실패했습니다","bad");return}
+    /* 내 실제 상태 저장 후 보관 */
+    save();cloudSaveWorld(true);
+    myState=S;
+    closePanel();
+    $("hud").classList.add("hide");
+    $("load").classList.remove("hide");
+    $("ltx").textContent=esc(name)+"의 "+bN(rec.biome||biome)+" 대륙으로 이동 중…";
+    /* 방문용 임시 상태(간단): 실제 시뮬레이션은 하지 않음 */
+    var vis={ver:VER,name:name,biome:rec.biome||biome,seed:rec.seed,
+      pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
+      hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
+      inv:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
+      paused:false,isVisiting:true,room:S.room,visitOwner:name,
+      stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
+    S=vis;document.body.dataset.b=S.biome;
+    /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
+    if(CloudSvc&&CloudSvc.online)netStart(S.room,S.biome);
+    setTimeout(function(){
+      rebuildWorldFrom(S.biome,S.seed,S.edits,function(){
+        S.pos.x=W/2+.5;S.pos.z=W/2+.5;S.pos.y=findGround(S.pos.x,S.pos.z);
+        look.yaw=0;look.pitch=0;
+        $("load").classList.add("hide");
+        $("hud").classList.remove("hide");
+        refreshHotbar();updateVisitBanner();
+        toast("🔭 "+name+"의 대륙을 구경합니다","good");
+      });
+    },50);
+  });
+}
+function endVisit(){
+  if(!S.isVisiting||!myState){return}
+  var back=myState;
+  $("hud").classList.add("hide");
+  $("load").classList.remove("hide");
+  $("ltx").textContent="내 월드로 돌아가는 중…";
+  closePanel();
+  S=back;myState=null;document.body.dataset.b=S.biome;
+  /* [V4] 내 대륙의 실시간 채널로 복귀 */
+  if(CloudSvc&&CloudSvc.online)netStart(S.room,S.biome);
+  setTimeout(function(){
+    rebuildWorldFrom(S.biome,S.seed,S.edits,function(){
+      S.pos.y=findGround(S.pos.x,S.pos.z);
+      look.yaw=S.yaw||0;look.pitch=S.pitch||0;
+      $("load").classList.add("hide");
+      $("hud").classList.remove("hide");
+      refreshHotbar();updateVisitBanner();updateTabBadge();
+      toast("내 월드로 돌아왔습니다","good");
+    });
+  },50);
+}
+/* 관전 중 화면 상단 안내 배너 */
+function updateVisitBanner(){
+  var el=$("visitBanner");
+  if(S&&S.isVisiting){
+    if(!el){
+      el=document.createElement("div");el.id="visitBanner";
+      el.innerHTML="<span>🔭 <b id='vbName'></b> 의 월드 구경 중 · 캐기/설치 잠금</span>"+
+        "<button id='vbBack'>내 월드로 복귀</button>";
+      $("hud").appendChild(el);
+      $("vbBack").addEventListener("click",endVisit);
+      $("vbBack").addEventListener("touchstart",function(e){e.preventDefault();e.stopPropagation();endVisit()},{passive:false});
+    }
+    $("vbName").textContent=S.visitOwner||"";
+    el.classList.remove("hide");
+  }else if(el){el.classList.add("hide")}
+}
+/* ---------- 메인 루프 ---------- */
+var lastT=0,acc=0,saveAcc=0,hudAcc=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  t=t||performance.now();
+  var dt=Math.min(.1,(t-lastT)/1000||0);lastT=t;
+  if(!S)return;
+  if(!S.paused){
+    readKeys();
+    movePlayer(dt);
+    target=raycast(5.5);
+    if(S.isVisiting){
+      /* 관전 모드: 이동·둘러보기만 되고 채집/설치/시뮬레이션/저장은 모두 정지 */
+      mineHold=false;mining=null;
+    }else{
+      if(mineHold)tryMine(dt);else mining=null;
+      simulate(dt,false);
+      saveAcc+=dt;if(saveAcc>5){saveAcc=0;save()}
+      /* 클라우드 세이브: 변경이 있으면 10초마다 업로드 */
+      if(cloudActive()){cloudAcc+=dt;if(cloudAcc>10){cloudAcc=0;if(cloudDirtyFlag)cloudSaveWorld(false)}}
+    }
+    netTick(dt);                     // [V4] 실시간 좌표 방송·피어 보간
+  }
+  skyUpdate();
+  drawScene();
+  hudAcc+=dt;if(hudAcc>.16){hudAcc=0;drawHUD()}
+}
+document.addEventListener("visibilitychange",function(){
+  if(!S)return;
+  if(document.hidden){save();if(cloudActive())cloudSaveWorld(true)}
+  else{lastT=performance.now();if(!S.isVisiting&&catchUp()>60)toast("돌아왔습니다")}
+});
+window.addEventListener("beforeunload",function(){save();if(cloudActive())cloudSaveWorld(true);netStop()});
+/* ---------- 앱 설치 (파일 없이 아이콘·매니페스트 생성) ---------- */
+function mkIcon(sz){
+  var c=document.createElement("canvas");c.width=c.height=sz;var x=c.getContext("2d"),u=sz/512;
+  x.fillStyle="#0d1319";x.fillRect(0,0,sz,sz);
+  var cols=["#7cc46a","#1fbfa0","#63a9ec","#e8a33d","#9fd8ff","#b78cf0"];
+  for(var i=0;i<6;i++){var a=-Math.PI/2+i*Math.PI/3;
+    x.fillStyle=cols[i];x.fillRect(256*u+Math.cos(a)*150*u-38*u,256*u+Math.sin(a)*150*u-38*u,76*u,76*u)}
+  x.fillStyle="#e9f2f7";x.beginPath();x.arc(256*u,256*u,44*u,0,Math.PI*2);x.fill();
+  return c.toDataURL("image/png");
+}
+(function pwa(){
+  try{
+    var i192=mkIcon(192),i512=mkIcon(512);
+    [["apple-touch-icon",i192],["icon",i192]].forEach(function(p){
+      var l=document.createElement("link");l.rel=p[0];l.href=p[1];document.head.appendChild(l)});
+    var mf={name:"여섯 대륙 — 기후와 무역",short_name:"여섯 대륙",start_url:".",scope:".",display:"fullscreen",
+      orientation:"landscape",background_color:"#0d1319",theme_color:"#0d1319",lang:"ko",
+      icons:[{src:i192,sizes:"192x192",type:"image/png"},{src:i512,sizes:"512x512",type:"image/png"},
+             {src:i512,sizes:"512x512",type:"image/png",purpose:"maskable"}]};
+    var l2=document.createElement("link");l2.rel="manifest";
+    l2.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:"application/manifest+json"}));
+    document.head.appendChild(l2);
+  }catch(e){}
+})();
+window.addEventListener("beforeinstallprompt",function(e){
+  e.preventDefault();
+  var b=document.createElement("button");b.className="go ghost sm";b.textContent="📲 앱으로 설치하기";
+  b.onclick=function(){e.prompt();b.remove()};
+  var boot=$("boot");if(boot&&!boot.classList.contains("hide"))boot.querySelector(".bwrap").appendChild(b);
+});
+/* 시작 */
+(function(){
+  var ok=false;
+  try{var t=document.createElement("canvas");ok=!!(t.getContext("webgl")||t.getContext("experimental-webgl"))}catch(e){}
+  if(!ok){
+    document.getElementById("boot").innerHTML=
+      "<div class='bwrap'><h1 class='t'>3D를 켤 수 없습니다</h1>"+
+      "<p class='sub'>이 브라우저에서 WebGL이 꺼져 있습니다. 크롬·엣지·사파리 최신 버전에서 열어주세요.</p></div>";
+    return;
+  }
+  initMarket();initCloud();buildBoot();bindInput();
+})();
+</script>
+</body>
+</html>
