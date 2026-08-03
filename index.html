@@ -189,13 +189,53 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
 .toggle{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
 .toggle button{padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--ink2)}
 .toggle button[aria-pressed=true]{background:var(--accent);color:#0d1319}
+
+/* ===== [기후 생존] 화면 가장자리 위기 오버레이 (폭염 아지랑이 / 혹한 성에) ===== */
+#fx{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+#fxHeat,#fxCold{position:absolute;inset:-8%;opacity:0;transition:opacity .45s ease;will-change:opacity,transform}
+/* 폭염: 붉은 기운이 가장자리에서 일렁이며(아지랑이) 안쪽으로 밀려온다 */
+#fxHeat{background:
+  radial-gradient(120% 90% at 50% 50%, transparent 46%, rgba(228,80,40,.16) 66%, rgba(210,45,20,.5) 100%);
+  animation:heatWobble 1.7s ease-in-out infinite}
+#fxHeat:after{content:"";position:absolute;inset:0;
+  background:radial-gradient(140% 100% at 50% 108%, rgba(255,150,60,.28), transparent 60%);
+  mix-blend-mode:screen;animation:heatRise 2.4s ease-in-out infinite}
+@keyframes heatWobble{0%,100%{filter:blur(0px) saturate(1)}50%{filter:blur(2.5px) saturate(1.3)}}
+@keyframes heatRise{0%,100%{transform:translateY(6px) scaleY(1.02);opacity:.75}50%{transform:translateY(-6px) scaleY(1.05);opacity:1}}
+/* 혹한: 하얀 성에가 가장자리에 끼고 네 귀퉁이에 결정이 자란다 */
+#fxCold{background:
+  radial-gradient(120% 90% at 50% 50%, transparent 44%, rgba(190,228,255,.22) 64%, rgba(150,205,245,.62) 100%);
+  animation:coldBreathe 3s ease-in-out infinite}
+#fxCold:before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+   radial-gradient(60% 60% at 0% 0%, rgba(255,255,255,.55), transparent 55%),
+   radial-gradient(60% 60% at 100% 0%, rgba(255,255,255,.55), transparent 55%),
+   radial-gradient(60% 60% at 0% 100%, rgba(255,255,255,.5), transparent 55%),
+   radial-gradient(60% 60% at 100% 100%, rgba(255,255,255,.5), transparent 55%);
+  mix-blend-mode:screen}
+@keyframes coldBreathe{0%,100%{filter:blur(.4px) brightness(1)}50%{filter:blur(1.4px) brightness(1.12)}}
+/* 화면 중앙 상단의 위기 경고 배너 */
+#envWarn{position:absolute;left:50%;top:calc(58px + env(safe-area-inset-top));transform:translateX(-50%);
+  z-index:11;pointer-events:none;display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;font-size:13px;
+  font-weight:800;letter-spacing:.01em;backdrop-filter:blur(6px);white-space:nowrap;box-shadow:0 4px 18px #0008;
+  animation:warnPulse 1.2s ease-in-out infinite}
+#envWarn.heat{background:#2a120bee;border:1px solid #ef7a3f;color:#ffcaa0}
+#envWarn.cold{background:#0d1c2aee;border:1px solid #7fc7ff;color:#cfeeff}
+#envWarn.safe{background:#0f2418ee;border:1px solid var(--good);color:#bff0d6;animation:none}
+@keyframes warnPulse{0%,100%{box-shadow:0 4px 18px #0008}50%{box-shadow:0 4px 26px #000c}}
+/* 오래 보여주는 '배움' 토스트(기후 적응 설명) */
+.toast.lesson{white-space:normal;max-width:320px;line-height:1.55;text-align:left;padding:11px 15px;
+  border-color:var(--accent);background:#0d1922f2;font-size:12.5px}
+.toast.lesson b{color:var(--accent)}
 </style>
 </head>
 <body data-b="temperate">
 <canvas id="c"></canvas>
+<div id="fx"><div id="fxHeat"></div><div id="fxCold"></div></div>
 <div id="peerLabels"></div>
 
 <div id="hud" class="hide">
+  <div id="envWarn" class="hide"></div>
   <div class="top">
     <div class="stats" id="stats"></div>
     <div class="info">
@@ -215,6 +255,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
     <button data-p="bag" title="가방·제작 (E)">🎒<span class="lab">가방</span></button>
     <button data-p="trade" title="무역소 (T)">⚖️<span class="lab">무역</span></button>
     <button data-p="record" title="기록 (R)">🏅<span class="lab">기록</span></button>
+    <button data-p="edu" title="학습 (G)">📚<span class="lab">학습</span></button>
     <button data-p="help" title="도움말 (H)">❓<span class="lab">도움</span></button>
   </div>
   <div id="hotbar"></div>
@@ -236,6 +277,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
       <button data-p="bag">🎒 가방·제작</button>
       <button data-p="trade">⚖️ 무역소</button>
       <button data-p="record">🏅 기록</button>
+      <button data-p="edu">📚 학습</button>
       <button data-p="help">❓ 도움말</button>
       <button class="x" id="pclose">✕</button>
     </div>
@@ -389,6 +431,7 @@ var ITEMS={
  coat:{n:"방한복",em:"🧥",tier:2,val:9.5},
  shade:{n:"햇빛막이",em:"⛱️",tier:2,val:9.5},
  bread:{n:"빵",em:"🍞",tier:2,val:4.2,food:{h:36}},
+ dried_fruit:{n:"말린 과일",em:"🍯",tier:2,val:3.6,food:{h:22,w:6}},
  campfire:{n:"모닥불",em:"🔥",tier:2,val:2},
  oil:{n:"원유",em:"🛢️",tier:3,val:3.6},
  gold:{n:"금",em:"🥇",tier:3,val:5.2},
@@ -413,8 +456,8 @@ var BIOMES={
  temperate:{n:"온대",diff:"EASY",dk:"쉬움",c:"#7cc46a",ord:0,role:"세계의 식량 창고 · 1차 산업",
    mods:{hunger:1,hydra:1,regen:1,cost:1,rot:1},day:22,night:14,
    sky:[0x8fc6ea,0x0b1220],fog:0xa9cfe8,grass:1,found:["밀","나무","점토","물"]},
- tropical:{n:"열대 우림",diff:"NORMAL",dk:"보통",c:"#1fbfa0",ord:1,role:"사치재 · 특수작물",
-   mods:{hunger:1,hydra:1.3,regen:1,cost:1.5,rot:2},day:32,night:25,
+ tropical:{n:"열대 우림",diff:"NORMAL",dk:"보통",c:"#1fbfa0",ord:1,role:"사치재 · 특수작물 (음식이 빨리 상함)",
+   mods:{hunger:1,hydra:1.3,regen:1,cost:1.5,rot:3},day:32,night:25,
    sky:[0x7fd4c2,0x08201c],fog:0x9fd9c9,grass:1,found:["고무","카카오","커피","향신료","희귀원목","과일"]},
  taiga:{n:"냉대",diff:"NORMAL",dk:"보통",c:"#63a9ec",ord:2,role:"보존 · 가공재",
    mods:{hunger:1.2,hydra:.9,regen:1,cost:1.1,rot:.7},day:4,night:-8,
@@ -441,10 +484,108 @@ function whereFrom(k){
   for(var i=0;i<RECIPES.length;i++)if(RECIPES[i].out[k])return "가방→제작에서 만들 수 있습니다";
   return "다른 대륙에서 구해야 합니다";
 }
+/* 기후별 '살아남는 법' 안내(도움말) — 게임에서 몸으로 겪는 규칙을 말로 정리 */
+var BIOME_SURVIVE={
+ temperate:"기후가 온화해 살기 좋습니다. 밀 농사로 식량이 넘치니, 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
+ tropical:"습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
+ taiga:"추워서 <b>농사가 안 됩니다</b>. 대신 <b>낚시·사냥(모피)·벌목</b>으로 삽니다. 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
+ desert:"낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>채집은 서늘한 <b>밤</b>에 하세요. 도착 직후 아침에 서둘러 <b>대피소부터</b> 지으세요.",
+ tundra:"낮이 <b>아주 짧습니다(08~16시)</b>. 밝을 때 <b>낚시</b>로 먹을 것을 모으고, 밤엔 <b>모닥불·방한복·지붕 있는 집</b> 안에서 버티세요. 밤에 밖을 돌면 몸이 얼어 느려지고 쓰러집니다. 이 땅에선 <b>농사가 안 되니</b> 낚시·모피가 생명줄입니다.",
+ alpine:"공기가 희박해 회복이 느립니다(기력·체력 주의). 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
+};
+/* ==========================================================================
+   [학습 콘텐츠] 6학년 사회 '기후와 생활' 교과 내용
+   각 기후: 월별 기온(°C)/강수(mm) → 기후 그래프, 의식주 적응, 대표 지역, 탐구 질문, 자기점검 퀴즈
+   ========================================================================== */
+var CLIMATE_EDU={
+ temperate:{
+   region:"우리나라·중국 동부·미국 동부·서유럽",
+   summary:"사계절이 뚜렷하고 여름에 비가 집중됩니다. 온화해 사람이 살기 좋습니다.",
+   clothes:"계절마다 옷을 바꿔 입습니다(여름 얇은 옷·겨울 두꺼운 옷).",
+   food:"벼·밀 농사가 잘 되어 <b>식량이 풍부</b>합니다.",
+   house:"계절 변화에 맞춘 일반 가옥(기와집·목조 등).",
+   industry:"세계의 식량 창고 · 농업(1차 산업)",
+   temp:[-2,1,7,13,18,22,25,26,21,14,7,0],
+   rain:[20,25,45,65,95,130,395,340,140,50,45,25],
+   q:["온대는 왜 인구가 많고 농업이 발달했을까요?","남는 식량을 어느 대륙(사막·한대)에 팔면 서로에게 좋을까요?"],
+   quiz:{q:"온대 기후에서 농업이 발달한 가장 큰 까닭은?",a:["기온이 온화하고 강수가 적당해 작물이 잘 자란다","일 년 내내 얼어 있어서","비가 전혀 오지 않아서"],c:0}
+ },
+ tropical:{
+   region:"아마존·동남아시아·콩고 분지(적도 부근)",
+   summary:"일 년 내내 덥고 비가 많이 옵니다. 습기와 벌레·홍수가 큰 문제입니다.",
+   clothes:"얇고 <b>통풍이 잘 되는 옷</b>을 입어 더위와 습기를 피합니다.",
+   food:"과일·향신료·카카오가 풍부하지만 <b>음식이 빨리 상해</b> 절이거나 바로 팔아야 합니다.",
+   house:"습기·벌레·홍수를 피하려고 <b>기둥을 세워 바닥을 띄운 고상 가옥</b>을 짓습니다.",
+   industry:"플랜테이션 · 사치작물(향신료·커피·고무)",
+   temp:[26,27,27,28,28,28,27,27,27,27,26,26],
+   rain:[240,160,180,180,170,160,160,175,180,205,255,290],
+   q:["열대 우림 사람들은 왜 집을 땅에서 띄워 지을까요?","더운 곳에서 음식을 오래 보관하려면 어떻게 해야 할까요?"],
+   quiz:{q:"열대 우림에서 고상 가옥(기둥집)을 짓는 까닭은?",a:["습기·벌레·홍수를 피하기 위해","눈이 많이 쌓여서","바람이 전혀 불지 않아서"],c:0}
+ },
+ taiga:{
+   region:"시베리아·캐나다 북부·북유럽(침엽수림대)",
+   summary:"겨울이 길고 매우 춥습니다. 여름은 짧습니다. 침엽수 숲이 넓게 펼쳐집니다.",
+   clothes:"두꺼운 옷과 <b>모피</b>로 추위를 막습니다.",
+   food:"추워서 <b>농사가 어렵고</b>, 낚시·사냥과 감자 등으로 먹고삽니다.",
+   house:"주변에 많은 나무로 지은 <b>통나무집</b>. 추워서 음식은 잘 상하지 않습니다.",
+   industry:"임업 · 모피 · 보존·가공재",
+   temp:[-9,-8,-2,7,14,18,20,18,12,5,-2,-7],
+   rain:[40,35,35,40,50,70,85,75,60,55,50,45],
+   q:["냉대(침엽수림)에서 농사 대신 어떤 일로 살아갈까요?","날이 추운 것이 음식 보관에는 왜 도움이 될까요?"],
+   quiz:{q:"냉대 기후 사람들의 주된 생활 방식은?",a:["임업·모피·낚시와 사냥","넓은 벼농사","향신료 플랜테이션"],c:0}
+ },
+ desert:{
+   region:"사하라·아라비아·중앙아시아 건조 지역",
+   summary:"비가 거의 오지 않고 <b>한낮은 매우 뜨겁고 밤은 서늘</b>합니다(일교차 큼).",
+   clothes:"온몸을 덮는 <b>헐렁하고 긴 옷</b>으로 햇빛·모래·수분 증발을 막습니다.",
+   food:"물이 귀해 대추야자·가축(유목)에 의지합니다.",
+   house:"<b>흙벽돌집</b>: 벽을 두껍게, 창을 작게 만들어 열을 막습니다.",
+   industry:"석유·광물 등 지하자원 · 첨단재(유리)",
+   temp:[15,18,22,28,33,37,38,38,35,29,22,17],
+   rain:[12,8,20,25,10,0,0,0,0,2,5,12],
+   q:["사막 사람들은 왜 한낮에 쉬고 밤·새벽에 움직일까요?","흙집의 벽이 두껍고 창이 작은 까닭은 무엇일까요?"],
+   quiz:{q:"사막에서 낮에 활동을 피하는 까닭은?",a:["한낮의 폭염으로 몸이 위험해서","비가 너무 많이 와서","너무 추워서"],c:0}
+ },
+ tundra:{
+   region:"북극해 연안·그린란드·시베리아 북부",
+   summary:"일 년 내내 춥고 <b>겨울밤이 깁니다</b>. 나무가 자라지 못합니다.",
+   clothes:"동물 <b>모피로 만든 두꺼운 방한복</b>으로 체온을 지킵니다.",
+   food:"<b>농사가 불가능</b>해 낚시·사냥(순록·물고기)으로만 먹고삽니다.",
+   house:"눈·얼음으로 만든 이글루 등 <b>단단히 막고 불로 데우는 집</b>.",
+   industry:"어업 · 자원 · 보존·특수재",
+   temp:[-25,-27,-25,-18,-7,1,4,3,-1,-9,-18,-23],
+   rain:[5,5,5,5,8,10,20,25,15,12,8,6],
+   q:["한대 지방에서 농사를 지을 수 없는 까닭은 무엇일까요?","짧은 낮과 긴 밤은 사람들의 생활 시간에 어떤 영향을 줄까요?"],
+   quiz:{q:"한대(툰드라) 지방 사람들의 식량은 주로?",a:["낚시와 사냥으로 얻는다","넓은 밭에서 곡식을 기른다","바나나를 재배한다"],c:0}
+ },
+ alpine:{
+   region:"안데스·히말라야·알프스 등 높은 산지",
+   summary:"고도가 높아 <b>일 년 내내 서늘하고 일교차가 큽니다</b>. 공기가 희박합니다.",
+   clothes:"낮과 밤의 큰 기온차에 대비해 <b>겹겹이 껴입습니다</b>.",
+   food:"감자 등 고랭지 작물과 가축(라마·야크)에 의지합니다.",
+   house:"바람과 추위를 막는 <b>돌집</b>.",
+   industry:"광업(철·구리) · 중화학",
+   temp:[-6,-5,-2,2,6,10,12,11,8,3,-2,-5],
+   rain:[60,55,60,70,90,110,120,110,85,70,65,60],
+   q:["높은 산지에서 회복이 느리게 느껴지는 까닭(공기)은 무엇일까요?","고산 지대는 어떤 자원(광물)으로 다른 대륙과 거래할 수 있을까요?"],
+   quiz:{q:"고산 기후의 특징으로 알맞은 것은?",a:["일 년 내내 서늘하고 일교차가 크다","일 년 내내 무덥다","비가 전혀 오지 않는다"],c:0}
+ }
+};
+/* 게임에서 몸으로 겪은 '배움'(S.taught 키) → 학습 노트에 정리해 보여줄 문구 */
+var LESSON_LABELS={
+ heat:"🔥 사막의 한낮은 사람이 활동할 수 없을 만큼 뜨겁다 → 낮엔 실내에서 쉬고 밤에 움직인다.",
+ shelterD:"🏠 지붕 있는 실내에 들어가면 폭염을 피할 수 있다 → 사막의 두꺼운 흙벽돌집.",
+ cold:"❄️ 극지방의 밤은 얼어붙을 만큼 춥고 낮이 짧다 → 밝을 때 서둘러 먹이를 구한다.",
+ shelterT:"🏠 지붕·불이 있으면 혹한을 견딜 수 있다 → 단단히 막은 집과 불에 의지한다.",
+ stilt:"🌴 열대에선 땅에 지은 집이 습기·벌레로 썩는다 → 기둥 위에 짓는 고상 가옥.",
+ rotfood:"🍌 무더운 열대에선 음식이 빨리 상한다 → 향신료로 절이거나 바로 판다.",
+ nofarm:"🌾 너무 추운 땅에선 곡식이 자라지 않는다 → 농사 대신 낚시·사냥으로 산다."
+};
 var RECIPES=[
  {id:"plank",out:{plank:2},need:{wood:1},eff:"건축의 기본 재료 · 놓을 수 있음"},
  {id:"fiber",out:{fiber:1},need:{wheat:3},eff:"옷을 만드는 실"},
  {id:"bread",out:{bread:2},need:{wheat:3,water:1},eff:"썩지 않는 식량 · 허기 +36"},
+ {id:"dried_fruit",out:{dried_fruit:2},need:{fruit:3,spice:1},eff:"향신료로 절인 보존식 · 썩지 않음 (열대에서 과일을 오래 두는 법)"},
  {id:"campfire",out:{campfire:1},need:{wood:3},eff:"놓으면 주변 체온을 지켜줍니다"},
  {id:"coat",out:{coat:1},need:{fur:2,fiber:2},eff:"추위를 막아줍니다 (냉대·한대 필수)"},
  {id:"shade",out:{shade:1},need:{plank:2,fiber:2},eff:"더위를 막아줍니다 (건조 기후 필수)"},
@@ -1043,6 +1184,80 @@ var mining=null, target=null, isTouch=("ontouchstart" in window)||navigator.maxT
 var look={yaw:0,pitch:0}, moveVec={f:0,s:0}, wantJump=false, sprint=false;
 var DAYSEC=600, SUNRISE=6;
 
+/* ==========================================================================
+   [기후 생존 시스템] 자연환경이 생활 양식을 강제하는 규칙들
+   ------------------------------------------------------------------------
+   · 사막(desert): 한낮 09~17시 폭염. 지붕(실내)이나 밤에만 안전.
+   · 한대(tundra): 밤엔 혹한. 짧은 낮(08~16시)에만 밖에서 활동 가능.
+   · 열대(tropical): 땅에 지은 집은 습기·해충으로 썩음 → 나무 기둥 위 고상 가옥만 유지.
+   · 한대/냉대(tundra/taiga): 추워서 농사 불가 → 낚시·수렵만.
+   매 프레임 simulate 가 이 상태를 계산해 스탯·이동·화면효과에 반영한다. ======= */
+var curHazard={type:null,sev:0,sheltered:false};   // 현재 위기 상태(HUD/오버레이가 참조)
+var envMoveSlow=0;                                  // 저체온 시 이동 둔화(0~1)
+var HOUSE={30:1,31:1,32:1,33:1,34:1};               // '집(거주 구조물)' 재료: 판자·벽돌·유리·석재블록·철블록
+var TROP_DECAY=20;                                  // 열대에서 접지형 집이 썩기까지(초)
+var lastEnvToast=0;                                 // 폭염/혹한 중 조작 재촉 토스트 스로틀
+
+/* 머리 위(하늘 방향)가 막혀 있는가? = 지붕이 있는 실내이거나 지하인가 판별.
+   사막의 '천장 덮인 실내', 한대의 '지붕 있는 대피소'를 이걸로 인정한다. */
+function shelteredNow(){
+  var px=Math.floor(S.pos.x), pz=Math.floor(S.pos.z);
+  var y0=Math.floor(S.pos.y+PH+.01);                // 머리 바로 위부터
+  for(var y=y0;y<H;y++){
+    var b=getB(px,y,pz);
+    if(b&&BL[b]&&BL[b].solid){return true;}         // 위쪽 어딘가에 단단한 블록(지붕) → 실내/지하
+  }
+  return false;
+}
+/* 현재 기후·시각·장비에 따른 위기 계산 → {type:'heat'|'cold'|null, sev:0~1, sheltered} */
+function envHazard(){
+  var h=clockOf(S).h, sheltered=shelteredNow();
+  var res={type:null,sev:0,sheltered:sheltered};
+  if(S.biome==="desert"){
+    /* 09:00~17:00 폭염. 지붕 아래(실내/지하)면 완전 회피. */
+    if(h>=9&&h<17&&!sheltered){
+      var mit=qty(S,"shade")>0?0.4:0;               // 햇빛막이는 부분 완화(그래도 밖은 위험)
+      res.type="heat";res.sev=1-mit;
+    }
+  }else if(S.biome==="tundra"){
+    /* 짧은 낮 08:00~16:00 밖에서만 안전. 그 외엔 혹한. 불·방한복·지붕으로 완화. */
+    if(h<8||h>=16){
+      var m2=0;
+      if(sheltered)m2+=0.5;
+      if(fireOn)m2+=0.4;
+      if(qty(S,"coat")>0)m2+=0.35;
+      m2=Math.min(m2,1);
+      if(m2<1){res.type="cold";res.sev=1-m2;}
+    }
+  }
+  return res;
+}
+/* 열대에서 (x,y,z)의 집 블록이 '땅에 접지'되어 썩을 운명인지(=고상 가옥이 아닌지) 판별.
+   아래로 훑어 나무 기둥(6)/빈공간을 만나면 고상(안전), 자연 지면을 만나면 접지(썩음). */
+function isGroundedHouse(x,y,z){
+  for(var yy=y-1;yy>=0;yy--){
+    var b=getB(x,yy,z);
+    if(b===6)return false;                          // 나무 기둥 위 → 고상 가옥(안전)
+    if(b===0||b===5)return false;                   // 아래가 빈공간/물 → 공중(안전)
+    if(HOUSE[b])continue;                            // 집 재료면 계속 내려가며 추적
+    return true;                                     // 자연 지면(흙·풀·모래·돌 등) 위에 바로 앉음 → 썩음
+  }
+  return false;
+}
+/* 기후 적응의 '왜'를 한 번만 크게 알려주는 배움 토스트 */
+function lessonToast(m){
+  var b=$("toasts");if(!b)return;
+  var e=document.createElement("div");e.className="toast lesson";e.innerHTML=m;
+  b.appendChild(e);setTimeout(function(){e.remove()},7200);
+  while(b.children.length>4)b.firstChild.remove();
+}
+function teachOnce(key,msg){
+  if(!S.taught)S.taught={};
+  if(S.taught[key])return;
+  S.taught[key]=1;lessonToast(msg);
+  logAdd(S,"[배움] "+String(msg).replace(/<[^>]+>/g,""));
+}
+
 function clamp(v,a,b){return v<a?a:v>b?b:v}
 function ri(a,b){return a+Math.floor(Math.random()*(b-a+1))}
 function uuid(){return (Date.now().toString(36)+Math.random().toString(36).slice(2,8))}
@@ -1071,7 +1286,7 @@ function movePlayer(dt){
   var p=S.pos,v=S.vel;
   /* 혹시 블록 안에 끼었다면 위로 밀어 올려 스스로 빠져나오게 함 */
   for(var g=0;g<10&&blocked(p.x,p.y,p.z);g++){p.y+=1;v.y=0}
-  var speed=(sprint&&S.stam>5?6.4:4.3)*(inWater(p)?.55:1);
+  var speed=(sprint&&S.stam>5?6.4:4.3)*(inWater(p)?.55:1)*(1-clamp(envMoveSlow,0,.7));
   var sy=Math.sin(look.yaw),cy=Math.cos(look.yaw);
   var f=moveVec.f,st=moveVec.s,len=Math.hypot(f,st);
   if(len>1){f/=len;st/=len}
@@ -1143,6 +1358,11 @@ function raycast(maxD){
 var MINE_TOLER=0.3;
 function tryMine(dt){
   if(S.isVisiting){mining=null;return}          // 관전 중에는 채집 불가
+  /* [기후 적응·산업] 한대·냉대에선 작물(밀 등)을 재배·수확할 수 없다 */
+  if(target&&target.b===24&&(S.biome==="tundra"||S.biome==="taiga")){
+    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
+    toast("날이 추워 작물이 자라지 않습니다","bad");mining=null;return;
+  }
   var mod=BIOMES[S.biome].mods.cost;
 
   /* 현재 조준하고 있는 유효한(캘 수 있는) 블록의 키를 구한다 */
@@ -1249,11 +1469,33 @@ function tryPlace(){
   if(overlapsPlayer(bx,by,bz)){toast("캐릭터와 겹치는 곳에는 설치할 수 없습니다","bad");return}
   var id=PLACE[sel];
   if(!id){toast(iN(sel)+"은(는) 설치할 수 없는 아이템입니다","bad");return}
+  /* [기후 적응·산업] 한대·냉대에선 작물(밀)을 흙에 심을 수 없다 */
+  if(id===24&&(S.biome==="tundra"||S.biome==="taiga")){
+    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
+    toast("날이 추워 작물이 자라지 않습니다","bad");return;
+  }
   if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
   setB(bx,by,bz,id);S.edits[bx+","+by+","+bz]=id;markDirty(bx,bz);
   netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
   S.stat.placed++;
   toast(iE(sel)+" "+iN(sel)+" 설치","good");
+  /* [기후 적응·거주] 열대: 땅에 바로 지은 집은 습기·해충으로 곧 썩는다.
+     나무 기둥(고상 가옥) 위나 공중에 지은 집만 남는다. */
+  if(S.biome==="tropical"){
+    if(!S.decay)S.decay={};
+    if(HOUSE[id]&&isGroundedHouse(bx,by,bz)){
+      S.decay[bx+","+by+","+bz]=TROP_DECAY;
+      teachOnce("stilt","🌴 <b>열대 우림</b>은 습기와 벌레가 많아 <b>땅에 지은 집은 금방 썩습니다</b>. 그래서 이곳 사람들은 <b>나무 기둥을 세우고 그 위에 사는 '고상 가옥'</b>을 짓습니다.");
+      toast("⚠ 습한 땅 위의 집은 곧 썩습니다! 나무 기둥 위에 지으세요","warn");
+    }
+    if(id===6){                                   // 나무 기둥을 세우면 바로 위 접지 집을 고상으로 승격 → 부패 취소
+      var upK=bx+","+(by+1)+","+bz;
+      if(S.decay[upK]){delete S.decay[upK];toast("🌳 기둥이 집을 받쳐 썩지 않게 되었습니다","good");}
+    }
+    if(HOUSE[id]&&!isGroundedHouse(bx,by,bz)){     // 고상으로 지은 집: 혹시 남아있던 부패 예약 해제
+      delete S.decay[bx+","+by+","+bz];
+    }
+  }
   if(id===35){S.hasPost=true;toast("무역소를 세웠습니다. 가까이서 무역할 수 있어요","good")}
   if(id===36){S.stat.monument=true;setTimeout(winScreen,300)}
   refreshHotbar();
@@ -1324,6 +1566,7 @@ function updateRot(dt,rotMod,quiet){
   if(spoiledMsg.length&&!quiet){
     var txt=spoiledMsg.map(function(s){return iE(s.k)+iN(s.k)+" "+s.n}).join(", ");
     toast(txt+" 상함","bad");refreshHotbar();
+    if(S.biome==="tropical")teachOnce("rotfood","🍌 <b>무더운 열대</b>에선 음식이 순식간에 상합니다. 그래서 이곳 사람들은 <b>향신료로 절여(말린 과일)</b> 보존하거나, 상하기 전에 <b>다른 대륙에 바로 팔아</b> 손해를 막습니다.");
     if(panelTab==="bag")drawPanel();
   }
 }
@@ -1354,6 +1597,52 @@ function simulate(dt,quiet){
   S.hydra=clamp(S.hydra-.10*m.hydra*dt,0,100);
   S.stam=clamp(S.stam+1.25*m.regen*(mining?.25:1)*dt,0,100);
   if(!quiet){fireCheck-=dt;if(fireCheck<=0){fireCheck=1.5;fireOn=nearFire()}}
+
+  /* ===== [기후 생존] 폭염(사막 낮)·혹한(한대 밤) 위기 처리 ===== */
+  envMoveSlow=0;curHazard={type:null,sev:0,sheltered:false};
+  if(S.hazGrace>0)S.hazGrace=Math.max(0,S.hazGrace-dt);   // 부활 직후 잠깐 위기 면제
+  if(!quiet){
+    var hz=envHazard();curHazard=hz;
+    if(S.hazGrace<=0&&hz.type==="heat"){
+      /* 폭염: 수분·기력이 초당 약 5씩 증발, 체온 급상승 → 밖에 있으면 1분 내 탈진 */
+      S.hydra=clamp(S.hydra-5*hz.sev*dt,0,100);
+      S.stam =clamp(S.stam -5*hz.sev*dt,0,100);
+      S.temp =Math.min(41,S.temp+0.9*hz.sev*dt);
+      teachOnce("heat","☀ <b>사막의 한낮</b>은 사람이 버틸 수 없을 만큼 뜨겁습니다. 그래서 사막 사람들은 낮엔 <b>두꺼운 흙집 안</b>에서 쉬고 서늘한 <b>밤</b>에 움직입니다. 지붕 있는 실내로 피하거나 굴을 파세요!");
+      var now=performance.now();
+      if(now-lastEnvToast>4000){lastEnvToast=now;toast("🔥 폭염! 그늘·실내로 피하세요","bad");}
+    }else if(S.hazGrace<=0&&hz.type==="cold"){
+      /* 혹한: 기력 소모·체온 급강하·몸이 얼어 이동이 느려짐 → 밖을 돌아다닐 수 없음 */
+      S.stam=clamp(S.stam-4*hz.sev*dt,0,100);
+      S.temp=Math.max(30,S.temp-0.8*hz.sev*dt);
+      envMoveSlow=Math.min(0.7,hz.sev*0.75);
+      teachOnce("cold","❄ <b>극지방의 밤</b>은 얼어붙을 만큼 춥고 낮이 짧습니다. 그래서 이곳 사람들은 <b>밝을 때 서둘러</b> 먹을 것을 구하고, 밤엔 <b>모닥불·방한복·지붕 있는 대피소</b>로 버팁니다.");
+      var now2=performance.now();
+      if(now2-lastEnvToast>4000){lastEnvToast=now2;toast("❄️ 혹한! 불·집·방한복이 필요합니다","bad");}
+    }else if(hz.sheltered){
+      /* 위기 시간대에 지붕 아래로 잘 대피했을 때의 긍정적 학습 */
+      var hh=clockOf(S).h;
+      if(S.biome==="desert"&&hh>=9&&hh<17)
+        teachOnce("shelterD","🏠 지붕 아래로 들어오니 폭염이 사라졌습니다. 사막의 <b>흙벽돌집</b>이 벽을 두껍게, 창을 작게 만드는 이유입니다.");
+      else if(S.biome==="tundra"&&(hh<8||hh>=16))
+        teachOnce("shelterT","🏠 지붕·불이 있으니 혹한을 견딜 수 있습니다. 극지방 사람들이 <b>단단히 막힌 집</b>과 <b>불</b>에 의지해 사는 이유입니다.");
+    }
+  }
+
+  /* ===== [기후 거주] 열대: 접지형 집이 습기·해충으로 서서히 썩어 무너짐 ===== */
+  if(S.biome==="tropical"&&S.decay){
+    for(var dk in S.decay){
+      if(!S.decay.hasOwnProperty(dk))continue;
+      S.decay[dk]-=dt;
+      if(S.decay[dk]<=0){
+        var da=dk.split(","),dx=+da[0],dy=+da[1],dz=+da[2];
+        if(HOUSE[getB(dx,dy,dz)]){setB(dx,dy,dz,0);S.edits[dk]=0;markDirty(dx,dz);netBroadcastEdit(dx,dy,dz,0);}
+        delete S.decay[dk];
+        if(!quiet){toast("🌿 습기와 해충으로 집이 썩어 무너졌습니다","bad");refreshHotbar();}
+      }
+    }
+  }
+
   S.temp+=(tempTarget()-S.temp)*Math.min(1,.02*dt);
   var d=0;
   if(S.hunger<=0)d+=.32;
@@ -1365,7 +1654,8 @@ function simulate(dt,quiet){
   if(quiet)S.hp=Math.max(S.hp,25);
   updateRot(dt,m.rot,quiet);
   if(S.hp<=0&&!quiet){
-    S.hp=55;S.hunger=Math.max(S.hunger,45);S.hydra=Math.max(S.hydra,45);S.temp=36.5;S.faint++;
+    S.hp=55;S.hunger=Math.max(S.hunger,45);S.hydra=Math.max(S.hydra,55);S.stam=Math.max(S.stam,55);S.temp=36.5;S.faint++;
+    S.hazGrace=7;                                  // 깨어난 직후 잠깐은 폭염/혹한 면제 → 대피할 시간
     S.pos.x=S.spawn.x;S.pos.z=S.spawn.z;S.pos.y=findGround(S.spawn.x,S.spawn.z);S.vel.y=0;
     var dropped=applyDeathPenalty();
     logAdd(S,"탈진해서 쓰러졌습니다. 처음 도착한 곳에서 깨어났습니다."+
@@ -2110,6 +2400,23 @@ function drawHUD(){
   var ring=$("minering"),mr=$("mr");
   if(mining){ring.classList.remove("hide");mr.style.strokeDashoffset=138*(1-mining.t/mining.need)}
   else ring.classList.add("hide");
+
+  /* ===== [기후 생존] 화면 가장자리 위기 오버레이 + 경고 배너 ===== */
+  var fxH=$("fxHeat"),fxC=$("fxCold"),warn=$("envWarn");
+  var hz=(S&&!S.isVisiting)?curHazard:{type:null,sev:0,sheltered:false};
+  if(hz&&hz.type==="heat"&&hz.sev>0){
+    fxH.style.opacity=(0.38+0.55*hz.sev).toFixed(2);fxC.style.opacity=0;
+    warn.className="heat";warn.innerHTML="🔥 폭염 — 그늘·실내(지붕 아래)로 피하거나 밤에 활동하세요";
+  }else if(hz&&hz.type==="cold"&&hz.sev>0){
+    fxC.style.opacity=(0.32+0.6*hz.sev).toFixed(2);fxH.style.opacity=0;
+    warn.className="cold";warn.innerHTML="❄️ 혹한 — 모닥불·방한복·지붕 있는 집으로 몸을 녹이세요";
+  }else{
+    fxH.style.opacity=0;fxC.style.opacity=0;
+    /* 위기는 없지만 대피에 성공한 상태면 안심 배너를 잠깐 */
+    if(hz&&hz.sheltered&&(S.biome==="desert"||S.biome==="tundra")){
+      warn.className="safe";warn.innerHTML=(S.biome==="desert"?"🏠 실내 — 폭염을 피했습니다":"🏠 실내 — 혹한을 피했습니다");
+    }else warn.className="hide";
+  }
 }
 function updateTabBadge(){
   var b=document.querySelector("#tabs button[data-p=trade]");if(!b)return;
@@ -2125,6 +2432,7 @@ function openPanel(tab){
   var bs=$("ptabs").querySelectorAll("button[data-p]");
   for(var i=0;i<bs.length;i++)bs[i].setAttribute("aria-current",bs[i].dataset.p===tab?"true":"false");
   if(tab==="trade"){S.newOffers=0;updateTabBadge();pollMarket()}
+  if(tab==="edu")S._quiz=-1;
   drawPanel();
 }
 function closePanel(){panelTab=null;S.paused=false;$("panel").classList.add("hide")}
@@ -2134,6 +2442,7 @@ function drawPanel(){
   if(panelTab==="bag")h=uiBag();
   else if(panelTab==="trade")h=uiTrade();
   else if(panelTab==="record")h=uiRecord();
+  else if(panelTab==="edu")h=uiEdu();
   else h=uiHelp();
   $("pbody").innerHTML=h;
 }
@@ -2293,6 +2602,85 @@ function uiRecord(){
     "<button class='mini' style='margin-top:8px' onclick='askReset()'>처음부터 다시</button></div></div>";
   return h;
 }
+/* ---- 기후 그래프 읽기: 월별 기온(선)·강수(막대) 인라인 SVG ---- */
+function climograph(biome){
+  var E=CLIMATE_EDU[biome];if(!E)return "";
+  var W2=336,H2=168,x0=40,x1=322,yTop=16,yBot=128;
+  var mw=(x1-x0)/12;
+  var pmax=Math.max.apply(null,E.rain);pmax=Math.max(pmax,60);
+  function py(t){return yBot-((t+30)/70)*(yBot-yTop)}  // 기온 -30~40°C
+  function ry(mm){return (mm/pmax)*(yBot-yTop)}         // 강수 높이
+  var bars="",line="",dots="",mlab="";
+  for(var i=0;i<12;i++){
+    var bx=x0+mw*i+2, bw=mw-4, bh=ry(E.rain[i]);
+    bars+="<rect x='"+bx.toFixed(1)+"' y='"+(yBot-bh).toFixed(1)+"' width='"+bw.toFixed(1)+"' height='"+bh.toFixed(1)+"' fill='#63a9ec' opacity='.75' rx='1'/>";
+    var cx=x0+mw*i+mw/2, cy=py(E.temp[i]);
+    line+=(i?"L":"M")+cx.toFixed(1)+" "+cy.toFixed(1)+" ";
+    dots+="<circle cx='"+cx.toFixed(1)+"' cy='"+cy.toFixed(1)+"' r='2.4' fill='#e8a33d'/>";
+    if(i%3===0)mlab+="<text x='"+cx.toFixed(1)+"' y='"+(yBot+13)+"' fill='#7b93a3' font-size='9' text-anchor='middle'>"+(i+1)+"월</text>";
+  }
+  var y0line=py(0);
+  return "<svg viewBox='0 0 "+W2+" "+H2+"' style='width:100%;height:auto;background:#0f1822;border-radius:8px'>"+
+    "<line x1='"+x0+"' y1='"+y0line.toFixed(1)+"' x2='"+x1+"' y2='"+y0line.toFixed(1)+"' stroke='#3d5266' stroke-dasharray='3 3'/>"+
+    "<text x='"+(x0-6)+"' y='"+(y0line+3).toFixed(1)+"' fill='#7b93a3' font-size='9' text-anchor='end'>0°C</text>"+
+    "<text x='"+(x0-6)+"' y='"+(py(30)+3).toFixed(1)+"' fill='#e8a33d' font-size='9' text-anchor='end'>30°</text>"+
+    "<text x='"+(x0-6)+"' y='"+(py(-20)+3).toFixed(1)+"' fill='#9fd8ff' font-size='9' text-anchor='end'>-20°</text>"+
+    "<text x='"+x1+"' y='"+(yBot+13)+"' fill='#63a9ec' font-size='9' text-anchor='end'>강수 최대 "+Math.round(pmax)+"mm</text>"+
+    bars+"<path d='"+line+"' fill='none' stroke='#e8a33d' stroke-width='2'/>"+dots+mlab+
+    "<rect x='"+x0+"' y='"+yTop+"' width='"+(x1-x0)+"' height='"+(yBot-yTop)+"' fill='none' stroke='#2c3d4c'/>"+
+    "</svg>"+
+    "<div class='eff' style='margin-top:4px;text-align:center'><span style='color:#e8a33d'>● 기온</span> &nbsp; <span style='color:#63a9ec'>▮ 강수</span></div>";
+}
+/* ---- 학습 탭: 기후 그래프 + 의식주 + 대표지역 + 배움 노트 + 탐구 질문 + 자기점검 ---- */
+function uiEdu(){
+  var b=S.biome,B=BIOMES[b],E=CLIMATE_EDU[b];
+  var h="<div class='sec'><h3>내 기후 카드: "+B.n+" <span class='sm'>"+B.dk+"</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:8px'>"+E.summary+"</p>"+climograph(b)+
+    "<div class='eff' style='margin-top:8px'>🌍 <b>대표 지역:</b> "+E.region+"</div></div></div>";
+  /* 의식주 + 산업 */
+  h+="<div class='sec'><h3>기후에 맞춘 생활 <span class='sm'>의·식·주</span></h3>"+
+    "<div class='card'><div class='eff'>👕 <b>의(옷)</b> · "+E.clothes+"</div></div>"+
+    "<div class='card'><div class='eff'>🍽️ <b>식(먹거리)</b> · "+E.food+"</div></div>"+
+    "<div class='card'><div class='eff'>🏠 <b>주(집)</b> · "+E.house+"</div></div>"+
+    "<div class='card'><div class='eff'>🏭 <b>산업</b> · "+E.industry+"</div></div></div>";
+  /* 내가 겪은 배움(플레이로 해금) */
+  var got=[],lockN=0;
+  for(var k in LESSON_LABELS){ if(S.taught&&S.taught[k])got.push(LESSON_LABELS[k]); else lockN++; }
+  h+="<div class='sec'><h3>내가 겪은 배움 <span class='sm'>"+got.length+"/"+Object.keys(LESSON_LABELS).length+"</span></h3><div class='card'>";
+  if(got.length)h+="<div class='eff' style='line-height:1.7'>"+got.map(function(t){return "✅ "+t}).join("<br>")+"</div>";
+  else h+="<p class='eff'>아직 없습니다. 밖에서 직접 살아 보면(폭염·혹한·건축·농사·부패) 겪은 것이 이곳에 정리됩니다.</p>";
+  if(lockN)h+="<div class='eff' style='margin-top:7px;color:var(--ink3)'>🔒 아직 겪지 않은 배움 "+lockN+"개가 남아 있어요.</div>";
+  h+="</div></div>";
+  /* 탐구 질문 */
+  h+="<div class='sec'><h3>탐구 질문 <span class='sm'>친구·선생님과 이야기해 보기</span></h3><div class='card'><div class='eff' style='line-height:1.8'>"+
+    E.q.map(function(q){return "❓ "+q}).join("<br>")+"</div></div></div>";
+  /* 자기 점검 퀴즈 */
+  var Q=E.quiz, pick=(typeof S._quiz==="number")?S._quiz:-1;
+  h+="<div class='sec'><h3>스스로 점검 <span class='sm'>퀴즈</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:8px'><b>"+Q.q+"</b></p>";
+  Q.a.forEach(function(opt,i){
+    var cls="mini",label=opt;
+    if(pick>=0){
+      if(i===Q.c){cls="mini acc";label="✅ "+opt;}
+      else if(i===pick){cls="mini";label="❌ "+opt;}
+    }
+    h+="<button class='"+cls+"' style='display:block;width:100%;text-align:left;margin:5px 0' onclick='eduAnswer("+i+")'>"+label+"</button>";
+  });
+  if(pick>=0)h+="<div class='"+(pick===Q.c?"eff":"why")+"' style='margin-top:6px'>"+
+    (pick===Q.c?"🎉 정답이에요! 게임에서 겪은 그대로죠.":"다시 생각해 볼까요? 초록색이 정답이에요.")+"</div>";
+  h+="</div></div>";
+  /* 여섯 기후 한눈에 비교(무역이 필요한 까닭) */
+  h+="<div class='sec'><h3>여섯 기후 한눈에 <span class='sm'>왜 무역이 필요할까?</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:8px'>어느 대륙도 혼자서는 모든 것을 가질 수 없습니다. 그래서 서로 <b>다른 것</b>을 주고받아야 합니다.</p>";
+  BKEYS.forEach(function(bb){var EE=CLIMATE_EDU[bb];
+    h+="<div class='rw' style='align-items:flex-start;margin:6px 0;gap:8px'>"+
+      "<span class='chip' style='min-width:70px;color:"+BIOMES[bb].c+"'>"+BIOMES[bb].n+(bb===b?" · 나":"")+"</span>"+
+      "<span class='eff' style='flex:1'>"+EE.industry+"</span></div>";
+  });
+  h+="</div></div>";
+  return h;
+}
+function eduAnswer(i){ S._quiz=i; drawPanel(); }
 function uiHelp(){
   var B=BIOMES[S.biome];
   return "<div class='sec'><h3>조작</h3><div class='card'>"+
@@ -2300,11 +2688,13 @@ function uiHelp(){
      "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다."
      :"<p class='eff'><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>Shift</kbd> 달리기 · 마우스로 둘러보기<br>"+
       "<b>왼쪽 버튼 꾹</b> 캐기 · <b>오른쪽 버튼</b> 놓기 · <kbd>1</kbd>~<kbd>9</kbd> 블록 고르기<br>"+
-      "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기</p>")+
+      "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>G</kbd> 학습 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기</p>")+
     "</div></div>"+
     "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>이 기후에서 살아남는 법 <span class='sm'>자연이 정한 규칙</span></h3><div class='card'><p class='eff'>"+
+    (BIOME_SURVIVE[S.biome]||"내 대륙의 자원을 캐고, 없는 것은 무역으로 구하세요.")+"</p></div></div>"+
     "<div class='sec'><h3>이 게임의 규칙</h3><div class='card'><p class='eff'>"+
     "1. 기후마다 나는 자원이 다릅니다. 내 대륙에 없는 것은 <b>반드시 무역</b>으로 구해야 합니다.<br>"+
     "2. 온대는 식량이 넘치지만 철·유리·얼음이 없고, 사막·한대는 먹을 것이 없지만 특별한 자원이 있습니다.<br>"+
@@ -2315,10 +2705,13 @@ function uiHelp(){
     "가방·자원·칭호는 <b>각자 따로</b> 저장되니 안심하고 함께 건축하세요.</p></div></div>"+
     "<div class='sec'><h3>살아남기</h3><div class='card'><p class='eff'>"+
     "허기·수분이 0이 되거나 체온이 무너지면 체력이 깎입니다.<br>"+
+    "🌞🌙 <b>기후마다 활동할 수 있는 시간이 다릅니다.</b> 사막은 낮(09~17시)에 폭염으로 밖이 위험하니 <b>밤</b>이나 <b>지붕 아래</b>에서 움직이고, 한대는 밤이 혹한이라 <b>짧은 낮(08~16시)</b>에만 밖에 나갈 수 있습니다.<br>"+
+    "🏠 <b>지붕(하늘이 막힌 실내·지하)</b> 안에 있으면 폭염·혹한을 피할 수 있습니다. 사막·한대에선 대피소를 먼저 지으세요.<br>"+
+    "🌴 열대에선 <b>땅에 지은 집이 썩습니다.</b> <b>나무 기둥</b>을 세우고 그 위에 지어야(고상 가옥) 남습니다.<br>"+
     "<b>탈진하면</b> 처음 도착한 곳에서 깨어나지만, 급히 나오느라 <b>티어1 생존 자원의 일부를 잃습니다</b>.<br>"+
-    "신선 식품(밀·과일·생선)은 시간이 지나면 <b>종류별로 하나씩 상합니다</b>. 빵·초콜릿·커피 같은 <b>가공식품은 썩지 않으니</b> 오래 두려면 가공하세요.<br>"+
+    "신선 식품(밀·과일·생선)은 시간이 지나면 <b>종류별로 하나씩 상합니다</b>(열대는 3배 빠름). 빵·<b>말린 과일</b>·초콜릿·커피 같은 <b>가공식품은 썩지 않습니다</b>.<br>"+
     "추운 곳: 모피+섬유로 <b>방한복</b>, 또는 <b>모닥불</b>을 놓으세요.<br>"+
-    "더운 곳: 판자+섬유로 <b>햇빛막이</b>를 만드세요.<br>"+
+    "더운 곳: 판자+섬유로 <b>햇빛막이</b>를 만드세요(그늘도 폭염은 완전히 막지 못하니 실내가 최고).<br>"+
     "물 블록을 캐면 물이 무한히 나옵니다.</p></div></div>"+
     "<div class='sec'><h3>글로벌 거래소 켜기 <span class='sm'>선생님용</span></h3><div class='card'><p class='eff'>"+
     "반 전체가 실시간으로 거래하려면 무료 <b>Supabase</b> 프로젝트 하나만 있으면 됩니다.<br>"+
@@ -2352,15 +2745,15 @@ function newState(name,biome,seed){
     pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},edits:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
-    isVisiting:false,room:marketRoom(),
+    isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
     stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
 }
 function startKit(s){
   var kit={temperate:{wheat:6,wood:4,water:4,plank:4,stone:2},
-    tropical:{fruit:6,wood:4,water:4,plank:4,stone:2},
+    tropical:{fruit:6,wood:6,water:4,plank:4,stone:2},
     taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2},
-    desert:{sand:6,water:6,plank:4,stone:2,glass:1},
-    tundra:{fish:5,ice:4,water:4,coat:1,plank:4,stone:2},
+    desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1},
+    tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
     alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4}}[s.biome];
   for(var k in kit)add(s,k,kit[k]);
 }
@@ -2394,6 +2787,7 @@ function loadSave(){
   try{var r=localStorage.getItem(SAVE);if(!r)return null;var s=JSON.parse(r);
     if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
     if(!s.rotT)s.rotT={};
+    if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
     if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
     s.isVisiting=false;if(!s.room)s.room=marketRoom();
     /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
@@ -2421,6 +2815,7 @@ function bindInput(){
     if(e.code==="KeyE"){e.preventDefault();panelTab==="bag"?closePanel():openPanel("bag")}
     if(e.code==="KeyT"){e.preventDefault();panelTab==="trade"?closePanel():openPanel("trade")}
     if(e.code==="KeyR"){e.preventDefault();panelTab==="record"?closePanel():openPanel("record")}
+    if(e.code==="KeyG"){e.preventDefault();panelTab==="edu"?closePanel():openPanel("edu")}
     if(e.code==="KeyH"){e.preventDefault();panelTab==="help"?closePanel():openPanel("help")}
     if(e.code==="Space")e.preventDefault();
     if(/^Digit[1-9]$/.test(e.code)){hotIdx=parseInt(e.code.slice(5),10)-1;refreshHotbar()}
@@ -2842,7 +3237,7 @@ function startVisit(nameEnc,biome){
       pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
       hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
       inv:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
-      paused:false,isVisiting:true,room:S.room,visitOwner:name,
+      paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
       stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
     S=vis;document.body.dataset.b=S.biome;
     /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
