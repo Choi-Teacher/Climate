@@ -223,6 +223,17 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
 #envWarn.cold{background:#0d1c2aee;border:1px solid #7fc7ff;color:#cfeeff}
 #envWarn.safe{background:#0f2418ee;border:1px solid var(--good);color:#bff0d6;animation:none}
 @keyframes warnPulse{0%,100%{box-shadow:0 4px 18px #0008}50%{box-shadow:0 4px 26px #000c}}
+/* ===== [날씨] 비/눈 오버레이 ===== */
+#fxRain{position:absolute;inset:0;opacity:0;transition:opacity .8s ease;pointer-events:none;
+  background-image:repeating-linear-gradient(105deg, rgba(180,210,240,.0) 0 6px, rgba(180,210,240,.22) 6px 7px);
+  background-size:60px 60px;animation:rainFall .5s linear infinite;mix-blend-mode:screen}
+#fxRain:after{content:"";position:absolute;inset:0;background:rgba(40,70,110,.14)}
+@keyframes rainFall{0%{background-position:0 0}100%{background-position:-16px 60px}}
+#fxRain.snow{background-image:radial-gradient(circle at 20% 20%, rgba(255,255,255,.7) 1.4px, transparent 2px),
+  radial-gradient(circle at 60% 50%, rgba(255,255,255,.6) 1.2px, transparent 2px),
+  radial-gradient(circle at 80% 80%, rgba(255,255,255,.65) 1.5px, transparent 2px);
+  background-size:70px 70px,90px 90px,110px 110px;animation:snowFall 3s linear infinite}
+@keyframes snowFall{0%{background-position:0 0,0 0,0 0}100%{background-position:0 70px,0 90px,0 110px}}
 /* 오래 보여주는 '배움' 토스트(기후 적응 설명) */
 .toast.lesson{white-space:normal;max-width:320px;line-height:1.55;text-align:left;padding:11px 15px;
   border-color:var(--accent);background:#0d1922f2;font-size:12.5px}
@@ -231,7 +242,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
 </head>
 <body data-b="temperate">
 <canvas id="c"></canvas>
-<div id="fx"><div id="fxHeat"></div><div id="fxCold"></div></div>
+<div id="fx"><div id="fxHeat"></div><div id="fxCold"></div><div id="fxRain"></div></div>
 <div id="peerLabels"></div>
 
 <div id="hud" class="hide">
@@ -365,7 +376,7 @@ create policy anon_players on players for all using(true) with check(true);
    여섯 대륙 — 기후와 무역 (3D 복셀) · 단일 파일
    Part 1. 데이터
    ========================================================================== */
-var VER="4.0", SAVE="sixcont4_"+ "v4";
+var VER="5.0", SAVE="sixcont5_"+ "v5";
 var W=96, H=44, SEA=8, CH=16;                 // 월드 크기 / 높이 / 해수면 / 청크
 
 /* 블록 정의: c=색, hard=캐는 시간(초), drop=나오는 아이템, solid, alpha */
@@ -394,7 +405,17 @@ var BL={
  21:{n:"모피 덤불",c:0x8a6a4a,hard:.5,drop:"fur",solid:true},
  22:{n:"과일 잎",c:0x63a83c,hard:.35,drop:"fruit",solid:true},
  23:{n:"낚시 구멍",c:0x1f4e78,hard:3.0,drop:"fish",solid:true,infinite:true},
- 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true},
+ 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true,crop:{item:"wheat",yield:[2,4],ripe:true}},
+ 25:{n:"어린 밀",c:0x9fb04a,hard:.2,drop:"seed_wheat",solid:false,plant:true,crop:{item:"wheat",grow:24,next:24,needWater:true}},
+ 26:{n:"감자 싹",c:0x6f8a3e,hard:.2,drop:"seed_potato",solid:false,plant:true,crop:{item:"potato",grow:27,next:27,needWater:true}},
+ 27:{n:"감자",c:0xb9944e,hard:.3,drop:"potato",solid:false,plant:true,crop:{item:"potato",yield:[2,4],ripe:true}},
+ 28:{n:"벼 모",c:0x7fae5a,hard:.2,drop:"seed_rice",solid:false,plant:true,crop:{item:"rice",grow:29,next:29,needWater:true,paddy:true}},
+ 29:{n:"벼",c:0xd6c463,hard:.3,drop:"rice",solid:false,plant:true,crop:{item:"rice",yield:[2,5],ripe:true}},
+ 40:{n:"어린 대추야자",c:0x7d9a4a,hard:.2,drop:"seed_date",solid:false,plant:true,crop:{item:"date",grow:41,next:41,needWater:true}},
+ 41:{n:"대추야자",c:0xcaa24a,hard:.35,drop:"date",solid:false,plant:true,crop:{item:"date",yield:[2,4],ripe:true}},
+ 42:{n:"카사바 싹",c:0x6c9a5a,hard:.2,drop:"seed_cassava",solid:false,plant:true,crop:{item:"cassava",grow:43,next:43,needWater:true}},
+ 43:{n:"카사바",c:0xa8b26a,hard:.35,drop:"cassava",solid:false,plant:true,crop:{item:"cassava",yield:[2,4],ripe:true}},
+ 44:{n:"우물",c:0x5a7fa8,hard:.6,drop:"water",solid:true,infinite:true,special:"well"},
  30:{n:"판자",c:0xc19a63,hard:.9,drop:"plank",solid:true},
  31:{n:"벽돌",c:0xb2604a,hard:1.6,drop:"brick",solid:true},
  32:{n:"유리",c:0xbfe6f2,hard:.4,drop:"glass",solid:true,alpha:.45},
@@ -406,10 +427,29 @@ var BL={
 };
 /* 아이템 → 놓을 수 있는 블록 */
 var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:34,
-  clay:10,coal:11,snow:8,wheat:24,tradepost:35,monument:36,campfire:37};
+  clay:10,coal:11,snow:8,wheat:24,tradepost:35,monument:36,campfire:37,well:44};
+/* 씨앗 아이템 → 심으면 자라나는 '어린 작물' 블록 */
+var SEED={seed_wheat:25,seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42};
+/* 기후별로 심을 수 있는 씨앗(=그 땅에서 자라는 작물). 한대·냉대는 농사 불가 */
+var BIOME_CROPS={
+  temperate:["seed_wheat","seed_potato","seed_rice"],
+  tropical:["seed_rice","seed_cassava"],
+  desert:["seed_date"],
+  alpine:["seed_potato"],
+  taiga:[], tundra:[]
+};
 
 var ITEMS={
  wheat:{n:"밀",em:"🌾",tier:1,val:1,rot:1,food:{h:18}},
+ potato:{n:"감자",em:"🥔",tier:1,val:1.1,rot:1,food:{h:20}},
+ rice:{n:"쌀",em:"🍚",tier:1,val:1.2,rot:1,food:{h:22}},
+ date:{n:"대추야자",em:"🌰",tier:1,val:1.4,rot:1,food:{h:16,w:6}},
+ cassava:{n:"카사바",em:"🍠",tier:1,val:1.2,rot:1,food:{h:20}},
+ seed_wheat:{n:"밀 씨앗",em:"🌱",tier:1,val:.5},
+ seed_potato:{n:"감자 씨",em:"🌱",tier:1,val:.5},
+ seed_rice:{n:"볍씨",em:"🌱",tier:1,val:.5},
+ seed_date:{n:"대추야자 씨",em:"🌱",tier:1,val:.6},
+ seed_cassava:{n:"카사바 줄기",em:"🌱",tier:1,val:.5},
  fruit:{n:"과일",em:"🍌",tier:1,val:1.1,rot:1,food:{h:12,w:8}},
  fish:{n:"생선",em:"🐟",tier:1,val:1.5,rot:1,food:{h:24}},
  water:{n:"물",em:"💧",tier:1,val:.6,food:{w:26}},
@@ -445,6 +485,7 @@ var ITEMS={
  brew:{n:"커피",em:"🧋",tier:3,val:7.2,food:{h:4,s:35}},
  power:{n:"전력",em:"⚡",tier:3,val:12},
  tradepost:{n:"무역소",em:"⚖️",tier:2,val:8},
+ well:{n:"우물",em:"🪣",tier:2,val:5},
  monument:{n:"기념비",em:"🗽",tier:3,val:99}
 };
 function iN(k){return ITEMS[k]?ITEMS[k].n:k}
@@ -486,12 +527,12 @@ function whereFrom(k){
 }
 /* 기후별 '살아남는 법' 안내(도움말) — 게임에서 몸으로 겪는 규칙을 말로 정리 */
 var BIOME_SURVIVE={
- temperate:"기후가 온화해 살기 좋습니다. 밀 농사로 식량이 넘치니, 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
- tropical:"습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
+ temperate:"기후가 온화해 살기 좋습니다. 호수·연못이 많아 물 걱정이 적고, <b>밀·감자·벼를 심어 농사</b>지으면 식량이 넘칩니다. 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
+ tropical:"습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>비가 잦아(우기) <b>벼·카사바 농사</b>가 잘 됩니다. 무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
  taiga:"추워서 <b>농사가 안 됩니다</b>. 대신 <b>낚시·사냥(모피)·벌목</b>으로 삽니다. 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
- desert:"낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>채집은 서늘한 <b>밤</b>에 하세요. 도착 직후 아침에 서둘러 <b>대피소부터</b> 지으세요.",
+ desert:"낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>💧 물이 아주 귀합니다. <b>오아시스</b>를 찾거나 <b>우물</b>(돌+판자)을 파서 물을 확보하세요. 물가에선 <b>대추야자</b>를 기를 수 있습니다. 채집은 서늘한 <b>밤</b>에 하세요.",
  tundra:"낮이 <b>아주 짧습니다(08~16시)</b>. 밝을 때 <b>낚시</b>로 먹을 것을 모으고, 밤엔 <b>모닥불·방한복·지붕 있는 집</b> 안에서 버티세요. 밤에 밖을 돌면 몸이 얼어 느려지고 쓰러집니다. 이 땅에선 <b>농사가 안 되니</b> 낚시·모피가 생명줄입니다.",
- alpine:"공기가 희박해 회복이 느립니다(기력·체력 주의). 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
+ alpine:"공기가 희박해 회복이 느립니다(기력·체력 주의). 빙하 녹은 물웅덩이가 드물게 있고, 서늘해도 <b>감자</b>는 기를 수 있습니다. 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
 };
 /* ==========================================================================
    [학습 콘텐츠] 6학년 사회 '기후와 생활' 교과 내용
@@ -596,6 +637,10 @@ var RECIPES=[
  {id:"power",out:{power:2},need:{fuel:1,copper:2,iron:1},eff:"발전 · 기념비에 필요"},
  {id:"chocolate",out:{chocolate:1},need:{cacao:2,ice:1},eff:"사치재 · 기념비에 필요"},
  {id:"brew",out:{brew:1},need:{coffee:2,water:1},eff:"사치재 · 스태미나 +35"},
+ {id:"well",out:{well:1},need:{stone:4,plank:2},eff:"땅에 놓으면 마르지 않는 물이 나옵니다 (사막·고지대에서 물 확보)"},
+ {id:"seed_wheat",out:{seed_wheat:3},need:{wheat:1},eff:"밀 1개로 씨앗 3개 · 온대에서 농사"},
+ {id:"seed_potato",out:{seed_potato:2},need:{potato:1},eff:"감자로 씨감자 · 온대·고산에서 농사"},
+ {id:"seed_rice",out:{seed_rice:3},need:{rice:1},eff:"쌀로 볍씨 · 물가(논)에 심기"},
  {id:"tradepost",out:{tradepost:1},need:{plank:4,stone:2},eff:"놓으면 그 자리에서 무역할 수 있습니다"},
  {id:"monument",out:{monument:1},need:{power:3,iron:5,glass:3,brick:4,rubber:2,gold:2,spice:2,ice:2,chocolate:1,brew:1},
   eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"}
@@ -776,8 +821,72 @@ function genWorld(biome,seed,onProg){
     var dx=2+Math.floor(r()*(W-4)),dz=2+Math.floor(r()*(W-4)),dh=hmap[dz*W+dx];
     if(dh>SEA)for(var dy=1;dy<=2+Math.floor(r()*2);dy++)setB(dx,dh+dy,dz,7);
   }
+  /* ===== [물] 지형 표면에 물웅덩이(호수·오아시스·연못)를 파서 만든다 =====
+     지대가 해수면보다 높아 바다에 못 닿는 대륙에서도 마실 물을 구할 수 있게 한다.
+     기후마다 물의 많고 적음을 다르게 준다:
+       온대: 호수·연못이 넉넉  /  열대: 곳곳에 습지·물웅덩이(가장 많음)
+       냉대: 물웅덩이 보통      /  고산: 빙하 녹은 웅덩이 적게
+       사막: 오아시스가 아주 드물게(귀함)  /  한대: 대부분 얼어 있음(물웅덩이 대신 얼음) */
+  function digPond(cx,cz,rad,fillTop){
+    /* (cx,cz) 둘레 rad 칸을 그릇처럼 파고 fillTop 높이까지 물을 채운다 */
+    var base=hmap[cz*W+cx];
+    if(base<=SEA)return false;                       // 이미 바다면 건너뜀
+    var top=fillTop!=null?fillTop:base-1;             // 물 표면 높이
+    if(top<2)return false;
+    for(var ox=-rad;ox<=rad;ox++)for(var oz=-rad;oz<=rad;oz++){
+      var dd=Math.sqrt(ox*ox+oz*oz);if(dd>rad+.3)continue;
+      var x=cx+ox,z=cz+oz;if(x<2||z<2||x>=W-2||z>=W-2)continue;
+      var floor=top-1-Math.round((rad-dd)*.5);        // 가운데가 조금 더 깊게
+      if(floor<1)floor=1;
+      /* 그릇 위쪽을 흙으로 비우고 → 바닥부터 top 까지 물을 채움 */
+      for(var yy=floor+1;yy<H;yy++){var b0=getB(x,yy,z);if(b0)setB(x,yy,z,0)}
+      for(var wy=floor+1;wy<=top;wy++)setB(x,wy,z,5);
+      setB(x,floor,z,biome==="desert"?4:(biome==="tropical"?3:2)); // 바닥
+    }
+    return true;
+  }
+  var pondSpec={temperate:14,tropical:20,taiga:9,alpine:5,desert:0,tundra:4}[biome]||0;
+  var placed=0,guard=0;
+  while(placed<pondSpec&&guard++<pondSpec*40){
+    var px=4+Math.floor(r()*(W-8)),pz=4+Math.floor(r()*(W-8)),ph=hmap[pz*W+px];
+    if(ph<=SEA+1)continue;                            // 해안 저지대는 이미 바다
+    var rad=biome==="temperate"?2+Math.floor(r()*2):(biome==="tropical"?1+Math.floor(r()*2):1+Math.floor(r()*2));
+    if(digPond(px,pz,rad,ph-1))placed++;
+  }
+  /* 사막 오아시스: 아주 드물게, 야자수와 함께 (사막에서 물은 생명) */
+  if(biome==="desert"){
+    var oasis=2+Math.floor(r()*2);                    // 2~3곳뿐
+    var og=0;
+    while(oasis>0&&og++<400){
+      var ox2=8+Math.floor(r()*(W-16)),oz2=8+Math.floor(r()*(W-16)),oh=hmap[oz2*W+ox2];
+      if(oh<=SEA+1)continue;
+      if(digPond(ox2,oz2,2,oh-1)){
+        /* 오아시스 가장자리에 대추야자 나무 몇 그루 */
+        for(var dp=0;dp<4;dp++){
+          var ang=r()*Math.PI*2,rr2=3+Math.floor(r()*2);
+          var tx=ox2+Math.round(Math.cos(ang)*rr2),tz=oz2+Math.round(Math.sin(ang)*rr2);
+          if(tx<2||tz<2||tx>=W-2||tz>=W-2)continue;
+          var tth=hmap[tz*W+tx];if(tth>SEA&&getB(tx,tth,tz)===4)palm(tx,tth,tz,r);
+        }
+        oasis--;
+      }
+    }
+  }
+  /* 고산: 빙하 녹은 물웅덩이 가장자리를 얼음으로 (차가운 물) */
   if(onProg)onProg(.8);
   return hmap;
+}
+/* 사막 오아시스용 야자수 */
+function palm(x,h,z,r){
+  var th=4+Math.floor(r()*2);
+  for(var i=1;i<=th;i++)setB(x,h+i,z,6);
+  var top=h+th;
+  var dirs=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1]];
+  for(var d=0;d<dirs.length;d++){
+    if(getB(x+dirs[d][0],top,z+dirs[d][1])===0)setB(x+dirs[d][0],top,z+dirs[d][1],22);
+    if(getB(x+dirs[d][0]*2,top-1,z+dirs[d][1]*2)===0)setB(x+dirs[d][0]*2,top-1,z+dirs[d][1]*2,22);
+  }
+  if(getB(x,top+1,z)===0)setB(x,top+1,z,22);
 }
 function clamp01(v){return v<0?0:v>1?1:v}
 function tree(x,h,z,r,trunk,leaf,minH,maxH){
@@ -964,6 +1073,7 @@ var lightF=1;
 function skyUpdate(){
   var B=BIOMES[S.biome],h=clockOf(S).h;
   lightF=clamp(Math.sin((h-6)/24*Math.PI*2)*1.5+.45,.24,1);
+  if(isRaining())lightF*=.62;                          // [날씨] 비 오면 하늘이 어둑해짐
   var d=[(B.sky[0]>>16&255)/255,(B.sky[0]>>8&255)/255,(B.sky[0]&255)/255];
   var n=[(B.sky[1]>>16&255)/255,(B.sky[1]>>8&255)/255,(B.sky[1]&255)/255];
   for(var i=0;i<3;i++)skyRGB[i]=n[i]+(d[i]-n[i])*lightF;
@@ -1183,6 +1293,31 @@ var keys={},PW=.62,PH=1.78,EYE=1.62,GRAV=26,JUMP=8.3;
 var mining=null, target=null, isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
 var look={yaw:0,pitch:0}, moveVec={f:0,s:0}, wantJump=false, sprint=false;
 var DAYSEC=600, SUNRISE=6;
+/* ===== [날씨 시스템] 비/맑음이 하루 주기로 바뀐다 =====
+   weather: 'clear'|'rain'  ·  비가 오면 밭이 물을 얻어 작물이 빨리 자라고,
+   야외 수분이 덜 마르며, 사막·고산의 물웅덩이가 조금씩 다시 찬다.
+   기후마다 비 올 확률이 다르다(열대=우기 잦음, 사막=거의 안 옴). */
+var WEATHER={type:"clear",t:0,next:40+Math.random()*40};
+var RAIN_CHANCE={temperate:.35,tropical:.7,taiga:.4,alpine:.4,desert:.04,tundra:.15};
+function isRaining(){return WEATHER.type==="rain"}
+function updateWeather(dt,quiet){
+  WEATHER.t+=dt;
+  if(WEATHER.t>=WEATHER.next){
+    WEATHER.t=0;
+    var wasRain=WEATHER.type==="rain";
+    var chance=RAIN_CHANCE[S.biome]!=null?RAIN_CHANCE[S.biome]:.3;
+    /* 한대·고산은 눈, 그 외는 비. 사막은 비가 오면 귀한 물 */
+    WEATHER.type=(!wasRain&&Math.random()<chance)?"rain":"clear";
+    WEATHER.next=(WEATHER.type==="rain")?(18+Math.random()*22):(35+Math.random()*55);
+    if(!quiet){
+      if(WEATHER.type==="rain"){
+        var snow=(S.biome==="tundra"||S.biome==="alpine");
+        toast(snow?"🌨️ 눈이 내립니다":"🌧️ 비가 내립니다","good");
+        if(S.biome==="desert")teachOnce("desertrain","🏜️ 사막엔 비가 <b>거의 오지 않습니다</b>. 오늘처럼 드물게 오는 비는 <b>아주 귀한 물</b>이라, 사막 사람들은 이 물을 <b>웅덩이·저수조에 모아</b> 씁니다.");
+      }else if(wasRain){toast("☀️ 날이 갰습니다","good");}
+    }
+  }
+}
 
 /* ==========================================================================
    [기후 생존 시스템] 자연환경이 생활 양식을 강제하는 규칙들
@@ -1406,13 +1541,29 @@ function breakBlock(x,y,z){
 function yieldBlock(x,y,z,b,B){
   B=B||BL[b];
   var item=B.drop,n=1;
-  if(b===24)n=ri(1,3);
-  if(b===7||b===22)n=Math.random()<.5?1:0;
-  if(b===11||b===12||b===13)n=ri(1,2);
+  var cr=B.crop;
+  /* 다 자란 작물을 수확: 여러 개 + 씨앗 1개 돌려받아 다시 심을 수 있음 */
+  if(cr&&cr.ripe){
+    var yl=cr.yield||[1,2];n=ri(yl[0],yl[1]);
+    /* 씨앗 아이템 키 찾기 (SEED 역매핑) */
+    var seedKey=null;for(var sk in SEED)if(BL[SEED[sk]]&&BL[SEED[sk]].crop&&BL[SEED[sk]].crop.item===cr.item){seedKey=sk;break}
+    if(seedKey){add(S,seedKey,1);S.stat.got[seedKey]=(S.stat.got[seedKey]||0)+1;}
+  }
+  else if(b===24)n=ri(1,3);
+  else if(b===7||b===22)n=Math.random()<.5?1:0;
+  else if(b===11||b===12||b===13)n=ri(1,2);
   if(!B.infinite){setB(x,y,z,0);S.edits[x+","+y+","+z]=0;markDirty(x,z);
+    if(S.crops)delete S.crops[x+","+y+","+z];        // 성장 타이머 제거
     netBroadcastEdit(x,y,z,0);}     // [V4] 캐기 실시간 동기화
   if(n>0&&item){add(S,item,n);S.stat.got[item]=(S.stat.got[item]||0)+n;
     toast(iE(item)+" "+iN(item)+" +"+n)}
+  /* [생물] 열린 물(호수·연못·오아시스)에서 물을 뜰 때 가끔 물고기가 잡힌다.
+     농사가 안 되는 기후가 아니어도 물가에서 단백질을 얻는 낚시 경험을 준다. */
+  if(b===5&&Math.random()<.18){
+    add(S,"fish",1);S.stat.got.fish=(S.stat.got.fish||0)+1;
+    toast("🐟 물에서 물고기를 잡았습니다! +1","good");
+    teachOnce("fishing","🐟 강·호수 같은 <b>물가</b>에서는 물고기를 잡아 먹을 수 있습니다. 사람들이 물가에 모여 사는 까닭 중 하나죠.");
+  }
 }
 /* 연쇄 파괴: 시작 기둥에서 위쪽·인접으로 이어진 나무(6)·잎(7,22)을 훑어 부순다.
    옆에 붙어 자란 '다른 나무'까지 번지지 않도록, 땅까지 기둥으로 이어진(=뿌리내린) 기둥은 건드리지 않는다. */
@@ -1467,6 +1618,8 @@ function tryPlace(){
   if(cur!==0&&cur!==5){toast("이미 블록이 있는 곳입니다","bad");return}
   /* 플레이어 몸(발끝~머리)과 겹치는 칸이면 막고 안내 */
   if(overlapsPlayer(bx,by,bz)){toast("캐릭터와 겹치는 곳에는 설치할 수 없습니다","bad");return}
+  /* ===== [농사] 씨앗 심기: 흙/풀/모래 위에만, 기후에 맞는 작물만 ===== */
+  if(SEED[sel]){plantSeed(sel,bx,by,bz,target);return}
   var id=PLACE[sel];
   if(!id){toast(iN(sel)+"은(는) 설치할 수 없는 아이템입니다","bad");return}
   /* [기후 적응·산업] 한대·냉대에선 작물(밀)을 흙에 심을 수 없다 */
@@ -1501,6 +1654,50 @@ function tryPlace(){
   refreshHotbar();
   cloudDirty();
 }
+/* 어떤 칸이 심을 수 있는 '밭'(흙·풀·모래·점토)인지 */
+function isFarmSoil(b){return b===1||b===2||b===4||b===10}
+/* 근처(같은 높이 3x3)에 물이 있는가 → 관개 여부 판별 */
+function waterNear(x,y,z){
+  for(var dx=-1;dx<=1;dx++)for(var dz=-1;dz<=1;dz++){
+    if(getB(x+dx,y,z+dz)===5||getB(x+dx,y-1,z+dz)===5)return true;
+  }
+  return false;
+}
+/* [농사] 씨앗을 심는다 */
+function plantSeed(sel,bx,by,bz,tg){
+  /* 한대·냉대: 농사 불가 */
+  if(S.biome==="tundra"||S.biome==="taiga"){
+    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
+    toast("날이 추워 씨앗이 자라지 않습니다","bad");return;
+  }
+  /* 이 기후에서 자라는 작물인지 */
+  var okList=BIOME_CROPS[S.biome]||[];
+  if(okList.indexOf(sel)<0){
+    var names=okList.map(function(k){return iN(k).replace(/ ?(씨앗|씨|줄기|볍씨)$/,"")}).join("·");
+    toast("이 기후에선 "+(names||"작물")+" 만 자랍니다","bad");return;
+  }
+  /* 심을 자리 아래가 밭(흙/풀/모래/점토)이어야 한다 */
+  var below=getB(bx,by-1,bz);
+  if(!isFarmSoil(below)){toast("흙·풀·모래 위에만 씨앗을 심을 수 있어요","bad");return}
+  var youngId=SEED[sel];
+  var cropInfo=BL[youngId].crop;
+  /* 벼(논)는 물가에만 심을 수 있다 */
+  if(cropInfo.paddy&&!waterNear(bx,by,bz)){
+    toast("🌾 벼는 물가(논)에만 심을 수 있어요. 물 옆에 심으세요","bad");
+    teachOnce("paddy","🌾 <b>벼농사</b>는 물을 댄 <b>논</b>에서 짓습니다. 물웅덩이·강 바로 옆 흙에 볍씨를 심으세요.");
+    return;
+  }
+  if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
+  setB(bx,by,bz,youngId);S.edits[bx+","+by+","+bz]=youngId;markDirty(bx,bz);
+  netBroadcastEdit(bx,by,bz,youngId);
+  /* 성장 예약: 이 칸에 성장 타이머를 건다 */
+  if(!S.crops)S.crops={};
+  S.crops[bx+","+by+","+bz]=0;
+  S.stat.placed++;
+  toast("🌱 "+iN(sel)+" 심음 · 물을 주면 자랍니다","good");
+  teachOnce("farm","🌾 씨앗을 심었습니다. <b>물이 가까이 있으면(비가 오거나 물웅덩이 옆)</b> 시간이 지나며 자라 <b>수확</b>할 수 있습니다. 온대는 농사에 가장 알맞은 땅입니다.");
+  refreshHotbar();cloudDirty();
+}
 /* 대상 칸이 플레이어 몸이 차지한 복셀과 겹치는지 (발끝/허리/머리 3칸 검사) */
 function overlapsPlayer(bx,by,bz){
   var px0=Math.floor(S.pos.x-PW/2),px1=Math.floor(S.pos.x+PW/2);
@@ -1511,8 +1708,8 @@ function overlapsPlayer(bx,by,bz){
 /* --- 핫바 --- */
 var hotbar=[],hotIdx=0;
 function refreshHotbar(){
-  var pri=["plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","tradepost","monument"];
-  var arr=Object.keys(S.inv).filter(function(k){return PLACE[k]&&S.inv[k]>0});
+  var pri=["seed_wheat","seed_potato","seed_rice","seed_date","seed_cassava","plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
+  var arr=Object.keys(S.inv).filter(function(k){return (PLACE[k]||SEED[k])&&S.inv[k]>0});
   arr.sort(function(a,b){var ia=pri.indexOf(a),ib=pri.indexOf(b);
     return (ia<0?99:ia)-(ib<0?99:ib)});
   hotbar=arr.slice(0,9);
@@ -1524,6 +1721,38 @@ function refreshHotbar(){
       (k?"<span class='nm'>"+iN(k)+"</span>"+iE(k)+"<span class='cnt'>"+S.inv[k]+"</span>":"")+"</button>";
   }
   document.getElementById("hotbar").innerHTML=h;
+}
+/* ===== [농사] 심은 작물의 성장 처리 =====
+   S.crops[key]=자란시간(초). 물이 가까이 있거나 비가 오면 빠르게,
+   물이 전혀 없으면 아주 느리게 자란다. 일정 시간이 지나면 다음 단계 블록으로 자란다. */
+var CROP_TIME=45;   // 한 단계 자라는 데 필요한 기준 시간(물 있을 때)
+function growCrops(dt,quiet){
+  if(!S.crops)return;
+  var raining=isRaining();
+  for(var key in S.crops){
+    if(!S.crops.hasOwnProperty(key))continue;
+    var a=key.split(","),x=+a[0],y=+a[1],z=+a[2];
+    var b=getB(x,y,z),B=BL[b];
+    if(!B||!B.crop||B.crop.ripe){delete S.crops[key];continue}  // 이미 다 자랐거나 사라짐
+    var watered=raining||waterNear(x,y,z);
+    /* 물 있으면 정상 속도, 없으면 1/4 속도(가뭄엔 거의 안 자람) */
+    var rate=watered?1:0.25;
+    /* 열대는 덥고 습해 조금 빨리, 고산·건조는 조금 느리게 */
+    if(S.biome==="tropical")rate*=1.25;
+    if(S.biome==="desert"||S.biome==="alpine")rate*=0.85;
+    S.crops[key]+=dt*rate;
+    if(S.crops[key]>=CROP_TIME){
+      var nx=B.crop.next;
+      setB(x,y,z,nx);S.edits[key]=nx;markDirty(x,z);
+      netBroadcastEdit(x,y,z,nx);
+      if(BL[nx].crop&&BL[nx].crop.ripe){
+        delete S.crops[key];                            // 다 자람 → 타이머 종료
+        if(!quiet)toast("🌾 작물이 다 자랐습니다! 캐서 수확하세요","good");
+      }else{
+        S.crops[key]=0;                                 // 다음 단계로
+      }
+    }
+  }
 }
 /* --- 스탯 시뮬레이션 --- */
 function nearFire(){
@@ -1593,8 +1822,12 @@ function simulate(dt,quiet){
   var m=BIOMES[S.biome].mods,prev=S.day;
   S.sec+=dt;S.day=1+Math.floor(S.sec/DAYSEC);
   if(S.day>prev){logAdd(S,S.day+"일차 아침이 밝았습니다.");if(!quiet)toast("☀ "+S.day+"일차")}
+  updateWeather(dt,quiet);                              // [날씨] 비/맑음 전환
+  growCrops(dt,quiet);                                  // [농사] 심은 작물 성장
   S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
-  S.hydra=clamp(S.hydra-.10*m.hydra*dt,0,100);
+  /* [날씨] 비가 오면 야외에서 수분이 덜 마른다(습도↑) */
+  var hydraMod=m.hydra*(isRaining()&&!shelteredNow()?.6:1);
+  S.hydra=clamp(S.hydra-.10*hydraMod*dt,0,100);
   S.stam=clamp(S.stam+1.25*m.regen*(mining?.25:1)*dt,0,100);
   if(!quiet){fireCheck-=dt;if(fireCheck<=0){fireCheck=1.5;fireOn=nearFire()}}
 
@@ -2384,7 +2617,9 @@ function drawHUD(){
    row("체온",tp,S.temp.toFixed(1)+"°",tc,S.temp<35.4||S.temp>37.6);
   $("ibio").textContent=BIOMES[S.biome].n;
   $("itime").textContent=c.hh+":"+c.mm;
-  $("isun").textContent=(c.h>=6&&c.h<18)?"☀":"🌙";
+  var day=(c.h>=6&&c.h<18);
+  var wIcon=isRaining()?((S.biome==="tundra"||S.biome==="alpine")?"🌨️":"🌧️"):(day?"☀":"🌙");
+  $("isun").textContent=wIcon;
   $("iday").textContent=S.day+"일차";
   $("itemp").textContent=Math.round(amb)+"°C"+(fireOn?" 🔥":"");
   function row(k,v,txt,col,al){
@@ -2395,12 +2630,31 @@ function drawHUD(){
   if(target&&BL[target.b]){
     t.classList.remove("hide");
     var B=BL[target.b];
-    t.innerHTML=B.n+(B.drop?" → "+iE(B.drop)+" "+iN(B.drop):" (캘 수 없음)");
+    if(B.crop&&!B.crop.ripe){
+      /* 자라는 중인 어린 작물: 진행 상황 안내 */
+      var ck=target.x+","+target.y+","+target.z;
+      var prog=(S.crops&&S.crops[ck]!=null)?Math.min(99,Math.round(S.crops[ck]/CROP_TIME*100)):0;
+      var watered=isRaining()||waterNear(target.x,target.y,target.z);
+      t.innerHTML="🌱 "+B.n+" · 자라는 중 "+prog+"% "+(watered?"💧":"🏜️가뭄");
+    }else if(B.crop&&B.crop.ripe){
+      t.innerHTML="🌾 "+B.n+" · 다 자람 → "+iE(B.drop)+" 수확";
+    }else{
+      t.innerHTML=B.n+(B.drop?" → "+iE(B.drop)+" "+iN(B.drop):" (캘 수 없음)");
+    }
   }else t.classList.add("hide");
   var ring=$("minering"),mr=$("mr");
   if(mining){ring.classList.remove("hide");mr.style.strokeDashoffset=138*(1-mining.t/mining.need)}
   else ring.classList.add("hide");
 
+  /* ===== [날씨] 비/눈 오버레이 ===== */
+  var fxR=$("fxRain");
+  if(fxR){
+    if(isRaining()&&!S.isVisiting){
+      fxR.style.opacity="1";
+      var snow=(S.biome==="tundra"||S.biome==="alpine");
+      fxR.classList.toggle("snow",snow);
+    }else fxR.style.opacity="0";
+  }
   /* ===== [기후 생존] 화면 가장자리 위기 오버레이 + 경고 배너 ===== */
   var fxH=$("fxHeat"),fxC=$("fxCold"),warn=$("envWarn");
   var hz=(S&&!S.isVisiting)?curHazard:{type:null,sev:0,sheltered:false};
@@ -2712,7 +2966,17 @@ function uiHelp(){
     "신선 식품(밀·과일·생선)은 시간이 지나면 <b>종류별로 하나씩 상합니다</b>(열대는 3배 빠름). 빵·<b>말린 과일</b>·초콜릿·커피 같은 <b>가공식품은 썩지 않습니다</b>.<br>"+
     "추운 곳: 모피+섬유로 <b>방한복</b>, 또는 <b>모닥불</b>을 놓으세요.<br>"+
     "더운 곳: 판자+섬유로 <b>햇빛막이</b>를 만드세요(그늘도 폭염은 완전히 막지 못하니 실내가 최고).<br>"+
-    "물 블록을 캐면 물이 무한히 나옵니다.</p></div></div>"+
+    "💧 <b>물</b>: 호수·연못·오아시스 같은 <b>물웅덩이</b>를 캐면 물이 나옵니다. 물웅덩이가 없는 <b>사막·높은 곳</b>에서는 <b>우물</b>(돌4+판자2)을 만들어 놓으면 마르지 않는 물을 얻어요. 열린 물에서는 가끔 <b>물고기</b>도 잡힙니다.</p></div></div>"+
+    "<div class='sec'><h3>🌾 농사짓기 <span class='sm'>온대가 가장 알맞은 땅</span></h3><div class='card'><p class='eff'>"+
+    "가방에서 <b>씨앗</b>을 골라 <b>흙·풀·모래</b> 위에 놓으면 심어집니다.<br>"+
+    "💦 <b>물이 가까이 있거나(웅덩이 옆) 비가 오면</b> 작물이 쑥쑥 자랍니다. 물이 없으면 아주 느리게 자라요(가뭄).<br>"+
+    "🌱 다 자란 작물을 캐면 <b>먹거리 여러 개 + 씨앗 1개</b>가 나와 계속 농사지을 수 있습니다.<br>"+
+    "기후마다 자라는 작물이 다릅니다 — <b>온대</b>: 밀·감자·벼 / <b>열대</b>: 벼·카사바 / <b>사막</b>: 대추야자 / <b>고산</b>: 감자.<br>"+
+    "🌾 <b>벼</b>는 물을 댄 <b>논</b>에서만 자라니 물웅덩이 바로 옆에 심으세요. <b>한대·냉대</b>는 너무 추워 농사가 안 됩니다(낚시·사냥으로 생활).</p></div></div>"+
+    "<div class='sec'><h3>🌦️ 날씨 <span class='sm'>하늘도 생활을 바꿉니다</span></h3><div class='card'><p class='eff'>"+
+    "날씨는 <b>맑음과 비</b>가 번갈아 바뀝니다. 화면 위 아이콘(☀🌧️🌨️)으로 지금 날씨를 알 수 있어요.<br>"+
+    "🌧️ 비가 오면 <b>작물이 잘 자라고</b>, 밖에 있어도 수분이 덜 마릅니다. 다만 하늘이 어두워집니다.<br>"+
+    "기후마다 비가 오는 정도가 다릅니다 — <b>열대</b>는 자주(우기), <b>사막</b>은 거의 오지 않아 비가 오면 아주 귀한 물이 됩니다. 한대·고산은 눈이 내립니다.</p></div></div>"+
     "<div class='sec'><h3>글로벌 거래소 켜기 <span class='sm'>선생님용</span></h3><div class='card'><p class='eff'>"+
     "반 전체가 실시간으로 거래하려면 무료 <b>Supabase</b> 프로젝트 하나만 있으면 됩니다.<br>"+
     "1. supabase.com에서 프로젝트를 만들고 <b>Project URL</b>과 <b>anon key</b>를 복사합니다.<br>"+
@@ -2744,17 +3008,17 @@ function newState(name,biome,seed){
   return{ver:VER,name:name,biome:biome,seed:seed,
     pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
-    inv:{},edits:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
+    inv:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
     stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
 }
 function startKit(s){
-  var kit={temperate:{wheat:6,wood:4,water:4,plank:4,stone:2},
-    tropical:{fruit:6,wood:6,water:4,plank:4,stone:2},
+  var kit={temperate:{wheat:6,wood:4,water:4,plank:4,stone:2,seed_wheat:6,seed_potato:3},
+    tropical:{fruit:6,wood:6,water:4,plank:4,stone:2,seed_rice:4,seed_cassava:3},
     taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2},
-    desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1},
+    desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1,seed_date:4},
     tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
-    alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4}}[s.biome];
+    alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4}}[s.biome];
   for(var k in kit)add(s,k,kit[k]);
 }
 /* ---------- 클라우드 세이브 ---------- */
@@ -2786,7 +3050,7 @@ function save(){
 function loadSave(){
   try{var r=localStorage.getItem(SAVE);if(!r)return null;var s=JSON.parse(r);
     if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
-    if(!s.rotT)s.rotT={};
+    if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
     if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
     if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
     s.isVisiting=false;if(!s.room)s.room=marketRoom();
