@@ -405,8 +405,7 @@ var BL={
  21:{n:"모피 덤불",c:0x8a6a4a,hard:.5,drop:"fur",solid:true},
  22:{n:"과일 잎",c:0x63a83c,hard:.35,drop:"fruit",solid:true},
  23:{n:"낚시 구멍",c:0x1f4e78,hard:3.0,drop:"fish",solid:true,infinite:true},
- 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true,crop:{item:"wheat",yield:[2,4],ripe:true}},
- 25:{n:"어린 밀",c:0x9fb04a,hard:.2,drop:"seed_wheat",solid:false,plant:true,crop:{item:"wheat",grow:24,next:24,needWater:true}},
+ 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true},
  26:{n:"감자 싹",c:0x6f8a3e,hard:.2,drop:"seed_potato",solid:false,plant:true,crop:{item:"potato",grow:27,next:27,needWater:true}},
  27:{n:"감자",c:0xb9944e,hard:.3,drop:"potato",solid:false,plant:true,crop:{item:"potato",yield:[2,4],ripe:true}},
  28:{n:"벼 모",c:0x7fae5a,hard:.2,drop:"seed_rice",solid:false,plant:true,crop:{item:"rice",grow:29,next:29,needWater:true,paddy:true}},
@@ -427,16 +426,24 @@ var BL={
 };
 /* 아이템 → 놓을 수 있는 블록 */
 var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:34,
-  clay:10,coal:11,snow:8,wheat:24,tradepost:35,monument:36,campfire:37,well:44};
-/* 씨앗 아이템 → 심으면 자라나는 '어린 작물' 블록 */
-var SEED={seed_wheat:25,seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42};
-/* 기후별로 심을 수 있는 씨앗(=그 땅에서 자라는 작물). 한대·냉대는 농사 불가 */
+  clay:10,coal:11,snow:8,tradepost:35,monument:36,campfire:37,well:44};
+/* 씨앗 아이템 → 심으면 자라나는 '어린 작물' 블록.
+   밀은 '심는 작물'이 아니라 온대 들판에 야생으로 나는 재료(빵·섬유용)라 여기 없다. */
+var SEED={seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42};
+/* 씨앗 → 보여줄 작물 이름(안내용) */
+var CROP_NAME={seed_potato:"감자",seed_rice:"벼",seed_date:"대추야자",seed_cassava:"카사바"};
+/* 기후별로 심을 수 있는 씨앗(=그 땅에서 자라는 작물).
+   실제 기후-작물 대응(6학년 사회):
+     온대=벼(세계의 곡창, 몬순 벼농사)  ·  열대=벼+카사바(고온다습)
+     건조=대추야자(오아시스 농업)  ·  고산=감자(안데스 원산)
+     냉대=감자만(짧은 여름의 서늘한 뿌리작물, 제한적)  ·  한대=농사 불가(영구동토) */
 var BIOME_CROPS={
-  temperate:["seed_wheat","seed_potato","seed_rice"],
+  temperate:["seed_rice"],
   tropical:["seed_rice","seed_cassava"],
   desert:["seed_date"],
   alpine:["seed_potato"],
-  taiga:[], tundra:[]
+  taiga:["seed_potato"],
+  tundra:[]
 };
 
 var ITEMS={
@@ -445,7 +452,6 @@ var ITEMS={
  rice:{n:"쌀",em:"🍚",tier:1,val:1.2,rot:1,food:{h:22}},
  date:{n:"대추야자",em:"🌰",tier:1,val:1.4,rot:1,food:{h:16,w:6}},
  cassava:{n:"카사바",em:"🍠",tier:1,val:1.2,rot:1,food:{h:20}},
- seed_wheat:{n:"밀 씨앗",em:"🌱",tier:1,val:.5},
  seed_potato:{n:"감자 씨",em:"🌱",tier:1,val:.5},
  seed_rice:{n:"볍씨",em:"🌱",tier:1,val:.5},
  seed_date:{n:"대추야자 씨",em:"🌱",tier:1,val:.6},
@@ -527,9 +533,9 @@ function whereFrom(k){
 }
 /* 기후별 '살아남는 법' 안내(도움말) — 게임에서 몸으로 겪는 규칙을 말로 정리 */
 var BIOME_SURVIVE={
- temperate:"기후가 온화해 살기 좋습니다. 호수·연못이 많아 물 걱정이 적고, <b>밀·감자·벼를 심어 농사</b>지으면 식량이 넘칩니다. 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
+ temperate:"기후가 온화해 살기 좋습니다. 호수·연못이 많아 물 걱정이 적고, <b>벼농사</b>가 잘 되어 식량이 넘칩니다(들판엔 야생 밀도 있어 빵·옷감을 만들 수 있어요). 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
  tropical:"습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>비가 잦아(우기) <b>벼·카사바 농사</b>가 잘 됩니다. 무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
- taiga:"추워서 <b>농사가 안 됩니다</b>. 대신 <b>낚시·사냥(모피)·벌목</b>으로 삽니다. 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
+ taiga:"여름이 짧고 서늘합니다. 벼·밀 같은 곡식은 어렵지만 추위에 강한 <b>감자</b>는 기를 수 있어요. 주로 <b>낚시·사냥(모피)·벌목</b>으로 살고, 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
  desert:"낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>💧 물이 아주 귀합니다. <b>오아시스</b>를 찾거나 <b>우물</b>(돌+판자)을 파서 물을 확보하세요. 물가에선 <b>대추야자</b>를 기를 수 있습니다. 채집은 서늘한 <b>밤</b>에 하세요.",
  tundra:"낮이 <b>아주 짧습니다(08~16시)</b>. 밝을 때 <b>낚시</b>로 먹을 것을 모으고, 밤엔 <b>모닥불·방한복·지붕 있는 집</b> 안에서 버티세요. 밤에 밖을 돌면 몸이 얼어 느려지고 쓰러집니다. 이 땅에선 <b>농사가 안 되니</b> 낚시·모피가 생명줄입니다.",
  alpine:"공기가 희박해 회복이 느립니다(기력·체력 주의). 빙하 녹은 물웅덩이가 드물게 있고, 서늘해도 <b>감자</b>는 기를 수 있습니다. 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
@@ -638,9 +644,8 @@ var RECIPES=[
  {id:"chocolate",out:{chocolate:1},need:{cacao:2,ice:1},eff:"사치재 · 기념비에 필요"},
  {id:"brew",out:{brew:1},need:{coffee:2,water:1},eff:"사치재 · 스태미나 +35"},
  {id:"well",out:{well:1},need:{stone:4,plank:2},eff:"땅에 놓으면 마르지 않는 물이 나옵니다 (사막·고지대에서 물 확보)"},
- {id:"seed_wheat",out:{seed_wheat:3},need:{wheat:1},eff:"밀 1개로 씨앗 3개 · 온대에서 농사"},
- {id:"seed_potato",out:{seed_potato:2},need:{potato:1},eff:"감자로 씨감자 · 온대·고산에서 농사"},
- {id:"seed_rice",out:{seed_rice:3},need:{rice:1},eff:"쌀로 볍씨 · 물가(논)에 심기"},
+ {id:"seed_potato",out:{seed_potato:2},need:{potato:1},eff:"감자로 씨감자 · 냉대·고산에서 농사"},
+ {id:"seed_rice",out:{seed_rice:3},need:{rice:1},eff:"쌀로 볍씨 · 온대·열대 물가(논)에 심기"},
  {id:"tradepost",out:{tradepost:1},need:{plank:4,stone:2},eff:"놓으면 그 자리에서 무역할 수 있습니다"},
  {id:"monument",out:{monument:1},need:{power:3,iron:5,glass:3,brick:4,rubber:2,gold:2,spice:2,ice:2,chocolate:1,brew:1},
   eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"}
@@ -1325,7 +1330,7 @@ function updateWeather(dt,quiet){
    · 사막(desert): 한낮 09~17시 폭염. 지붕(실내)이나 밤에만 안전.
    · 한대(tundra): 밤엔 혹한. 짧은 낮(08~16시)에만 밖에서 활동 가능.
    · 열대(tropical): 땅에 지은 집은 습기·해충으로 썩음 → 나무 기둥 위 고상 가옥만 유지.
-   · 한대/냉대(tundra/taiga): 추워서 농사 불가 → 낚시·수렵만.
+   · 한대(tundra): 땅이 얼어 농사 불가 → 낚시·수렵만. 냉대(taiga)는 감자만 가능.
    매 프레임 simulate 가 이 상태를 계산해 스탯·이동·화면효과에 반영한다. ======= */
 var curHazard={type:null,sev:0,sheltered:false};   // 현재 위기 상태(HUD/오버레이가 참조)
 var envMoveSlow=0;                                  // 저체온 시 이동 둔화(0~1)
@@ -1493,9 +1498,9 @@ function raycast(maxD){
 var MINE_TOLER=0.3;
 function tryMine(dt){
   if(S.isVisiting){mining=null;return}          // 관전 중에는 채집 불가
-  /* [기후 적응·산업] 한대·냉대에선 작물(밀 등)을 재배·수확할 수 없다 */
-  if(target&&target.b===24&&(S.biome==="tundra"||S.biome==="taiga")){
-    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
+  /* [기후 적응·산업] 한대(영구동토)에선 곡식이 자라지 않는다 */
+  if(target&&target.b===24&&S.biome==="tundra"){
+    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
     toast("날이 추워 작물이 자라지 않습니다","bad");mining=null;return;
   }
   var mod=BIOMES[S.biome].mods.cost;
@@ -1622,11 +1627,6 @@ function tryPlace(){
   if(SEED[sel]){plantSeed(sel,bx,by,bz,target);return}
   var id=PLACE[sel];
   if(!id){toast(iN(sel)+"은(는) 설치할 수 없는 아이템입니다","bad");return}
-  /* [기후 적응·산업] 한대·냉대에선 작물(밀)을 흙에 심을 수 없다 */
-  if(id===24&&(S.biome==="tundra"||S.biome==="taiga")){
-    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
-    toast("날이 추워 작물이 자라지 않습니다","bad");return;
-  }
   if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
   setB(bx,by,bz,id);S.edits[bx+","+by+","+bz]=id;markDirty(bx,bz);
   netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
@@ -1665,16 +1665,21 @@ function waterNear(x,y,z){
 }
 /* [농사] 씨앗을 심는다 */
 function plantSeed(sel,bx,by,bz,tg){
-  /* 한대·냉대: 농사 불가 */
-  if(S.biome==="tundra"||S.biome==="taiga"){
-    teachOnce("nofarm","🌾 <b>너무 추운 땅</b>에선 곡식이 자라지 않습니다. 그래서 한대·냉대 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(모피·고기)</b>으로 먹고삽니다.");
-    toast("날이 추워 씨앗이 자라지 않습니다","bad");return;
+  /* 한대(영구동토): 농사 완전 불가 */
+  if(S.biome==="tundra"){
+    teachOnce("nofarm","🌾 <b>한대(툰드라)</b>는 땅이 얼어 있어 곡식이 자라지 않습니다. 그래서 이곳 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(순록·물고기)</b>으로 먹고삽니다.");
+    toast("얼어붙은 땅이라 씨앗이 자라지 않습니다","bad");return;
   }
   /* 이 기후에서 자라는 작물인지 */
   var okList=BIOME_CROPS[S.biome]||[];
+  if(okList.length===0){
+    toast("이 기후에선 농사를 지을 수 없습니다","bad");return;
+  }
   if(okList.indexOf(sel)<0){
-    var names=okList.map(function(k){return iN(k).replace(/ ?(씨앗|씨|줄기|볍씨)$/,"")}).join("·");
-    toast("이 기후에선 "+(names||"작물")+" 만 자랍니다","bad");return;
+    var names=okList.map(function(k){return CROP_NAME[k]||iN(k)}).join("·");
+    /* 냉대는 서늘해 감자만 되는 것을 짚어준다 */
+    if(S.biome==="taiga")teachOnce("taigafarm","🥔 <b>냉대</b>는 여름이 짧고 서늘해 벼·밀 같은 곡식은 어렵지만, 추위에 강한 <b>감자</b>는 기를 수 있습니다.");
+    toast("이 기후에선 "+(names||"작물")+"만 자랍니다","bad");return;
   }
   /* 심을 자리 아래가 밭(흙/풀/모래/점토)이어야 한다 */
   var below=getB(bx,by-1,bz);
@@ -1695,7 +1700,7 @@ function plantSeed(sel,bx,by,bz,tg){
   S.crops[bx+","+by+","+bz]=0;
   S.stat.placed++;
   toast("🌱 "+iN(sel)+" 심음 · 물을 주면 자랍니다","good");
-  teachOnce("farm","🌾 씨앗을 심었습니다. <b>물이 가까이 있으면(비가 오거나 물웅덩이 옆)</b> 시간이 지나며 자라 <b>수확</b>할 수 있습니다. 온대는 농사에 가장 알맞은 땅입니다.");
+  teachOnce("farm","🌾 씨앗을 심었습니다. <b>물이 가까이 있으면(비가 오거나 물웅덩이 옆)</b> 시간이 지나며 자라 <b>수확</b>할 수 있습니다. 온대·열대는 물이 넉넉해 <b>벼농사</b>에 알맞습니다.");
   refreshHotbar();cloudDirty();
 }
 /* 대상 칸이 플레이어 몸이 차지한 복셀과 겹치는지 (발끝/허리/머리 3칸 검사) */
@@ -1708,7 +1713,7 @@ function overlapsPlayer(bx,by,bz){
 /* --- 핫바 --- */
 var hotbar=[],hotIdx=0;
 function refreshHotbar(){
-  var pri=["seed_wheat","seed_potato","seed_rice","seed_date","seed_cassava","plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
+  var pri=["seed_rice","seed_potato","seed_date","seed_cassava","plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
   var arr=Object.keys(S.inv).filter(function(k){return (PLACE[k]||SEED[k])&&S.inv[k]>0});
   arr.sort(function(a,b){var ia=pri.indexOf(a),ib=pri.indexOf(b);
     return (ia<0?99:ia)-(ib<0?99:ib)});
@@ -2971,8 +2976,8 @@ function uiHelp(){
     "가방에서 <b>씨앗</b>을 골라 <b>흙·풀·모래</b> 위에 놓으면 심어집니다.<br>"+
     "💦 <b>물이 가까이 있거나(웅덩이 옆) 비가 오면</b> 작물이 쑥쑥 자랍니다. 물이 없으면 아주 느리게 자라요(가뭄).<br>"+
     "🌱 다 자란 작물을 캐면 <b>먹거리 여러 개 + 씨앗 1개</b>가 나와 계속 농사지을 수 있습니다.<br>"+
-    "기후마다 자라는 작물이 다릅니다 — <b>온대</b>: 밀·감자·벼 / <b>열대</b>: 벼·카사바 / <b>사막</b>: 대추야자 / <b>고산</b>: 감자.<br>"+
-    "🌾 <b>벼</b>는 물을 댄 <b>논</b>에서만 자라니 물웅덩이 바로 옆에 심으세요. <b>한대·냉대</b>는 너무 추워 농사가 안 됩니다(낚시·사냥으로 생활).</p></div></div>"+
+    "기후마다 자라는 작물이 다릅니다 — <b>온대</b>: 벼 / <b>열대</b>: 벼·카사바 / <b>사막</b>: 대추야자 / <b>냉대·고산</b>: 감자 / <b>한대</b>: 농사 불가.<br>"+
+    "🌾 <b>벼</b>는 물을 댄 <b>논</b>에서만 자라니 물웅덩이 바로 옆에 심으세요. <b>냉대</b>는 서늘해 <b>감자</b>만 되고, <b>한대</b>는 땅이 얼어 농사가 전혀 안 됩니다(낚시·사냥으로 생활).</p></div></div>"+
     "<div class='sec'><h3>🌦️ 날씨 <span class='sm'>하늘도 생활을 바꿉니다</span></h3><div class='card'><p class='eff'>"+
     "날씨는 <b>맑음과 비</b>가 번갈아 바뀝니다. 화면 위 아이콘(☀🌧️🌨️)으로 지금 날씨를 알 수 있어요.<br>"+
     "🌧️ 비가 오면 <b>작물이 잘 자라고</b>, 밖에 있어도 수분이 덜 마릅니다. 다만 하늘이 어두워집니다.<br>"+
@@ -3013,9 +3018,9 @@ function newState(name,biome,seed){
     stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
 }
 function startKit(s){
-  var kit={temperate:{wheat:6,wood:4,water:4,plank:4,stone:2,seed_wheat:6,seed_potato:3},
+  var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
     tropical:{fruit:6,wood:6,water:4,plank:4,stone:2,seed_rice:4,seed_cassava:3},
-    taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2},
+    taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2,seed_potato:4},
     desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1,seed_date:4},
     tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
     alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4}}[s.biome];
