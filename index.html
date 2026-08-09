@@ -10,57 +10,137 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="여섯 대륙">
+<!-- 본문 글꼴. 학교망에서 CDN이 막혀도 아래 시스템 글꼴로 자연스럽게 대체된다. -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 :root{
   --ink:#eef5f9;--ink2:#a8bcc9;--ink3:#7b93a3;
   --panel:#141d26e6;--panel2:#1b2733;--line:#2c3d4c;--line2:#3d5266;
   --accent:#7cc46a;--warn:#e8a33d;--bad:#ef5f5f;--good:#5fd3a3;
-  --f:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
+  --f:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
   --m:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* 시작 화면 전용 — '지구의 단면' 팔레트 */
+  --polar:#0c1622;   /* 화면 위쪽(극지방) 차가운 남색 */
+  --equator:#181410; /* 화면 아래쪽(적도) 따뜻한 흙색 */
+  --surf:#111a22;--surf2:#16212b;--edge:#22303c;
 }
 body[data-b=temperate]{--accent:#7cc46a}body[data-b=tropical]{--accent:#1fbfa0}
 body[data-b=taiga]{--accent:#63a9ec}body[data-b=desert]{--accent:#e8a33d}
 body[data-b=tundra]{--accent:#9fd8ff}body[data-b=alpine]{--accent:#b78cf0}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:#0d1319;color:var(--ink);font-family:var(--f);
-  overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none}
+html,body{height:100%;height:100dvh;overflow:hidden;background:#0d1319;color:var(--ink);font-family:var(--f);
+  overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+/* [모바일 수정] touch-action:none 을 body 에서 캔버스로 옮겼다.
+   body 에 걸어 두면 그 자손인 시작 화면·게임 패널이 손가락으로 스크롤되지 않는다. */
 button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
+input,textarea{user-select:text;-webkit-user-select:text}
 .hide{display:none!important}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .mono{font-family:var(--m);font-variant-numeric:tabular-nums}
 
-/* ---------- 로딩 / 시작 ---------- */
-#boot{position:fixed;inset:0;z-index:50;background:#0d1319;overflow-y:auto;padding:24px 16px 40px;
-  display:flex;flex-direction:column;justify-content:center}
-.bwrap{max-width:620px;margin:0 auto;width:100%}
-.eyebrow{font-family:var(--m);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3)}
-h1.t{font-size:clamp(28px,8vw,44px);line-height:1.04;font-weight:800;letter-spacing:-.02em;margin-top:8px}
-h1.t span{color:var(--accent)}
-.sub{color:var(--ink2);font-size:14px;margin-top:10px;line-height:1.5}
+/* ==========================================================================
+   시작 화면 — '지구의 단면'
+   위도에 따라 기후가 달라진다는 것을 고르는 행위 자체로 배우게 한다.
+   위(극) → 아래(적도) 순으로 기후 띠를 쌓고, 왼쪽에 위도 눈금을 세웠다.
+   ========================================================================== */
+#boot{position:fixed;inset:0;z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  touch-action:pan-y;padding:max(20px,env(safe-area-inset-top)) 16px 44px;display:flex;
+  background:
+    radial-gradient(120% 70% at 12% -10%, #16283a 0%, transparent 55%),
+    radial-gradient(110% 60% at 88% 108%, #2a1d14 0%, transparent 58%),
+    linear-gradient(180deg,var(--polar) 0%,#0d1319 52%,var(--equator) 100%);
+}
+.bwrap{max-width:1060px;width:100%;margin:auto}   /* justify-content:center 대신 auto 마진 — 넘칠 때 윗부분이 잘리지 않음 */
+.eyebrow{font-family:var(--m);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3);
+  display:flex;align-items:center;gap:8px}
+.eyebrow:before{content:"";width:22px;height:1px;background:var(--ink3);opacity:.6}
+h1.t{font-size:clamp(30px,7vw,52px);line-height:1;font-weight:800;letter-spacing:-.035em;margin-top:12px}
+h1.t span{color:var(--accent);transition:color .4s}
+.sub{color:var(--ink2);font-size:14px;margin-top:12px;line-height:1.6;max-width:44ch}
+/* 2단: 왼쪽 입력 / 오른쪽 기후 띠 */
+.bcols{display:grid;grid-template-columns:1fr;gap:24px;margin-top:26px}
+/* 모바일(1단)에서는 입력 → 대륙 고르기 → 도착하기 순서.
+   버튼이 대륙 선택보다 위에 있으면 골랐는지 확인하러 다시 올라가야 한다. */
+.bform{order:1}.latwrap{order:2}.bgo{order:3}
+.bgo .go{margin-top:0}.bgo .go+.go{margin-top:8px}
+@media(min-width:900px){
+  .bcols{grid-template-columns:minmax(300px,.85fr) 1.15fr;column-gap:38px;row-gap:18px;align-items:start}
+  .bform{grid-column:1;grid-row:1}
+  .latwrap{grid-column:2;grid-row:1 / span 2}
+  .bgo{grid-column:1;grid-row:2}
+}
 label.lb{display:block;font-family:var(--m);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--ink3);margin:18px 0 6px}
-.inp{width:100%;background:#151f29;border:1px solid var(--line);border-radius:10px;padding:11px 12px;outline:none}
-.inp:focus{border-color:var(--accent)}
-.bg6{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.bc{text-align:left;background:#151f29;border:1px solid var(--line);border-radius:10px;padding:11px;
-  display:flex;flex-direction:column;gap:4px}
-.bc[aria-pressed=true]{border-color:var(--cc);box-shadow:inset 0 0 0 1px var(--cc)}
-.bc .n{font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px}
-.bc .n i{width:9px;height:9px;border-radius:2px;background:var(--cc)}
-.bc .d{font-family:var(--m);font-size:10px;letter-spacing:.1em;color:var(--cc)}
-.bc .r{font-size:12px;color:var(--ink2);line-height:1.35}
-.go{display:block;width:100%;background:var(--accent);color:#0d1319;border-radius:10px;padding:14px;
-  font-weight:800;font-size:16px;margin-top:20px}
-.go:disabled{opacity:.4}
+  color:var(--ink3);margin:16px 0 6px}
+label.lb .free{text-transform:none;letter-spacing:0;color:#61798a}
+.inp{width:100%;background:#0e1720;border:1px solid var(--edge);border-radius:11px;padding:12px 13px;outline:none;
+  transition:border-color .18s,background .18s;font-size:15px}
+.inp::placeholder{color:#54697a}
+.inp:focus{border-color:var(--accent);background:#101c26}
+.go{display:block;width:100%;background:var(--accent);color:#0b1118;border-radius:11px;padding:15px;
+  font-weight:800;font-size:16px;margin-top:20px;letter-spacing:-.01em;transition:filter .18s,opacity .18s}
+.go:hover:not(:disabled){filter:brightness(1.08)}
+.go:disabled{opacity:.32;cursor:not-allowed}
 .go.ghost{background:none;border:1px solid var(--line2);color:var(--ink)}
-.go.sm{padding:10px;font-size:13.5px;margin-top:8px}
-details{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+.go.ghost:hover{border-color:var(--accent)}
+.go.sm{padding:11px;font-size:13.5px;margin-top:8px}
+details{margin-top:26px;border-top:1px solid var(--edge);padding-top:14px}
 summary{font-family:var(--m);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);cursor:pointer}
-.note{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-top:10px}
-#load{position:fixed;inset:0;z-index:60;background:#0d1319;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:14px}
+summary:hover{color:var(--ink2)}
+.note{font-size:12.5px;color:var(--ink2);line-height:1.6;margin-top:10px}
+
+/* --- 학생/선생님 전환 --- */
+.toggle{display:inline-flex;border:1px solid var(--edge);border-radius:999px;overflow:hidden;background:#0e1720}
+.toggle button{padding:9px 16px;font-size:13px;font-weight:700;color:var(--ink3);transition:color .18s}
+.toggle button[aria-pressed=true]{background:var(--accent);color:#0b1118}
+
+/* --- 기후 띠(위도 단면) --- */
+.latwrap{position:relative}
+.latcap{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;gap:10px}
+.latcap b{font-size:13px;font-weight:700}
+.latcap span{font-family:var(--m);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.lat{display:flex;flex-direction:column;gap:4px}
+.band{position:relative;display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:10px;
+  text-align:left;background:var(--surf);border:1px solid var(--edge);border-radius:12px;
+  padding:12px 13px 12px 0;overflow:hidden;transition:border-color .2s,transform .2s;isolation:isolate}
+.band:before{content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(90deg,var(--cc) 0%,transparent 66%);opacity:.09;transition:opacity .25s}
+.band:after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cc);opacity:.5;transition:opacity .25s}
+.band:hover{border-color:var(--cc)}
+.band:hover:before{opacity:.16}
+.band[aria-pressed=true]{border-color:var(--cc);transform:translateX(3px)}
+.band[aria-pressed=true]:before{opacity:.28}
+.band[aria-pressed=true]:after{opacity:1;width:4px}
+.band .tick{font-family:var(--m);font-size:10px;color:var(--ink3);text-align:right;padding-right:2px;
+  font-variant-numeric:tabular-nums;line-height:1.25}
+.band .tick em{display:block;font-style:normal;font-size:8.5px;opacity:.6;letter-spacing:.06em}
+.band .bmid{display:block;min-width:0}
+.band .bn{font-weight:800;font-size:16.5px;letter-spacing:-.02em;display:flex;align-items:baseline;gap:7px}
+.band .bn em{font-family:var(--m);font-style:normal;font-size:9.5px;letter-spacing:.14em;color:var(--cc);opacity:.85}
+.band .br{display:block;font-size:12px;color:var(--ink2);margin-top:3px;line-height:1.4}
+.band .bd{font-family:var(--m);font-size:9.5px;letter-spacing:.1em;color:var(--ink3);border:1px solid var(--edge);
+  border-radius:5px;padding:3px 7px;white-space:nowrap}
+.band[aria-pressed=true] .bd{color:var(--cc);border-color:var(--cc)}
+.band.alt{border-style:dashed}
+.lat.locked .band{opacity:.32;pointer-events:none;filter:saturate(.4)}
+.lat.locked .band[aria-pressed=true]{opacity:1;filter:none}
+.latend{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;margin-top:6px}
+.latend .tick{font-family:var(--m);font-size:10px;color:var(--warn);text-align:right;padding-right:2px}
+.latend i{height:1px;background:linear-gradient(90deg,var(--warn),transparent)}
+.latnote{font-size:11.5px;color:var(--ink3);margin-top:11px;line-height:1.5}
+/* 등장 모션: 극 → 적도 순서로 한 줄씩 내려온다 */
+@keyframes bandIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.lat .band{animation:bandIn .34s cubic-bezier(.2,.7,.3,1) backwards}
+#assignInfo{font-size:13px;line-height:1.55;background:#0e1720;border:1px solid var(--edge);
+  border-radius:10px;padding:10px 12px;margin-top:12px}
+#assignInfo.ok{border-color:var(--accent)}
+
+/* --- 로딩 --- */
+#load{position:fixed;inset:0;z-index:60;background:linear-gradient(180deg,var(--polar),#0d1319 60%,var(--equator));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px}
 #load .lt{font-family:var(--m);font-size:12px;color:var(--ink2);letter-spacing:.1em}
-.lbar{width:220px;height:6px;background:#1b2733;border-radius:999px;overflow:hidden}
+.lbar{width:min(260px,64vw);height:5px;background:#1b2733;border-radius:999px;overflow:hidden}
 .lbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 
 /* ---------- HUD ---------- */
@@ -90,12 +170,16 @@ summary{font-family:var(--m);font-size:11px;letter-spacing:.12em;text-transform:
 #target{position:absolute;left:50%;bottom:calc(122px + env(safe-area-inset-bottom));transform:translateX(-50%);
   background:#0d1319cc;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12px;
   white-space:nowrap;backdrop-filter:blur(4px)}
-/* 핫바 */
+/* 핫바 — [모바일 수정] 슬롯 9칸(468px)이 좁은 폰에서 화면 밖으로 잘려 나갔다.
+   화면 폭에 맞춰 슬롯 크기를 줄이고, 그래도 모자라면 가로로 넘길 수 있게 했다. */
 #hotbar{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  display:flex;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;
-  backdrop-filter:blur(6px)}
-.slot{width:46px;height:46px;border-radius:8px;background:#0f1922;border:1px solid var(--line);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;font-size:19px}
+  display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;
+  backdrop-filter:blur(6px);max-width:calc(100vw - 16px);overflow-x:auto;scrollbar-width:none;
+  touch-action:pan-x;--slot:clamp(36px,9.6vw,46px)}
+#hotbar::-webkit-scrollbar{display:none}
+.slot{width:var(--slot);height:var(--slot);flex:0 0 auto;border-radius:8px;background:#0f1922;border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;
+  font-size:clamp(15px,4vw,19px)}
 .slot.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .slot .cnt{position:absolute;right:3px;bottom:1px;font-family:var(--m);font-size:9.5px;color:var(--ink2)}
 .slot .nm{font-size:8px;color:var(--ink3);position:absolute;top:2px;left:0;right:0;text-align:center;
@@ -137,8 +221,9 @@ summary{font-family:var(--m);font-size:11px;letter-spacing:.12em;text-transform:
 /* ---------- 게임 내 패널 ---------- */
 #panel{position:fixed;inset:0;z-index:30;background:#060a0eb8;backdrop-filter:blur(3px);
   display:flex;align-items:center;justify-content:center;padding:12px}
-.sheet{width:100%;max-width:640px;max-height:92vh;overflow-y:auto;background:#111a23f2;border:1px solid var(--line2);
-  border-radius:16px;padding:0 0 16px;overscroll-behavior:contain}
+.sheet{width:100%;max-width:640px;max-height:92vh;max-height:88dvh;overflow-y:auto;background:#111a23f2;
+  border:1px solid var(--line2);border-radius:16px;padding:0 0 16px;overscroll-behavior:contain;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch}
 .ph{position:sticky;top:0;z-index:2;background:#0f1822f5;border-bottom:1px solid var(--line);
   display:flex;gap:4px;padding:8px 10px;border-radius:16px 16px 0 0;flex-wrap:wrap;align-items:center}
 .ph button{padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink2)}
@@ -185,11 +270,90 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
   padding:6px 8px 6px 14px;font-size:12.5px;backdrop-filter:blur(6px);z-index:12;max-width:94vw}
 #visitBanner b{color:var(--warn)}
 #visitBanner button{background:var(--bad);color:#fff;border-radius:999px;padding:6px 12px;font-weight:700;font-size:12px}
-.rosterRow{display:grid;grid-template-columns:1fr 118px 34px;gap:6px;align-items:center;margin:5px 0}
-.rosterRow.has4{grid-template-columns:1fr 106px 34px 34px}
-.toggle{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
-.toggle button{padding:8px 14px;font-size:12.5px;font-weight:700;color:var(--ink2)}
-.toggle button[aria-pressed=true]{background:var(--accent);color:#0d1319}
+/* ==========================================================================
+   선생님 명단 관리 — 한 손으로도 되게, 지금 상태가 늘 보이게
+   ========================================================================== */
+.tcard{background:var(--surf);border:1px solid var(--edge);border-radius:13px;padding:14px;margin-top:12px}
+.tcard>h4{font-size:13.5px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.tcard>h4 .cnt{margin-left:auto;font-family:var(--m);font-size:10.5px;color:var(--ink3);font-weight:400}
+.thint{font-size:11.5px;color:var(--ink3);line-height:1.55;margin:6px 0 10px}
+/* 기후별 인원 요약 — 명단 전체가 한눈에 */
+.tsum{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}
+.tsum button{display:inline-flex;align-items:center;gap:6px;background:#0e1720;border:1px solid var(--edge);
+  border-radius:999px;padding:5px 11px 5px 8px;font-size:12px;color:var(--ink2);transition:border-color .18s,color .18s}
+.tsum button i{width:8px;height:8px;border-radius:2px;background:var(--cc)}
+.tsum button b{font-family:var(--m);font-size:11.5px;color:var(--ink)}
+.tsum button[aria-pressed=true]{border-color:var(--cc);color:var(--ink)}
+.tsum button.zero{opacity:.45}
+/* 학생 한 명 = 한 줄 */
+.rlist{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.rrow{background:#0e1720;border:1px solid var(--edge);border-radius:11px;overflow:hidden;transition:border-color .18s}
+.rrow:focus-within{border-color:var(--line2)}
+.rtop{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:7px 7px 7px 11px}
+.rname{background:none;border:0;outline:none;font-size:14.5px;font-weight:600;padding:5px 2px;
+  min-width:0;border-bottom:1px solid transparent;border-radius:0}
+.rname:focus{border-bottom-color:var(--line2)}
+.rbio{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--cc);border-radius:999px;
+  padding:5px 11px;font-size:12.5px;font-weight:700;color:var(--cc);white-space:nowrap;background:#0d1620}
+.rbio:after{content:"▾";font-size:9px;opacity:.7}
+.rbio.none{border-color:var(--bad);color:var(--bad)}
+.rmore{width:32px;height:32px;border-radius:9px;color:var(--ink3);font-size:15px;line-height:1;
+  border:1px solid transparent;transition:background .15s,color .15s}
+.rmore:hover{background:#16232e;color:var(--ink)}
+.rmore.danger:hover{color:var(--bad)}
+/* 기후 고르기 칩 — 셀렉트 대신 큼직한 버튼(태블릿에서 훨씬 빠름) */
+.rpick{display:flex;flex-wrap:wrap;gap:5px;padding:0 9px 10px}
+.rpick button{border:1px solid var(--edge);border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:700;
+  color:var(--ink2);background:#101b25;transition:border-color .15s,color .15s}
+.rpick button[aria-pressed=true]{border-color:var(--cc);color:var(--cc);background:#0d1620}
+.rpick .rdel{margin-left:auto;color:var(--bad);border-color:transparent}
+/* 여러 명 한꺼번에 붙여넣기 */
+.tpaste{width:100%;min-height:78px;background:#0e1720;border:1px solid var(--edge);border-radius:11px;
+  padding:11px 12px;font-size:14px;line-height:1.6;resize:vertical;outline:none;color:var(--ink)}
+.tpaste:focus{border-color:var(--accent)}
+.trow{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.trow .mini{flex:1 1 auto;min-width:110px;text-align:center}
+/* 저장 상태 막대 — 늘 보이게 아래에 붙여 둔다 */
+.tsave{position:sticky;bottom:0;margin-top:14px;padding:14px 0 6px;
+  background:linear-gradient(180deg,transparent,#0b1218e6 42%);backdrop-filter:blur(6px)}
+.tsave .go{margin-top:0}
+.tdirty{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--warn);margin-bottom:8px}
+.tdirty i{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:0 0 auto}
+.tdirty.saved{color:var(--good)}.tdirty.saved i{background:var(--good)}
+.tempty{font-size:12.5px;color:var(--ink3);line-height:1.6;text-align:center;padding:18px 10px;
+  border:1px dashed var(--edge);border-radius:11px;margin-top:10px}
+
+/* ==========================================================================
+   [모바일] 좁은 화면 · 가로 모드 보정
+   ========================================================================== */
+@media(max-width:430px){
+  .stats{min-width:0;flex:1 1 auto;padding:7px}
+  .st .k{width:30px;font-size:9.5px}
+  .info{padding:7px 8px}.info .bn{font-size:12px}.info .cl{font-size:10px}
+  #tabs{gap:5px}
+  #tabs button{width:42px;height:42px;font-size:17px;border-radius:10px}
+  #stick{width:104px;height:104px}
+  #tbtn{grid-template-columns:repeat(2,54px);gap:7px}
+  #tbtn button{height:54px}
+  #tbtn button.big{height:42px}
+  .slot .nm{font-size:7px}
+  .slot .cnt{font-size:9px}
+  #toasts{max-width:94vw}
+  .toast{white-space:normal;text-align:center}
+}
+/* 가로로 눕힌 폰: 세로 공간이 아주 좁다 */
+@media(max-height:460px) and (orientation:landscape){
+  #tabs{top:calc(6px + env(safe-area-inset-top));right:6px;flex-direction:row}
+  .top{top:calc(4px + env(safe-area-inset-top))}
+  #stick{width:92px;height:92px;bottom:calc(58px + env(safe-area-inset-bottom))}
+  #stick i{width:38px;height:38px;margin:-19px 0 0 -19px}
+  #tbtn{bottom:calc(58px + env(safe-area-inset-bottom));grid-template-columns:repeat(2,48px);gap:6px}
+  #tbtn button{height:48px}#tbtn button.big{height:36px;font-size:13px}
+  #toasts{bottom:calc(120px + env(safe-area-inset-bottom))}
+  #boot{padding-top:14px;padding-bottom:24px}
+  h1.t{font-size:30px}
+  .sheet{max-height:94dvh}
+}
 
 /* ===== [기후 생존] 화면 가장자리 위기 오버레이 (폭염 아지랑이 / 혹한 성에) ===== */
 #fx{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
@@ -298,70 +462,97 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
 </div>
 
 <div id="boot"><div class="bwrap">
-  <p class="eyebrow">1인칭 복셀 · 기후와 무역 · 6학년 사회</p>
-  <h1 class="t">여섯 대륙,<br>하나의 <span>무역망</span></h1>
-  <p class="sub">직접 걸어다니며 캐고, 만들고, 짓습니다. 기후마다 나는 자원이 다르니 혼자서는 문명을 완성할 수 없습니다.</p>
-
-  <div class="toggle" id="modeToggle" style="margin-top:18px">
-    <button data-m="student" aria-pressed="true">🎒 학생</button>
-    <button data-m="teacher" aria-pressed="false">🧑‍🏫 선생님</button>
+  <div class="bhead">
+    <p class="eyebrow">6학년 사회 · 기후와 인간생활</p>
+    <h1 class="t">위도가 다르면<br><span>사는 법</span>도 다릅니다</h1>
+    <p class="sub">적도에서 극지방까지, 여섯 기후를 직접 걸어 봅니다. 기후마다 나는 것이 다르니 어느 대륙도 혼자서는 문명을 완성할 수 없습니다.</p>
+    <div class="toggle" id="modeToggle" style="margin-top:20px">
+      <button data-m="student" aria-pressed="true">🎒 학생</button>
+      <button data-m="teacher" aria-pressed="false">🧑‍🏫 선생님</button>
+    </div>
   </div>
 
   <!-- ===== 학생 모드 ===== -->
-  <div id="studentPane">
-    <label class="lb" for="s_room">방 코드 <span style="text-transform:none;letter-spacing:0">(선생님이 알려줌 · 없으면 비워도 됨)</span></label>
-    <input class="inp" id="s_room" maxlength="24" placeholder="예: class-1" autocomplete="off">
-    <label class="lb" for="nm">내 이름</label>
-    <input class="inp" id="nm" maxlength="12" placeholder="예: 김민준" autocomplete="off">
-    <div id="assignInfo" class="note hide" style="margin-top:8px"></div>
-    <div id="pickWrap">
-      <label class="lb">내 대륙 고르기 <span id="pickHint" style="text-transform:none;letter-spacing:0;color:var(--ink3)"></span></label>
-      <div class="bg6" id="bpick"></div>
+  <div class="bcols" id="studentPane">
+    <div class="bform">
+      <label class="lb" for="s_room">방 코드 <span class="free">선생님이 알려 줍니다 · 없으면 비워 두세요</span></label>
+      <input class="inp" id="s_room" maxlength="24" placeholder="예: class-1" autocomplete="off">
+      <label class="lb" for="nm">내 이름</label>
+      <input class="inp" id="nm" maxlength="12" placeholder="예: 김민준" autocomplete="off">
+      <div id="assignInfo" class="hide"></div>
     </div>
-    <button class="go" id="start" disabled>대륙에 도착하기</button>
-    <button class="go ghost sm hide" id="cont">이어서 하기</button>
+
+    <div class="latwrap" id="pickWrap">
+      <div class="latcap"><b>내 대륙 고르기</b><span id="pickHint">북극 → 적도</span></div>
+      <div class="lat" id="bpick"></div>
+      <div class="latend"><span class="tick">0°</span><i></i></div>
+      <p class="latnote">적도에 가까울수록 햇빛을 많이 받아 덥고, 극에 가까울수록 춥습니다. <b>고산</b>만은 위도가 아니라 <b>높이</b>가 만든 기후예요.</p>
+    </div>
+
+    <div class="bgo">
+      <button class="go" id="start" disabled>대륙에 도착하기</button>
+      <button class="go ghost sm hide" id="cont">이어서 하기</button>
+    </div>
   </div>
 
   <!-- ===== 선생님 모드 ===== -->
   <div id="teacherPane" class="hide">
-    <p class="sub" style="margin-top:14px">서버 연결은 앱에 내장되어 있습니다. 선생님 계정으로 로그인한 뒤 방 코드를 정하고, 학생 이름과 배정할 기후를 미리 정해 두세요. 학생은 방 코드와 이름만 입력하면 지정된 기후로 바로 접속합니다.</p>
-    <label class="lb">선생님 이메일</label>
-    <input class="inp" id="t_email" type="email" placeholder="teacher@school.kr" autocomplete="username">
-    <label class="lb">비밀번호</label>
-    <input class="inp" id="t_pw" type="password" placeholder="••••••••" autocomplete="current-password">
-    <label class="lb">방 코드</label>
-    <input class="inp" id="t_room" placeholder="class-1" autocomplete="off">
-    <div class="rw" style="gap:8px">
-      <button class="go sm" id="t_connect" style="flex:1">로그인하고 명단 불러오기</button>
-      <button class="go ghost sm hide" id="t_logout" style="flex:0 0 auto">로그아웃</button>
-    </div>
-    <div id="t_status" class="note" style="margin-top:8px"></div>
+    <div class="bcols">
+      <div>
+        <div class="tcard">
+          <h4>🔐 선생님 로그인</h4>
+          <p class="thint">서버 주소와 키는 앱에 들어 있습니다. 명단을 저장하려면 선생님 계정으로 로그인하세요. 학생은 <b>방 코드와 이름</b>만 넣으면 배정된 기후로 바로 들어갑니다.</p>
+          <label class="lb" for="t_email">이메일</label>
+          <input class="inp" id="t_email" type="email" placeholder="teacher@school.kr" autocomplete="username">
+          <label class="lb" for="t_pw">비밀번호</label>
+          <input class="inp" id="t_pw" type="password" placeholder="••••••••" autocomplete="current-password">
+          <label class="lb" for="t_room">방 코드 <span class="free">학생에게 알려 줄 코드</span></label>
+          <input class="inp" id="t_room" placeholder="class-1" autocomplete="off">
+          <button class="go sm" id="t_connect">로그인하고 명단 불러오기</button>
+          <button class="go ghost sm hide" id="t_logout">로그아웃</button>
+          <div id="t_status" class="note"></div>
+        </div>
 
-    <label class="lb" style="margin-top:20px">학생 배정 명단</label>
-    <div id="rosterList"></div>
-    <div class="rosterRow" style="margin-top:6px">
-      <input class="inp" id="r_name" placeholder="학생 이름" autocomplete="off">
-      <select class="sel" id="r_biome"></select>
-      <button class="mini acc" id="r_add" style="height:100%">추가</button>
+        <div class="tcard">
+          <h4>➕ 학생 추가</h4>
+          <p class="thint">한 줄에 한 명씩, 또는 쉼표로 구분해 붙여넣으세요. 엑셀에서 이름 열을 그대로 복사해도 됩니다.</p>
+          <textarea class="tpaste" id="r_bulk" placeholder="김민준&#10;이서연&#10;박지호" autocomplete="off" spellcheck="false"></textarea>
+          <div class="trow">
+            <button class="mini acc" id="r_add">명단에 넣기</button>
+            <button class="mini" id="t_autofill">6기후로 고르게 나누기</button>
+            <button class="mini" id="t_clear">전체 비우기</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="tcard">
+          <h4>👥 배정 명단 <span class="cnt" id="r_count">0명</span></h4>
+          <div class="tsum" id="r_summary"></div>
+          <div id="rosterList"></div>
+        </div>
+        <div class="tsave">
+          <div class="tdirty hide" id="t_dirty"><i></i><span></span></div>
+          <button class="go" id="t_save">명단 저장</button>
+          <p class="note" id="t_saveMsg"></p>
+        </div>
+      </div>
     </div>
-    <button class="go sm" id="t_autofill">이름들 6기후로 자동 분배</button>
-    <button class="go" id="t_save">명단 DB에 저장</button>
-    <p class="note" id="t_saveMsg"></p>
+
+    <details>
+      <summary>처음 한 번만 하는 서버 준비</summary>
+      <p class="note">서버 주소와 키는 앱에 내장되어 있어 아무도 입력하지 않습니다. 개발자가 <b>.env</b>에 한 번 넣어 배포하면 반 전체가 같은 서버를 씁니다.
+      데이터베이스 쪽은 아래 세 가지만 한 번 해 두면 됩니다.</p>
+      <p class="note">1. Supabase 대시보드 → <b>Authentication → Sign In / Providers</b> 에서 <b>Anonymous sign-ins</b>를 켭니다.
+      학생마다 익명 계정이 발급되고, 이 계정이 있어야 “내 데이터만 내가 고친다”는 규칙(RLS)이 실제로 작동합니다.</p>
+      <p class="note">2. <b>Authentication → Rate Limits</b> 에서 익명 로그인 한도를 시간당 30회보다 넉넉하게(예: 200) 올립니다.
+      학교는 한 IP를 다 같이 쓰기 때문에 기본값이면 한 반이 다 접속하지 못합니다.</p>
+      <p class="note">3. <b>SQL Editor</b>에 함께 배포된 <b class="mono">schema.sql</b> 전체를 붙여넣고 실행합니다.
+      표와 접근 규칙(RLS)이 한 번에 만들어집니다. 마지막에 선생님 계정을 <b class="mono">teachers</b> 표에 넣는 줄이 있으니 이메일만 바꿔 주세요.</p>
+      <p class="note">선생님 계정은 <b>Authentication → Users → Add user</b>에서 이메일·비밀번호로 하나 만들면 됩니다.
+      이 계정으로 로그인해야 명단을 저장하고 학생 데이터를 정리할 수 있습니다.</p>
+    </details>
   </div>
-
-  <details>
-    <summary>선생님용 · 처음 한 번만 하는 서버 준비</summary>
-    <p class="note">서버 주소와 키는 앱에 내장되어 있어 아무도 입력하지 않습니다. 개발자가 <b>.env</b>에 한 번 넣어 배포하면 반 전체가 같은 서버를 씁니다.
-    데이터베이스 쪽은 아래 세 가지만 한 번 해 두면 됩니다.</p>
-    <p class="note">1. Supabase 대시보드 → <b>Authentication → Sign In / Providers</b> 에서 <b>Anonymous sign-ins</b>를 켭니다.
-    학생마다 익명 계정이 발급되고, 이 계정이 있어야 “내 데이터만 내가 고친다”는 규칙(RLS)이 실제로 작동합니다.</p>
-    <p class="note">2. <b>Authentication → Rate Limits</b> 에서 익명 로그인 한도를 시간당 30회보다 넉넉하게(예: 200) 올립니다.
-    학교는 한 IP를 다 같이 쓰기 때문에 기본값이면 한 반이 다 접속하지 못합니다.</p>
-    <p class="note">3. <b>SQL Editor</b>에 함께 배포된 <b class="mono">schema.sql</b> 전체를 붙여넣고 실행합니다.
-    표와 접근 규칙(RLS)이 한 번에 만들어집니다. 마지막에 선생님 계정을 <b class="mono">teachers</b> 표에 넣는 줄이 있으니 이메일만 바꿔 주세요.</p>
-    <p class="note">선생님 계정은 <b>Authentication → Users → Add user</b>에서 이메일·비밀번호로 하나 만들면 됩니다.
-    이 계정으로 로그인해야 명단을 저장하고 학생 데이터를 정리할 수 있습니다.</p>
-  </details>
 </div></div>
 
 <div id="load" class="hide"><div class="lt" id="ltx">대륙을 만드는 중…</div><div class="lbar"><i id="lbi"></i></div></div>
@@ -645,6 +836,7 @@ var ITEMS={
  spice:{n:"향신료",em:"🌶️",tier:3,val:3},
  hardwood:{n:"희귀원목",em:"🌳",tier:3,val:3.2},
  fuel:{n:"연료",em:"⛽",tier:3,val:7.6},
+ solar:{n:"태양광 패널",em:"🔆",tier:3,val:9},
  chocolate:{n:"초콜릿",em:"🍫",tier:3,val:8,food:{h:10}},
  brew:{n:"커피",em:"🧋",tier:3,val:7.2,food:{h:4,s:35}},
  power:{n:"전력",em:"⚡",tier:3,val:12},
@@ -679,6 +871,47 @@ var BIOMES={
 };
 var BKEYS=Object.keys(BIOMES).sort(function(a,b){return BIOMES[a].ord-BIOMES[b].ord});
 function bN(k){return BIOMES[k]?BIOMES[k].n:"?"}
+
+/* ==========================================================================
+   [학습 추가] 위도와 기후대
+   --------------------------------------------------------------------------
+   교과의 첫 단추는 "왜 기후가 다른가 = 위도에 따라 받는 햇빛의 양이 다르다"이다.
+   시작 화면에서 대륙을 고르는 행위 자체가 이 개념을 보여주도록, 극 → 적도 순으로
+   기후 띠를 세워 놓는다. 고산은 위도가 아니라 '고도'가 만든 기후라 따로 둔다.
+   ========================================================================== */
+var LAT_ORDER=["tundra","taiga","temperate","desert","tropical","alpine"];
+var LAT_INFO={
+ tundra   :{deg:"90°",  zone:"극",     en:"TUNDRA"},
+ taiga    :{deg:"66.5°",zone:"고위도", en:"TAIGA"},
+ temperate:{deg:"50°",  zone:"중위도", en:"TEMPERATE"},
+ desert   :{deg:"30°",  zone:"아열대", en:"ARID"},
+ tropical :{deg:"20°",  zone:"저위도", en:"TROPICAL"},
+ alpine   :{deg:"2000m",zone:"높은 곳",en:"ALPINE"}
+};
+
+/* ==========================================================================
+   [학습 추가] 탄소와 지구 온난화  — [6사12-02] 지속가능한 미래
+   --------------------------------------------------------------------------
+   기존 게임은 "기후가 사람을 바꾼다"까지만 다뤘다. 교육과정이 함께 요구하는
+   나머지 절반은 "사람이 기후를 바꾼다"이다. 그래서 화석연료를 태우는 제작에만
+   탄소를 붙이고, 같은 결과를 내는 재생에너지 경로를 나란히 놓았다.
+   아이는 잔소리가 아니라 '선택'으로 배운다: 값싼 화석연료 vs 재료가 더 드는 태양광.
+   쌓인 탄소는 실제로 내 대륙의 기온을 올린다(ambient).
+   ========================================================================== */
+var CARBON_OF={brick:1,glass:1,iron:2,fuel:4,power:6};   // 만들 때 나오는 탄소(석탄·석유를 태우는 제작)
+var CARBON_STEP=[
+ {at:0,  d:0, n:"안정",  c:"#5fd3a3", m:"아직은 지구가 견디고 있습니다."},
+ {at:25, d:1, n:"주의",  c:"#e8d24a", m:"평균 기온이 <b>1°C</b> 올랐습니다. 더워진 만큼 폭염과 가뭄이 잦아집니다."},
+ {at:60, d:2, n:"경고",  c:"#e8a33d", m:"평균 기온이 <b>2°C</b> 올랐습니다. 빙하가 녹고 해수면이 오르기 시작합니다."},
+ {at:110,d:3, n:"위기",  c:"#ef5f5f", m:"평균 기온이 <b>3°C</b> 올랐습니다. 사는 곳을 옮겨야 하는 사람들이 생깁니다."}
+];
+function carbonAmt(){return (S&&S.carbon)||0}
+function carbonStep(){
+  var v=carbonAmt(),r=CARBON_STEP[0];
+  for(var i=0;i<CARBON_STEP.length;i++)if(v>=CARBON_STEP[i].at)r=CARBON_STEP[i];
+  return r;
+}
+function warmDeg(){return carbonStep().d}     // ambient() 에 더해지는 온난화 보정(°C)
 var SPECIAL={temperate:["wheat","wood","clay","bread"],tropical:["rubber","cacao","coffee","spice","hardwood","fruit"],
  taiga:["wood","fur","coal"],desert:["sand","oil","gold","glass"],tundra:["ice","fish"],
  alpine:["iron_ore","copper","stone","iron"]};
@@ -705,77 +938,152 @@ var BIOME_SURVIVE={
 var CLIMATE_EDU={
  temperate:{
    region:"우리나라·중국 동부·미국 동부·서유럽",
+   lat:"중위도 30°~50°",
+   why:"적도와 극의 <b>가운데</b>라 햇빛을 알맞게 받습니다. 우리나라는 여기에 속하고, 여름과 겨울에 부는 바람의 방향이 바뀌는 <b>계절풍</b> 때문에 여름에 비가 몰립니다.",
    summary:"사계절이 뚜렷하고 여름에 비가 집중됩니다. 온화해 사람이 살기 좋습니다.",
    clothes:"계절마다 옷을 바꿔 입습니다(여름 얇은 옷·겨울 두꺼운 옷).",
    food:"벼·밀 농사가 잘 되어 <b>식량이 풍부</b>합니다.",
    house:"계절 변화에 맞춘 일반 가옥(기와집·목조 등).",
    industry:"세계의 식량 창고 · 농업(1차 산업)",
+   life:"오늘 먹은 <b>쌀밥</b>이 여기서 났습니다. 살기 좋아 세계 인구가 가장 많이 모여 사는 기후대예요.",
+   warm:"여름이 길어지고 폭염 일수가 늘고 있습니다. 사과 재배지가 대구에서 강원도로 <b>북쪽으로 올라가는</b> 것도 그 때문이에요.",
    temp:[-2,1,7,13,18,22,25,26,21,14,7,0],
    rain:[20,25,45,65,95,130,395,340,140,50,45,25],
-   q:["온대는 왜 인구가 많고 농업이 발달했을까요?","남는 식량을 어느 대륙(사막·한대)에 팔면 서로에게 좋을까요?"],
-   quiz:{q:"온대 기후에서 농업이 발달한 가장 큰 까닭은?",a:["기온이 온화하고 강수가 적당해 작물이 잘 자란다","일 년 내내 얼어 있어서","비가 전혀 오지 않아서"],c:0}
+   q:["온대는 왜 인구가 많고 농업이 발달했을까요?","남는 식량을 어느 대륙(사막·한대)에 팔면 서로에게 좋을까요?","우리나라 여름에 비가 몰리는 것은 농사에 도움이 될까요, 방해가 될까요?"],
+   quiz:[
+     {q:"온대 기후에서 농업이 발달한 가장 큰 까닭은?",a:["기온이 온화하고 강수가 알맞아 작물이 잘 자란다","일 년 내내 얼어 있어서","비가 전혀 오지 않아서"],c:0,
+      why:"온대는 너무 덥지도 춥지도 않고 비도 알맞게 옵니다. 그래서 예로부터 사람이 가장 많이 모여 살고 농사가 발달했어요."},
+     {q:"우리나라가 속한 기후대는?",a:["중위도의 온대 기후","적도의 열대 기후","극지방의 한대 기후"],c:0,
+      why:"우리나라는 위도 33°~43°에 있는 중위도 나라라 사계절이 뚜렷한 온대 기후에 속합니다."},
+     {q:"온대의 기후 그래프에서 볼 수 있는 특징은?",a:["여름과 겨울의 기온 차가 크고 여름에 비가 몰린다","열두 달 기온이 거의 같다","일 년 내내 영하로 내려간다"],c:0,
+      why:"기온 선이 산 모양으로 크게 오르내리고, 강수 막대가 여름에만 높이 솟는 것이 온대 몬순 지역의 그래프 모양입니다."}
+   ]
  },
  tropical:{
    region:"아마존·동남아시아·콩고 분지(적도 부근)",
+   lat:"저위도 0°~20°",
+   why:"적도라 햇빛이 <b>거의 수직으로</b> 내리쬡니다. 뜨거워진 공기가 위로 올라가며 구름이 되어 거의 매일 오후 소나기(스콜)가 쏟아집니다.",
    summary:"일 년 내내 덥고 비가 많이 옵니다. 습기와 벌레·홍수가 큰 문제입니다.",
    clothes:"얇고 <b>통풍이 잘 되는 옷</b>을 입어 더위와 습기를 피합니다.",
    food:"과일·향신료·카카오가 풍부하지만 <b>음식이 빨리 상해</b> 절이거나 바로 팔아야 합니다.",
    house:"습기·벌레·홍수를 피하려고 <b>기둥을 세워 바닥을 띄운 고상 가옥</b>을 짓습니다.",
    industry:"플랜테이션 · 사치작물(향신료·커피·고무)",
+   life:"<b>초콜릿·커피·바나나·고무 타이어</b>가 모두 열대에서 옵니다. 우리 교실에도 열대가 들어와 있는 셈이에요.",
+   warm:"숲을 베어 낼수록 이산화탄소를 빨아들이는 <b>지구의 허파</b>가 줄어듭니다. 홍수와 태풍도 더 세지고 있어요.",
    temp:[26,27,27,28,28,28,27,27,27,27,26,26],
    rain:[240,160,180,180,170,160,160,175,180,205,255,290],
-   q:["열대 우림 사람들은 왜 집을 땅에서 띄워 지을까요?","더운 곳에서 음식을 오래 보관하려면 어떻게 해야 할까요?"],
-   quiz:{q:"열대 우림에서 고상 가옥(기둥집)을 짓는 까닭은?",a:["습기·벌레·홍수를 피하기 위해","눈이 많이 쌓여서","바람이 전혀 불지 않아서"],c:0}
+   q:["열대 우림 사람들은 왜 집을 땅에서 띄워 지을까요?","더운 곳에서 음식을 오래 보관하려면 어떻게 해야 할까요?","열대의 숲을 베어 농장을 만드는 일은 누구에게 이롭고 누구에게 해로울까요?"],
+   quiz:[
+     {q:"열대 우림에서 고상 가옥(기둥집)을 짓는 까닭은?",a:["습기·벌레·홍수를 피하기 위해","눈이 많이 쌓여서","바람이 전혀 불지 않아서"],c:0,
+      why:"땅에서 올라오는 습기와 벌레, 비가 많이 올 때의 물을 피하려고 바닥을 띄웁니다. 게임에서도 땅에 지은 집은 썩었지요."},
+     {q:"적도 부근이 일 년 내내 더운 까닭은?",a:["햇빛을 거의 수직으로 받아서","바다에서 멀어서","고도가 높아서"],c:0,
+      why:"같은 양의 햇빛이라도 수직으로 받으면 좁은 땅에 모여 뜨겁고, 비스듬히 받으면 넓게 퍼져 미지근합니다. 이것이 기후가 갈리는 첫 번째 까닭이에요."},
+     {q:"카카오·커피·바나나의 공통점은?",a:["덥고 비가 많은 열대에서 자란다","추운 곳에서만 자란다","사막에서만 자란다"],c:0,
+      why:"우리가 즐겨 먹는 이 작물들은 열대에서만 잘 자랍니다. 그래서 먼 나라에서 배로 실어 옵니다 — 무역이 생기는 까닭이에요."}
+   ]
  },
  taiga:{
    region:"시베리아·캐나다 북부·북유럽(침엽수림대)",
+   lat:"고위도 50°~70°",
+   why:"햇빛이 비스듬히 들어와 겨울이 길고 매섭습니다. 잎이 <b>바늘처럼 뾰족한 침엽수</b>만 이 추위를 견뎌 냅니다.",
    summary:"겨울이 길고 매우 춥습니다. 여름은 짧습니다. 침엽수 숲이 넓게 펼쳐집니다.",
    clothes:"두꺼운 옷과 <b>모피</b>로 추위를 막습니다.",
    food:"추워서 <b>농사가 어렵고</b>, 낚시·사냥과 감자 등으로 먹고삽니다.",
    house:"주변에 많은 나무로 지은 <b>통나무집</b>. 추워서 음식은 잘 상하지 않습니다.",
    industry:"임업 · 모피 · 보존·가공재",
+   life:"우리가 쓰는 <b>공책·종이·가구</b>의 나무가 이 침엽수림에서 옵니다.",
+   warm:"얼어 있던 땅(<b>영구동토</b>)이 녹으면서 갇혀 있던 온실가스가 새어 나오고, 여름 산불이 크게 늘고 있습니다.",
    temp:[-9,-8,-2,7,14,18,20,18,12,5,-2,-7],
    rain:[40,35,35,40,50,70,85,75,60,55,50,45],
-   q:["냉대(침엽수림)에서 농사 대신 어떤 일로 살아갈까요?","날이 추운 것이 음식 보관에는 왜 도움이 될까요?"],
-   quiz:{q:"냉대 기후 사람들의 주된 생활 방식은?",a:["임업·모피·낚시와 사냥","넓은 벼농사","향신료 플랜테이션"],c:0}
+   q:["냉대(침엽수림)에서 농사 대신 어떤 일로 살아갈까요?","날이 추운 것이 음식 보관에는 왜 도움이 될까요?","남반구에는 왜 냉대 기후가 거의 없을까요?"],
+   quiz:[
+     {q:"냉대 기후 사람들의 주된 생활 방식은?",a:["임업·모피·낚시와 사냥","넓은 벼농사","향신료 플랜테이션"],c:0,
+      why:"여름이 짧아 곡식 농사는 어렵습니다. 대신 끝없이 펼쳐진 침엽수림에서 나무를 얻고, 사냥과 낚시로 살아갑니다."},
+     {q:"냉대에 침엽수림이 넓게 펼쳐진 까닭은?",a:["겨울이 길고 추워 잎이 뾰족한 나무만 살아남아서","비가 너무 많이 와서","일 년 내내 더워서"],c:0,
+      why:"넓적한 잎은 추위에 얼어 버립니다. 잎이 좁고 뾰족한 침엽수라야 수분을 지키며 긴 겨울을 견딥니다."},
+     {q:"냉대에서 음식이 잘 상하지 않는 까닭은?",a:["기온이 낮아 음식을 상하게 하는 세균이 잘 자라지 못해서","습기가 많아서","햇빛이 강해서"],c:0,
+      why:"냉장고가 하는 일을 자연이 대신해 줍니다. 그래서 냉대는 식품을 저장하고 가공하는 데 유리합니다."}
+   ]
  },
  desert:{
    region:"사하라·아라비아·중앙아시아 건조 지역",
+   lat:"위도 20°~30° (아열대 고압대)",
+   why:"적도에서 올라간 공기가 이 위도쯤에서 <b>다시 내려오며 바짝 마릅니다</b>. 그래서 사막은 적도가 아니라 그 옆 위도에 <b>띠처럼</b> 늘어서 있습니다.",
    summary:"비가 거의 오지 않고 <b>한낮은 매우 뜨겁고 밤은 서늘</b>합니다(일교차 큼).",
    clothes:"온몸을 덮는 <b>헐렁하고 긴 옷</b>으로 햇빛·모래·수분 증발을 막습니다.",
    food:"물이 귀해 대추야자·가축(유목)에 의지합니다.",
    house:"<b>흙벽돌집</b>: 벽을 두껍게, 창을 작게 만들어 열을 막습니다.",
    industry:"석유·광물 등 지하자원 · 첨단재(유리)",
+   life:"우리가 쓰는 <b>플라스틱·휘발유</b>의 원료인 석유가 이 지역에서 많이 나옵니다. 햇빛이 강해 <b>태양광 발전</b>에도 가장 유리한 땅이에요.",
+   warm:"사막이 주변으로 넓어지는 <b>사막화</b>가 빨라지고, 물이 말라 살던 곳을 떠나는 사람들이 늘고 있습니다.",
    temp:[15,18,22,28,33,37,38,38,35,29,22,17],
    rain:[12,8,20,25,10,0,0,0,0,2,5,12],
-   q:["사막 사람들은 왜 한낮에 쉬고 밤·새벽에 움직일까요?","흙집의 벽이 두껍고 창이 작은 까닭은 무엇일까요?"],
-   quiz:{q:"사막에서 낮에 활동을 피하는 까닭은?",a:["한낮의 폭염으로 몸이 위험해서","비가 너무 많이 와서","너무 추워서"],c:0}
+   q:["사막 사람들은 왜 한낮에 쉬고 밤·새벽에 움직일까요?","흙집의 벽이 두껍고 창이 작은 까닭은 무엇일까요?","햇빛이 강한 사막은 어떤 에너지를 만들기에 좋을까요?"],
+   quiz:[
+     {q:"사막에서 낮에 활동을 피하는 까닭은?",a:["한낮의 폭염으로 몸이 위험해서","비가 너무 많이 와서","너무 추워서"],c:0,
+      why:"게임에서도 09~17시에 밖에 서 있으면 곧 탈진했지요. 실제 사막 사람들도 한낮엔 실내에서 쉬고 서늘한 때에 움직입니다."},
+     {q:"사막이 적도가 아니라 위도 20~30°에 띠처럼 있는 까닭은?",a:["적도에서 올라간 공기가 이 위도에서 내려오며 건조해져서","적도보다 햇빛을 더 많이 받아서","바다가 아예 없어서"],c:0,
+      why:"공기가 올라가는 적도에는 비가 쏟아지고, 그 공기가 내려앉는 위도 20~30°에는 비가 오지 않습니다. 세계지도에서 사막이 가로줄로 늘어선 이유예요."},
+     {q:"사막의 흙집이 벽은 두껍고 창은 작은 까닭은?",a:["한낮의 열이 집 안으로 들어오지 못하게 하려고","눈이 쌓이지 않게 하려고","빗물을 받으려고"],c:0,
+      why:"두꺼운 흙벽은 열이 천천히 스며들게 해 낮에는 시원하고 밤에는 덜 춥게 해 줍니다."}
+   ]
  },
  tundra:{
    region:"북극해 연안·그린란드·시베리아 북부",
+   lat:"고위도 66.5°~90° (극지방)",
+   why:"햇빛이 <b>아주 비스듬히</b> 들어와 같은 양의 빛이 넓은 땅에 퍼집니다. 그래서 데워지지 않습니다. 여름엔 해가 지지 않는 <b>백야</b>가 있어요.",
    summary:"일 년 내내 춥고 <b>겨울밤이 깁니다</b>. 나무가 자라지 못합니다.",
    clothes:"동물 <b>모피로 만든 두꺼운 방한복</b>으로 체온을 지킵니다.",
    food:"<b>농사가 불가능</b>해 낚시·사냥(순록·물고기)으로만 먹고삽니다.",
    house:"눈·얼음으로 만든 이글루 등 <b>단단히 막고 불로 데우는 집</b>.",
    industry:"어업 · 자원 · 보존·특수재",
+   life:"얼음이 녹아 <b>북극 항로</b>가 열리면서, 지하자원을 두고 여러 나라가 이 땅에 관심을 쏟고 있습니다.",
+   warm:"지구에서 <b>가장 빨리 더워지는 곳</b>입니다. 빙하가 녹아 바닷물이 불어나고, 북극곰의 사냥터인 바다 얼음이 사라지고 있어요.",
    temp:[-25,-27,-25,-18,-7,1,4,3,-1,-9,-18,-23],
    rain:[5,5,5,5,8,10,20,25,15,12,8,6],
-   q:["한대 지방에서 농사를 지을 수 없는 까닭은 무엇일까요?","짧은 낮과 긴 밤은 사람들의 생활 시간에 어떤 영향을 줄까요?"],
-   quiz:{q:"한대(툰드라) 지방 사람들의 식량은 주로?",a:["낚시와 사냥으로 얻는다","넓은 밭에서 곡식을 기른다","바나나를 재배한다"],c:0}
+   q:["한대 지방에서 농사를 지을 수 없는 까닭은 무엇일까요?","짧은 낮과 긴 밤은 사람들의 생활 시간에 어떤 영향을 줄까요?","북극의 얼음이 녹으면 우리나라에는 어떤 일이 생길까요?"],
+   quiz:[
+     {q:"한대(툰드라) 지방 사람들의 식량은 주로?",a:["낚시와 사냥으로 얻는다","넓은 밭에서 곡식을 기른다","바나나를 재배한다"],c:0,
+      why:"땅이 얼어 있어 농사가 안 됩니다. 그래서 순록을 기르고 물고기를 잡아 살아갑니다."},
+     {q:"극지방이 추운 가장 큰 까닭은?",a:["햇빛이 비스듬히 들어와 같은 빛이 넓게 퍼져서","바다가 없어서","산이 높아서"],c:0,
+      why:"손전등을 바닥에 수직으로 비추면 밝고 좁게, 비스듬히 비추면 어둡고 넓게 퍼지죠. 지구도 똑같습니다."},
+     {q:"한대 지방에 나무가 자라지 못하는 까닭은?",a:["땅이 일 년 내내 얼어 있고 여름이 너무 짧아서","비가 너무 많이 와서","햇빛이 너무 강해서"],c:0,
+      why:"뿌리를 내릴 땅이 얼어 있고, 자랄 수 있는 여름이 두어 달뿐입니다. 그래서 키 작은 이끼와 풀만 자랍니다."}
+   ]
  },
  alpine:{
    region:"안데스·히말라야·알프스 등 높은 산지",
+   lat:"위도와 상관없음 · 해발 2,000m 이상",
+   why:"위도가 아니라 <b>높이</b>가 만든 기후입니다. 100m 올라갈 때마다 기온이 약 <b>0.6°C</b> 내려가서, 적도 바로 위 안데스산맥 꼭대기에도 만년설이 있습니다.",
    summary:"고도가 높아 <b>일 년 내내 서늘하고 일교차가 큽니다</b>. 공기가 희박합니다.",
-   clothes:"낮과 밤의 큰 기온차에 대비해 <b>겹겹이 껴입습니다</b>.",
+   clothes:"낮과 밤의 큰 기온차에 대비해 <b>겹겹이 껴입습니다</b>(판초).",
    food:"감자 등 고랭지 작물과 가축(라마·야크)에 의지합니다.",
    house:"바람과 추위를 막는 <b>돌집</b>.",
    industry:"광업(철·구리) · 중화학",
+   life:"우리가 먹는 <b>감자</b>의 고향이 안데스 고산 지대입니다. 여름 배추가 나는 강원도 고랭지도 같은 원리예요.",
+   warm:"산꼭대기의 <b>만년설과 빙하가 줄어</b>, 그 물에 기대 살던 산 아래 도시의 식수와 농업용수가 마르고 있습니다.",
    temp:[-6,-5,-2,2,6,10,12,11,8,3,-2,-5],
    rain:[60,55,60,70,90,110,120,110,85,70,65,60],
-   q:["높은 산지에서 회복이 느리게 느껴지는 까닭(공기)은 무엇일까요?","고산 지대는 어떤 자원(광물)으로 다른 대륙과 거래할 수 있을까요?"],
-   quiz:{q:"고산 기후의 특징으로 알맞은 것은?",a:["일 년 내내 서늘하고 일교차가 크다","일 년 내내 무덥다","비가 전혀 오지 않는다"],c:0}
+   q:["높은 산지에서 회복이 느리게 느껴지는 까닭(공기)은 무엇일까요?","고산 지대는 어떤 자원(광물)으로 다른 대륙과 거래할 수 있을까요?","적도 위에 있는 산인데 왜 꼭대기에는 눈이 쌓여 있을까요?"],
+   quiz:[
+     {q:"고산 기후의 특징으로 알맞은 것은?",a:["일 년 내내 서늘하고 일교차가 크다","일 년 내내 무덥다","비가 전혀 오지 않는다"],c:0,
+      why:"고도가 높아 늘 서늘하고, 공기가 얇아 낮에는 햇빛이 따갑고 밤에는 열이 금방 빠져나가 일교차가 큽니다."},
+     {q:"적도 바로 위인데도 산꼭대기에 눈이 쌓여 있는 까닭은?",a:["높이 올라갈수록 기온이 내려가서","적도에서 멀어서","바람이 불지 않아서"],c:0,
+      why:"위도만 기후를 정하는 것이 아닙니다. 고도도 기후를 바꿉니다 — 킬리만자로산이 대표적인 예예요."},
+     {q:"안데스 사람들이 감자를 주로 기르는 까닭은?",a:["서늘한 고산에서도 잘 자라는 작물이라서","물이 아주 많이 필요해서","더운 곳에서만 자라서"],c:0,
+      why:"감자는 서늘한 땅에서도 뿌리에 양분을 저장합니다. 그래서 안데스가 감자의 고향이 되었고, 지금은 전 세계가 먹습니다."}
+   ]
  }
 };
+/* 여섯 기후 공통 — 지구 온난화 자기 점검(교과: 지속가능한 미래) */
+var WARM_QUIZ=[
+ {q:"석탄·석유를 태울 때 나와 지구를 덥히는 기체는?",a:["이산화탄소","산소","질소"],c:0,
+  why:"이산화탄소는 지구가 내보내려는 열을 붙잡아 둡니다. 이불처럼 지구를 덮는다고 해서 '온실가스'라고 불러요."},
+ {q:"기후변화를 줄이려면 전기를 어떻게 만드는 것이 좋을까요?",a:["햇빛·바람 같은 재생에너지로 만든다","석탄을 더 많이 태운다","전기를 아예 쓰지 않는다"],c:0,
+  why:"태양광·풍력은 연료를 태우지 않아 탄소가 나오지 않습니다. 게임에서도 태양광 패널로 발전하면 탄소가 0이었지요."},
+ {q:"기후변화의 피해가 가장 먼저 크게 나타나는 곳은?",a:["빙하가 녹는 극지방과 물이 마르는 건조 지역","우리 교실","도시의 지하철역"],c:0,
+  why:"탄소를 가장 적게 내뿜은 곳이 가장 먼저 피해를 봅니다. 그래서 기후 문제는 '함께' 풀어야 하는 문제예요."}
+];
 /* 게임에서 몸으로 겪은 '배움'(S.taught 키) → 학습 노트에 정리해 보여줄 문구 */
 var LESSON_LABELS={
  heat:"🔥 사막의 한낮은 사람이 활동할 수 없을 만큼 뜨겁다 → 낮엔 실내에서 쉬고 밤에 움직인다.",
@@ -784,8 +1092,23 @@ var LESSON_LABELS={
  shelterT:"🏠 지붕·불이 있으면 혹한을 견딜 수 있다 → 단단히 막은 집과 불에 의지한다.",
  stilt:"🌴 열대에선 땅에 지은 집이 습기·벌레로 썩는다 → 기둥 위에 짓는 고상 가옥.",
  rotfood:"🍌 무더운 열대에선 음식이 빨리 상한다 → 향신료로 절이거나 바로 판다.",
- nofarm:"🌾 너무 추운 땅에선 곡식이 자라지 않는다 → 농사 대신 낚시·사냥으로 산다."
+ nofarm:"🌾 너무 추운 땅에선 곡식이 자라지 않는다 → 농사 대신 낚시·사냥으로 산다.",
+ farm:"🌱 씨앗은 물이 가까울 때 잘 자란다 → 사람이 강가·물가에 모여 농사를 지어 온 까닭.",
+ paddy:"🌾 벼는 물을 댄 논에서만 자란다 → 비가 많은 온대·열대의 몬순 지역이 세계의 쌀 창고가 된 까닭.",
+ taigafarm:"🥔 냉대의 짧은 여름엔 곡식 대신 감자 → 기후가 기를 수 있는 작물을 정한다.",
+ fishing:"🐟 물가에서는 물고기를 얻을 수 있다 → 사람들이 강·바다 곁에 모여 사는 까닭.",
+ desertrain:"🏜️ 사막에 드물게 오는 비는 아주 귀하다 → 저수조·웅덩이에 받아 두고 쓴다.",
+ wellDug:"💧 비가 없는 땅에서는 땅을 파서 물을 얻는다 → 사막 사람들이 오아시스와 우물 곁에 마을을 세운 까닭.",
+ traded:"⚖️ 내 대륙에 없는 것은 다른 기후에서 온다 → <b>자연환경이 다르기 때문에 무역이 생긴다</b>.",
+ carbon:"🏭 석탄·석유를 태우면 눈에 안 보이는 이산화탄소가 나온다 → 하늘에 쌓여 지구를 덮는다.",
+ renew:"🔆 햇빛으로 만든 전기는 탄소를 내뿜지 않는다 → 재생에너지가 기후위기의 답으로 꼽히는 까닭.",
+ warming:"🌡️ 쌓인 탄소가 내 대륙의 기온을 올렸다 → 기후는 사람을 바꾸고, 사람도 기후를 바꾼다."
 };
+/* 그 배움이 '어느 기후에서 겪을 수 있는 일'인지. 내 대륙에서 못 겪는 것은
+   못 한 것이 아니라 '친구의 대륙 이야기'라고 알려 주기 위한 것. b 없으면 어디서나 가능. */
+var LESSON_BIOME={heat:"desert",shelterD:"desert",desertrain:"desert",wellDug:"desert",
+ cold:"tundra",shelterT:"tundra",nofarm:"tundra",stilt:"tropical",rotfood:"tropical",
+ taigafarm:"taiga",paddy:"temperate"};
 var RECIPES=[
  {id:"plank",out:{plank:2},need:{wood:1},eff:"건축의 기본 재료 · 놓을 수 있음"},
  {id:"fiber",out:{fiber:1},need:{wheat:3},eff:"옷을 만드는 실"},
@@ -797,8 +1120,10 @@ var RECIPES=[
  {id:"brick",out:{brick:1},need:{clay:2,coal:1},eff:"단단한 건축 블록"},
  {id:"glass",out:{glass:1},need:{sand:2,coal:1},eff:"투명 블록 · 창문"},
  {id:"iron",out:{iron:1},need:{iron_ore:2,coal:1},eff:"모든 기계의 재료"},
- {id:"fuel",out:{fuel:1},need:{oil:2},eff:"전력을 만드는 연료"},
- {id:"power",out:{power:2},need:{fuel:1,copper:2,iron:1},eff:"발전 · 기념비에 필요"},
+ {id:"fuel",out:{fuel:1},need:{oil:2},eff:"원유를 태워 쓰는 화석연료 · 🏭 탄소 4"},
+ {id:"power",out:{power:2},need:{fuel:1,copper:2,iron:1},eff:"화력 발전 · 값싸지만 🏭 탄소 6"},
+ {id:"solar",out:{solar:1},need:{glass:3,copper:2,iron:1},eff:"햇빛으로 전기를 만드는 판 (건조의 유리 + 고산의 금속)"},
+ {id:"power_sun",out:{power:2},need:{solar:1,copper:1},eff:"태양광 발전 · 재료는 더 들지만 🌱 탄소 0"},
  {id:"chocolate",out:{chocolate:1},need:{cacao:2,ice:1},eff:"사치재 · 기념비에 필요"},
  {id:"brew",out:{brew:1},need:{coffee:2,water:1},eff:"사치재 · 스태미나 +35"},
  {id:"well",out:{well:1},need:{stone:4,plank:2},eff:"땅에 놓으면 마르지 않는 물이 나옵니다 (사막·고지대에서 물 확보)"},
@@ -1568,7 +1893,11 @@ function logAdd(s,t){s.log.unshift({t:Date.now(),x:t});if(s.log.length>90)s.log.
 function clockOf(s){var f=(s.sec%DAYSEC)/DAYSEC,h=f*24;
   return{h:h,hh:String(Math.floor(h)).padStart(2,"0"),mm:String(Math.floor(h%1*60)).padStart(2,"0")}}
 function ambient(s){var B=BIOMES[s.biome],h=clockOf(s).h;
-  var w=.5-.5*Math.cos((h-4)/24*Math.PI*2);return B.night+(B.day-B.night)*w}
+  var w=.5-.5*Math.cos((h-4)/24*Math.PI*2);
+  /* [기후변화] 쌓인 탄소만큼 내 대륙의 기온이 실제로 오른다. 말이 아니라 몸으로 겪게. */
+  var warm=(typeof s.carbon==="number")?(function(){var v=s.carbon,d=0;
+    for(var i=0;i<CARBON_STEP.length;i++)if(v>=CARBON_STEP[i].at)d=CARBON_STEP[i].d;return d})():0;
+  return B.night+(B.day-B.night)*w+warm}
 
 /* --- 충돌 --- */
 function blocked(x,y,z){
@@ -1790,6 +2119,8 @@ function tryPlace(){
   netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
   S.stat.placed++;
   toast(iE(sel)+" "+iN(sel)+" 설치","good");
+  if(id===44)teachOnce("wellDug","💧 비가 오지 않는 땅에서는 <b>땅을 파서</b> 물을 얻습니다. 사막 사람들이 <b>오아시스와 우물 곁</b>에 마을을 세운 까닭이에요.");
+  if(id===36)teachOnce("traded","⚖️ 기념비에는 <b>여섯 대륙의 자원</b>이 모두 들어갔습니다. 어느 한 기후도 혼자서는 만들 수 없었어요.");
   /* [기후 적응·거주] 열대: 땅에 바로 지은 집은 습기·해충으로 곧 썩는다.
      나무 기둥(고상 가옥) 위나 공중에 지은 집만 남는다. */
   if(S.biome==="tropical"){
@@ -2077,7 +2408,29 @@ function craft(id){
   payFor(S,r.need);
   for(var k in r.out){add(S,k,r.out[k]);S.stat.made[k]=(S.stat.made[k]||0)+r.out[k];
     toast(iE(k)+" "+iN(k)+" +"+r.out[k],"good")}
+  emitCarbon(r);
   refreshHotbar();drawPanel();
+}
+/* 화석연료를 태우는 제작에만 탄소가 붙는다. 태양광 경로(power_sun)는 0. */
+function emitCarbon(r){
+  if(!S)return;
+  if(typeof S.carbon!=="number")S.carbon=0;
+  var before=carbonStep().d, amt=0;
+  if(r.id!=="power_sun")for(var k in r.out)if(CARBON_OF[k])amt+=CARBON_OF[k]*r.out[k];
+  if(r.id==="power_sun"||r.id==="solar"){
+    teachOnce("renew","🔆 <b>햇빛으로 만든 전기</b>는 탄소를 내뿜지 않습니다. 재생에너지가 기후위기의 답으로 꼽히는 까닭이에요.");
+    if(r.id==="power_sun")toast("🌱 탄소 배출 없이 전력을 얻었습니다","good");
+  }
+  if(!amt)return;
+  S.carbon+=amt;
+  S.stat.carbon=(S.stat.carbon||0)+amt;
+  teachOnce("carbon","🏭 석탄·석유를 <b>태워서</b> 만들면 이산화탄소가 나옵니다. 눈에 안 보여도 하늘에 <b>쌓입니다</b>. 학습(📚) 탭에서 얼마나 쌓였는지 볼 수 있어요.");
+  var after=carbonStep();
+  if(after.d>before){
+    teachOnce("warming","🌡️ 쌓인 탄소가 <b>내 대륙의 기온</b>을 올렸습니다. 기후변화는 먼 나라 이야기가 아닙니다.");
+    logAdd(S,"[기후변화] 누적 탄소 "+S.carbon+" · 평균 기온 +"+after.d+"°C ("+after.n+")");
+    lessonToast("🌍 <b>온난화 "+after.n+"</b> · "+after.m+"<br>🔆 <b>태양광 패널</b>로 발전하면 더 오르지 않아요.");
+  }
 }
 function checkTitles(){
   TITLES.forEach(function(t){
@@ -2636,6 +2989,7 @@ function aiTrade(dt,quiet){
         Market.cancelOffer(p.id,S.name,function(){});   // 로컬 거래소에서도 내려준다
         for(var k in p.want){add(S,k,p.want[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+p.want[k]}
         S.stat.trades++;
+        teachOnce("traded","⚖️ 내 대륙에 <b>남는 것</b>을 다른 기후에 팔았습니다. 나라마다 나는 것이 달라서 <b>무역</b>이 생깁니다.");
         for(var g in p.give)if(ITEMS[g]&&ITEMS[g].food)S.stat.foodOut+=p.give[g];
         logAdd(S,p.buyer+"이(가) 내 물건을 사갔습니다.");
         if(!quiet){toast("💰 "+p.buyer+" 거래 성사","good");refreshHotbar();if(panelTab==="trade")drawPanel()}
@@ -2674,6 +3028,7 @@ function settleBuy(o){
   for(var k in o.give){add(S,k,o.give[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+o.give[k]}
   for(var w in o.want)if(ITEMS[w]&&ITEMS[w].food)S.stat.foodOut+=o.want[w];
   S.stat.trades++;
+  teachOnce("traded","⚖️ 내 대륙에 <b>없는 것</b>을 다른 기후에서 얻었습니다. 나라마다 자연환경이 달라 나는 것이 다르기 때문에 <b>무역</b>이 생깁니다.");
   S.offers=S.offers.filter(function(x){return x.id!==o.id});
   logAdd(S,(o.name||bN(o.from))+"와(과) 거래했습니다.");
   toast("🤝 거래 성사!","good");refreshHotbar();drawPanel();updateTabBadge();
@@ -2742,6 +3097,7 @@ function pollMarket(force){
       for(var k in p.want){add(S,k,p.want[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+p.want[k]}
       for(var g in p.give)if(ITEMS[g]&&ITEMS[g].food)S.stat.foodOut+=p.give[g];
       S.stat.trades++;
+      teachOnce("traded","⚖️ 내 대륙에 <b>남는 것</b>을 다른 기후에 팔았습니다. 자연환경이 다르면 나는 것도 다르기 때문에 <b>무역</b>이 생깁니다.");
       logAdd(S,p.buyer+"이(가) 내 물건을 사갔습니다.");
       toast("💰 "+p.buyer+" 거래 성사","good");
     });
@@ -2859,7 +3215,9 @@ function openPanel(tab){
   var bs=$("ptabs").querySelectorAll("button[data-p]");
   for(var i=0;i<bs.length;i++)bs[i].setAttribute("aria-current",bs[i].dataset.p===tab?"true":"false");
   if(tab==="trade"){S.newOffers=0;updateTabBadge();pollMarket()}
-  if(tab==="edu")S._quiz=-1;
+  /* 퀴즈 답(S.quizA)은 저장에 남기므로 탭을 다시 열어도 지우지 않는다.
+     비교 그래프 선택만 초기화해 늘 '내 기후'부터 보이게 한다. */
+  if(tab==="edu")S._cmp=null;
   drawPanel();
 }
 function closePanel(){panelTab=null;S.paused=false;$("panel").classList.add("hide")}
@@ -3008,7 +3366,8 @@ function uiRecord(){
   h+="<div class='sec'><h3>기록</h3><div class='card'><div class='chips'>"+
     "<span class='chip'>거래 <b>"+st.trades+"</b>회</span><span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
     "<span class='chip'>식량 수출 <b>"+st.foodOut+"</b></span><span class='chip'>설치한 블록 <b>"+st.placed+"</b></span>"+
-    "<span class='chip'>생존 <b>"+S.day+"</b>일차</span><span class='chip'>탈진 <b>"+S.faint+"</b>회</span></div>";
+    "<span class='chip'>생존 <b>"+S.day+"</b>일차</span><span class='chip'>탈진 <b>"+S.faint+"</b>회</span>"+
+    "<span class='chip' style='color:"+carbonStep().c+"'>내가 낸 탄소 <b>"+carbonAmt()+"</b> · "+carbonStep().n+"</span></div>";
   if(imp)h+="<div class='chips' style='margin-top:8px'>"+Object.keys(st.imp).map(function(k){
     return "<span class='chip t"+iT(k)+"'>수입 "+iE(k)+" "+iN(k)+" <b>"+st.imp[k]+"</b></span>"}).join("")+"</div>";
   h+="</div></div>";
@@ -3031,12 +3390,60 @@ function uiRecord(){
     "<button class='mini' style='margin-top:8px' onclick='askReset()'>처음부터 다시</button></div></div>";
   return h;
 }
-/* ---- 기후 그래프 읽기: 월별 기온(선)·강수(막대) 인라인 SVG ---- */
-function climograph(biome){
+/* ==========================================================================
+   [학습] 위도 그림 — "왜 기후가 다른가"의 첫 단추
+   지구를 옆에서 자른 단면(북극 → 적도)에 나란한 햇빛을 그린다.
+   같은 햇빛이라도 적도에서는 좁게 모여 닿고, 극에서는 비스듬히 넓게 퍼진다.
+   ========================================================================== */
+function latDiagram(cur){
+  var order=["tundra","taiga","temperate","desert","tropical"];
+  var W2=340,H2=208, bx=150, bw=178, top=14, bh=34, gap=3.5;
+  var arc="M96 16 Q152 62 152 190";
+  var s="<svg viewBox='0 0 "+W2+" "+H2+"' role='img' aria-label='위도에 따른 기후대 그림' "+
+    "style='width:100%;height:auto;background:#0f1822;border-radius:8px'>";
+  /* 지구 단면(북극 → 적도) */
+  s+="<path d='"+arc+"' fill='none' stroke='#3d5266' stroke-width='1.6'/>";
+  s+="<text x='100' y='11' fill='#9fd8ff' font-size='8.5' text-anchor='middle'>북극</text>";
+  s+="<text x='146' y='202' fill='#e8a33d' font-size='8.5' text-anchor='end'>적도</text>";
+  /* 나란히 들어오는 햇빛 — 아래로 갈수록 수직에 가깝게 닿는다 */
+  var rays=[{y:34,w:.35},{y:70,w:.55},{y:106,w:.75},{y:142,w:.9},{y:178,w:1}];
+  s+="<defs><marker id='ar' markerWidth='5' markerHeight='5' refX='4.4' refY='2.5' orient='auto'>"+
+     "<path d='M0 0 L5 2.5 L0 5 z' fill='#e8d24a'/></marker></defs>";
+  rays.forEach(function(r){
+    s+="<line x1='10' y1='"+r.y+"' x2='"+(96+r.y*0.24)+"' y2='"+r.y+"' stroke='#e8d24a' "+
+       "stroke-width='1.4' opacity='"+(0.3+r.w*0.55).toFixed(2)+"' marker-end='url(#ar)'/>";
+  });
+  s+="<text x='10' y='202' fill='#7b93a3' font-size='8'>같은 세기의 햇빛</text>";
+  /* 기후 띠 */
+  order.forEach(function(k,i){
+    var y=top+i*(bh+gap), on=(k===cur), c=BIOMES[k].c, E=CLIMATE_EDU[k];
+    s+="<rect x='"+bx+"' y='"+y+"' width='"+bw+"' height='"+bh+"' rx='5' fill='"+c+"' "+
+       "opacity='"+(on?.30:.13)+"' stroke='"+c+"' stroke-opacity='"+(on?1:.35)+"'/>";
+    s+="<text x='"+(bx+11)+"' y='"+(y+15)+"' fill='"+(on?"#eef5f9":"#a8bcc9")+"' font-size='11.5' "+
+       "font-weight='"+(on?"800":"600")+"'>"+BIOMES[k].n+(on?" · 나":"")+"</text>";
+    s+="<text x='"+(bx+11)+"' y='"+(y+27)+"' fill='#7b93a3' font-size='8.5'>"+(E?E.lat:"")+"</text>";
+  });
+  /* 고산은 위도가 아니라 높이가 만든 기후 — 띠 밖에 따로 */
+  var ay=top+5*(bh+gap);
+  s+="<rect x='"+bx+"' y='"+ay+"' width='"+bw+"' height='24' rx='5' fill='"+BIOMES.alpine.c+"' "+
+     "opacity='"+(cur==="alpine"?.30:.10)+"' stroke='"+BIOMES.alpine.c+"' stroke-dasharray='3 3' "+
+     "stroke-opacity='"+(cur==="alpine"?1:.4)+"'/>";
+  s+="<text x='"+(bx+11)+"' y='"+(ay+16)+"' fill='"+(cur==="alpine"?"#eef5f9":"#a8bcc9")+"' font-size='10' "+
+     "font-weight='"+(cur==="alpine"?"800":"600")+"'>고산"+(cur==="alpine"?" · 나":"")+" — 위도가 아니라 높이</text>";
+  s+="</svg>";
+  return s;
+}
+
+/* ---- 기후 그래프 읽기: 월별 기온(선)·강수(막대) 인라인 SVG ----
+   [보강] 다른 기후를 겹쳐 볼 수 있게 하고(비교), 그래프에서 읽어 내야 할 값
+   (가장 더운 달·가장 추운 달·기온의 연교차·연강수량)을 함께 계산해 보여준다. */
+function climograph(biome,cmp){
   var E=CLIMATE_EDU[biome];if(!E)return "";
   var W2=336,H2=168,x0=40,x1=322,yTop=16,yBot=128;
   var mw=(x1-x0)/12;
-  var pmax=Math.max.apply(null,E.rain);pmax=Math.max(pmax,60);
+  var pmax=Math.max.apply(null,E.rain);
+  if(cmp&&CLIMATE_EDU[cmp])pmax=Math.max(pmax,Math.max.apply(null,CLIMATE_EDU[cmp].rain));
+  pmax=Math.max(pmax,60);
   function py(t){return yBot-((t+30)/70)*(yBot-yTop)}  // 기온 -30~40°C
   function ry(mm){return (mm/pmax)*(yBot-yTop)}         // 강수 높이
   var bars="",line="",dots="",mlab="";
@@ -3048,68 +3455,184 @@ function climograph(biome){
     dots+="<circle cx='"+cx.toFixed(1)+"' cy='"+cy.toFixed(1)+"' r='2.4' fill='#e8a33d'/>";
     if(i%3===0)mlab+="<text x='"+cx.toFixed(1)+"' y='"+(yBot+13)+"' fill='#7b93a3' font-size='9' text-anchor='middle'>"+(i+1)+"월</text>";
   }
+  /* 비교선(다른 기후의 기온) */
+  var cline="";
+  if(cmp&&CLIMATE_EDU[cmp]){
+    var C=CLIMATE_EDU[cmp],p="";
+    for(var j=0;j<12;j++)p+=(j?"L":"M")+(x0+mw*j+mw/2).toFixed(1)+" "+py(C.temp[j]).toFixed(1)+" ";
+    cline="<path d='"+p+"' fill='none' stroke='"+BIOMES[cmp].c+"' stroke-width='1.8' stroke-dasharray='4 3' opacity='.9'/>";
+  }
   var y0line=py(0);
-  return "<svg viewBox='0 0 "+W2+" "+H2+"' style='width:100%;height:auto;background:#0f1822;border-radius:8px'>"+
+  var svg="<svg viewBox='0 0 "+W2+" "+H2+"' style='width:100%;height:auto;background:#0f1822;border-radius:8px'>"+
     "<line x1='"+x0+"' y1='"+y0line.toFixed(1)+"' x2='"+x1+"' y2='"+y0line.toFixed(1)+"' stroke='#3d5266' stroke-dasharray='3 3'/>"+
     "<text x='"+(x0-6)+"' y='"+(y0line+3).toFixed(1)+"' fill='#7b93a3' font-size='9' text-anchor='end'>0°C</text>"+
     "<text x='"+(x0-6)+"' y='"+(py(30)+3).toFixed(1)+"' fill='#e8a33d' font-size='9' text-anchor='end'>30°</text>"+
     "<text x='"+(x0-6)+"' y='"+(py(-20)+3).toFixed(1)+"' fill='#9fd8ff' font-size='9' text-anchor='end'>-20°</text>"+
     "<text x='"+x1+"' y='"+(yBot+13)+"' fill='#63a9ec' font-size='9' text-anchor='end'>강수 최대 "+Math.round(pmax)+"mm</text>"+
-    bars+"<path d='"+line+"' fill='none' stroke='#e8a33d' stroke-width='2'/>"+dots+mlab+
+    bars+cline+"<path d='"+line+"' fill='none' stroke='#e8a33d' stroke-width='2'/>"+dots+mlab+
     "<rect x='"+x0+"' y='"+yTop+"' width='"+(x1-x0)+"' height='"+(yBot-yTop)+"' fill='none' stroke='#2c3d4c'/>"+
-    "</svg>"+
-    "<div class='eff' style='margin-top:4px;text-align:center'><span style='color:#e8a33d'>● 기온</span> &nbsp; <span style='color:#63a9ec'>▮ 강수</span></div>";
+    "</svg>";
+  var legend="<div class='eff' style='margin-top:4px;text-align:center'><span style='color:#e8a33d'>● 기온</span> &nbsp; "+
+    "<span style='color:#63a9ec'>▮ 강수</span>"+
+    (cmp&&BIOMES[cmp]?" &nbsp; <span style='color:"+BIOMES[cmp].c+"'>┄ "+bN(cmp)+" 기온</span>":"")+"</div>";
+  return svg+legend;
 }
-/* ---- 학습 탭: 기후 그래프 + 의식주 + 대표지역 + 배움 노트 + 탐구 질문 + 자기점검 ---- */
+/* 그래프에서 읽어 내야 할 값을 대신 계산해 주지 않고, '어디를 보면 되는지'를 알려 준다 */
+function climoRead(biome){
+  var E=CLIMATE_EDU[biome];if(!E)return "";
+  var hi=0,lo=0;
+  for(var i=1;i<12;i++){if(E.temp[i]>E.temp[hi])hi=i;if(E.temp[i]<E.temp[lo])lo=i;}
+  var range=(E.temp[hi]-E.temp[lo]).toFixed(0);
+  var sum=E.rain.reduce(function(a,b){return a+b},0);
+  var wet=0;for(var j=1;j<12;j++)if(E.rain[j]>E.rain[wet])wet=j;
+  return "<div class='chips' style='margin-top:9px'>"+
+    "<span class='chip'>가장 더운 달 <b>"+(hi+1)+"월 "+E.temp[hi]+"°C</b></span>"+
+    "<span class='chip'>가장 추운 달 <b>"+(lo+1)+"월 "+E.temp[lo]+"°C</b></span>"+
+    "<span class='chip'>기온의 연교차 <b>"+range+"°C</b></span>"+
+    "<span class='chip'>연강수량 <b>"+sum+"mm</b></span>"+
+    "<span class='chip'>비가 가장 많은 달 <b>"+(wet+1)+"월</b></span></div>"+
+    "<div class='eff' style='margin-top:6px'>📖 <b>기후 그래프 읽는 법</b> · 주황 <b>선</b>은 달마다의 기온, 파란 <b>막대</b>는 그달에 내린 비의 양입니다. "+
+    "선이 얼마나 오르내리는지(연교차)와 막대가 한쪽에 몰렸는지 고른지를 보면 그 땅의 기후를 알 수 있어요.</div>";
+}
+
+/* ---- 지구 온난화 계기판 ---- */
+function carbonGauge(){
+  var v=carbonAmt(), st=carbonStep();
+  var max=CARBON_STEP[CARBON_STEP.length-1].at*1.4;
+  var pct=Math.min(100,v/max*100);
+  var marks="";
+  CARBON_STEP.forEach(function(s){
+    if(!s.at)return;
+    marks+="<i style='position:absolute;left:"+Math.min(99,s.at/max*100).toFixed(1)+"%;top:0;bottom:0;width:1px;background:#0d1319;opacity:.9'></i>";
+  });
+  return "<div class='card' style='border-color:"+st.c+"'>"+
+    "<div class='rw'><span style='font-size:19px'>🌍</span><b>지구 온난화 · "+st.n+"</b>"+
+    "<span style='flex:1'></span><span class='mono' style='font-size:12px;color:"+st.c+"'>누적 탄소 "+v+"</span></div>"+
+    "<div class='bar' style='position:relative;margin-top:9px;height:10px'>"+
+      "<i style='width:"+pct.toFixed(1)+"%;background:"+st.c+"'></i>"+marks+"</div>"+
+    "<div class='eff' style='margin-top:7px'>"+st.m+"</div>"+
+    (st.d?"<div class='why'>지금 내 대륙의 기온이 원래보다 <b>+"+st.d+"°C</b> 높습니다. 화면 위 온도계를 확인해 보세요.</div>":"")+
+    "<div class='eff' style='margin-top:7px'>🏭 탄소가 나오는 제작 · "+
+      Object.keys(CARBON_OF).map(function(k){return iE(k)+iN(k)+"(+"+CARBON_OF[k]+")"}).join(" · ")+
+    "</div>"+
+    "<div class='eff' style='margin-top:4px;color:var(--good)'>🌱 탄소가 나오지 않는 길 · 🔆 태양광 패널로 만든 <b>태양광 발전</b>(전력 ×2, 탄소 0)</div>"+
+    "</div>";
+}
+
+/* ---- 학습 탭 ---- */
 function uiEdu(){
   var b=S.biome,B=BIOMES[b],E=CLIMATE_EDU[b];
-  var h="<div class='sec'><h3>내 기후 카드: "+B.n+" <span class='sm'>"+B.dk+"</span></h3><div class='card'>"+
-    "<p class='eff' style='margin-bottom:8px'>"+E.summary+"</p>"+climograph(b)+
-    "<div class='eff' style='margin-top:8px'>🌍 <b>대표 지역:</b> "+E.region+"</div></div></div>";
-  /* 의식주 + 산업 */
+  var cmp=S._cmp&&S._cmp!==b?S._cmp:null;
+
+  /* 1. 내 기후 카드 */
+  var h="<div class='sec'><h3>내 기후 카드: "+B.n+" <span class='sm'>"+(E.lat||"")+"</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:8px'>"+E.summary+"</p>"+
+    "<div class='eff'>🌍 <b>대표 지역:</b> "+E.region+"</div></div></div>";
+
+  /* 2. 위도 — 왜 이 기후가 생겼나 */
+  h+="<div class='sec'><h3>왜 이런 기후가 될까? <span class='sm'>위도와 햇빛</span></h3><div class='card'>"+
+    latDiagram(b)+
+    "<div class='eff' style='margin-top:9px'>☀️ 같은 세기의 햇빛도 <b>적도에서는 좁게 모여</b> 닿고 <b>극지방에서는 비스듬히 넓게 퍼져</b> 닿습니다. "+
+    "그래서 위도가 낮을수록 덥고, 높을수록 춥습니다.</div>"+
+    "<div class='eff' style='margin-top:7px'>📍 <b>"+B.n+"</b> · "+(E.why||"")+"</div></div></div>";
+
+  /* 3. 기후 그래프 + 읽는 법 + 비교 */
+  h+="<div class='sec'><h3>기후 그래프 <span class='sm'>숫자가 아니라 모양으로 읽기</span></h3><div class='card'>"+
+    climograph(b,cmp)+climoRead(b)+
+    "<div class='eff' style='margin-top:9px'>🔍 <b>다른 기후와 겹쳐 보기</b></div><div class='chips' style='margin-top:6px'>";
+  BKEYS.forEach(function(bb){
+    if(bb===b)return;
+    h+="<button class='chip act' style='"+(cmp===bb?"border-color:"+BIOMES[bb].c+";color:"+BIOMES[bb].c:"")+
+       "' onclick=\"eduCompare('"+bb+"')\">"+(cmp===bb?"✓ ":"")+BIOMES[bb].n+"</button>";
+  });
+  h+="</div></div></div>";
+
+  /* 4. 의식주 + 산업 + 우리 생활과의 연결 */
   h+="<div class='sec'><h3>기후에 맞춘 생활 <span class='sm'>의·식·주</span></h3>"+
     "<div class='card'><div class='eff'>👕 <b>의(옷)</b> · "+E.clothes+"</div></div>"+
     "<div class='card'><div class='eff'>🍽️ <b>식(먹거리)</b> · "+E.food+"</div></div>"+
     "<div class='card'><div class='eff'>🏠 <b>주(집)</b> · "+E.house+"</div></div>"+
-    "<div class='card'><div class='eff'>🏭 <b>산업</b> · "+E.industry+"</div></div></div>";
-  /* 내가 겪은 배움(플레이로 해금) */
-  var got=[],lockN=0;
-  for(var k in LESSON_LABELS){ if(S.taught&&S.taught[k])got.push(LESSON_LABELS[k]); else lockN++; }
-  h+="<div class='sec'><h3>내가 겪은 배움 <span class='sm'>"+got.length+"/"+Object.keys(LESSON_LABELS).length+"</span></h3><div class='card'>";
-  if(got.length)h+="<div class='eff' style='line-height:1.7'>"+got.map(function(t){return "✅ "+t}).join("<br>")+"</div>";
-  else h+="<p class='eff'>아직 없습니다. 밖에서 직접 살아 보면(폭염·혹한·건축·농사·부패) 겪은 것이 이곳에 정리됩니다.</p>";
-  if(lockN)h+="<div class='eff' style='margin-top:7px;color:var(--ink3)'>🔒 아직 겪지 않은 배움 "+lockN+"개가 남아 있어요.</div>";
-  h+="</div></div>";
-  /* 탐구 질문 */
-  h+="<div class='sec'><h3>탐구 질문 <span class='sm'>친구·선생님과 이야기해 보기</span></h3><div class='card'><div class='eff' style='line-height:1.8'>"+
-    E.q.map(function(q){return "❓ "+q}).join("<br>")+"</div></div></div>";
-  /* 자기 점검 퀴즈 */
-  var Q=E.quiz, pick=(typeof S._quiz==="number")?S._quiz:-1;
-  h+="<div class='sec'><h3>스스로 점검 <span class='sm'>퀴즈</span></h3><div class='card'>"+
-    "<p class='eff' style='margin-bottom:8px'><b>"+Q.q+"</b></p>";
-  Q.a.forEach(function(opt,i){
-    var cls="mini",label=opt;
-    if(pick>=0){
-      if(i===Q.c){cls="mini acc";label="✅ "+opt;}
-      else if(i===pick){cls="mini";label="❌ "+opt;}
-    }
-    h+="<button class='"+cls+"' style='display:block;width:100%;text-align:left;margin:5px 0' onclick='eduAnswer("+i+")'>"+label+"</button>";
+    "<div class='card'><div class='eff'>🏭 <b>산업</b> · "+E.industry+"</div></div>"+
+    (E.life?"<div class='card' style='border-color:var(--accent)'><div class='eff'>🔗 <b>우리 생활과의 연결</b> · "+E.life+"</div></div>":"")+
+    "</div>";
+
+  /* 5. 기후변화 */
+  h+="<div class='sec'><h3>지구가 더워지면 <span class='sm'>사람도 기후를 바꾼다</span></h3>"+
+    (E.warm?"<div class='card'><div class='eff'>🌡️ <b>"+B.n+"에서는</b> · "+E.warm+"</div></div>":"")+
+    carbonGauge()+
+    "<div class='card'><div class='eff'>💡 <b>내가 할 수 있는 일</b> · 필요한 만큼만 만들기 · 화력 대신 <b>태양광 발전</b> 쓰기 · "+
+    "부족한 것은 남에게서 <b>사 오기</b>(각자 잘 만드는 것을 나누면 전체가 덜 만들어도 됩니다).</div></div></div>";
+
+  /* 6. 내가 겪은 배움 */
+  var keys=Object.keys(LESSON_LABELS);
+  var mine=[],other=[],lockN=0;
+  keys.forEach(function(k){
+    var owner=LESSON_BIOME[k];
+    if(S.taught&&S.taught[k]){mine.push(LESSON_LABELS[k]);return}
+    if(owner&&owner!==b)other.push({t:LESSON_LABELS[k],b:owner});
+    else lockN++;
   });
-  if(pick>=0)h+="<div class='"+(pick===Q.c?"eff":"why")+"' style='margin-top:6px'>"+
-    (pick===Q.c?"🎉 정답이에요! 게임에서 겪은 그대로죠.":"다시 생각해 볼까요? 초록색이 정답이에요.")+"</div>";
-  h+="</div></div>";
-  /* 여섯 기후 한눈에 비교(무역이 필요한 까닭) */
+  h+="<div class='sec'><h3>내가 겪은 배움 <span class='sm'>"+mine.length+"/"+keys.length+"</span></h3><div class='card'>";
+  if(mine.length)h+="<div class='eff' style='line-height:1.75'>"+mine.map(function(t){return "✅ "+t}).join("<br>")+"</div>";
+  else h+="<p class='eff'>아직 없습니다. 밖에서 직접 살아 보면(폭염·혹한·건축·농사·부패·무역) 겪은 것이 이곳에 정리됩니다.</p>";
+  if(lockN)h+="<div class='eff' style='margin-top:8px;color:var(--ink3)'>🔒 내 대륙에서 아직 겪지 않은 배움 "+lockN+"개가 남아 있어요.</div>";
+  h+="</div>";
+  if(other.length){
+    h+="<div class='card'><div class='eff' style='color:var(--ink3)'>🌐 <b>친구의 대륙에서만 겪을 수 있는 배움 "+other.length+"개</b> — "+
+      "한 사람이 모든 기후를 살아 볼 수는 없습니다. 친구에게 물어보거나 '구경 가기'로 다녀오세요.</div>"+
+      "<div class='chips' style='margin-top:7px'>"+other.map(function(o){
+        return "<span class='chip' style='color:"+BIOMES[o.b].c+"'>"+BIOMES[o.b].n+"</span>"}).join("")+"</div></div>";
+  }
+  h+="</div>";
+
+  /* 7. 탐구 질문 */
+  h+="<div class='sec'><h3>탐구 질문 <span class='sm'>친구·선생님과 이야기해 보기</span></h3><div class='card'><div class='eff' style='line-height:1.85'>"+
+    E.q.map(function(q){return "❓ "+q}).join("<br>")+"</div></div></div>";
+
+  /* 8. 자기 점검 퀴즈(내 기후 3문항 + 기후변화 3문항) */
+  h+=quizBlock("내 기후 스스로 점검",E.quiz,"c");
+  h+=quizBlock("지구와 기후변화","WARM","w");
+
+  /* 9. 여섯 기후 한눈에 */
   h+="<div class='sec'><h3>여섯 기후 한눈에 <span class='sm'>왜 무역이 필요할까?</span></h3><div class='card'>"+
-    "<p class='eff' style='margin-bottom:8px'>어느 대륙도 혼자서는 모든 것을 가질 수 없습니다. 그래서 서로 <b>다른 것</b>을 주고받아야 합니다.</p>";
-  BKEYS.forEach(function(bb){var EE=CLIMATE_EDU[bb];
-    h+="<div class='rw' style='align-items:flex-start;margin:6px 0;gap:8px'>"+
-      "<span class='chip' style='min-width:70px;color:"+BIOMES[bb].c+"'>"+BIOMES[bb].n+(bb===b?" · 나":"")+"</span>"+
-      "<span class='eff' style='flex:1'>"+EE.industry+"</span></div>";
+    "<p class='eff' style='margin-bottom:8px'>어느 대륙도 혼자서는 모든 것을 가질 수 없습니다. 그래서 서로 <b>다른 것</b>을 주고받아야 합니다. "+
+    "국가 간 무역이 생기는 가장 큰 까닭이에요.</p>";
+  LAT_ORDER.forEach(function(bb){var EE=CLIMATE_EDU[bb];
+    h+="<div class='rw' style='align-items:flex-start;margin:7px 0;gap:8px'>"+
+      "<span class='chip' style='min-width:76px;color:"+BIOMES[bb].c+"'>"+BIOMES[bb].n+(bb===b?" · 나":"")+"</span>"+
+      "<span class='eff' style='flex:1'>"+EE.industry+"<br><span style='color:var(--ink3)'>"+EE.lat+"</span></span></div>";
   });
   h+="</div></div>";
   return h;
 }
-function eduAnswer(i){ S._quiz=i; drawPanel(); }
+/* 퀴즈 한 묶음: 문항마다 따로 채점하고 왜 그런지 해설을 붙인다 */
+function quizBlock(title,list,ns){
+  var arr=(list==="WARM")?WARM_QUIZ:list;
+  if(!arr||!arr.length)return "";
+  if(!S.quizA)S.quizA={};
+  var done=0;
+  arr.forEach(function(Q,qi){var k=ns+qi;if(S.quizA[k]===Q.c)done++});
+  var h="<div class='sec'><h3>"+title+" <span class='sm'>"+done+"/"+arr.length+" 맞음</span></h3>";
+  arr.forEach(function(Q,qi){
+    var key=ns+qi, pick=(typeof S.quizA[key]==="number")?S.quizA[key]:-1;
+    h+="<div class='card'><p class='eff' style='margin-bottom:8px'><b>"+(qi+1)+". "+Q.q+"</b></p>";
+    Q.a.forEach(function(opt,i){
+      var cls="mini",label=opt;
+      if(pick>=0){
+        if(i===Q.c){cls="mini acc";label="✅ "+opt}
+        else if(i===pick){label="❌ "+opt}
+      }
+      h+="<button class='"+cls+"' style='display:block;width:100%;text-align:left;margin:5px 0' "+
+         "onclick=\"eduAnswer('"+key+"',"+i+")\">"+label+"</button>";
+    });
+    if(pick>=0)h+="<div class='"+(pick===Q.c?"eff":"why")+"' style='margin-top:7px'>"+
+      (pick===Q.c?"🎉 정답이에요! ":"다시 볼까요? 초록색이 정답이에요. ")+(Q.why||"")+"</div>";
+    h+="</div>";
+  });
+  return h+"</div>";
+}
+function eduAnswer(key,i){ if(!S.quizA)S.quizA={}; S.quizA[key]=i; drawPanel(); }
+function eduCompare(b){ S._cmp=(S._cmp===b)?null:b; drawPanel(); }
 function uiHelp(){
   var B=BIOMES[S.biome];
   return "<div class='sec'><h3>조작</h3><div class='card'>"+
@@ -3152,6 +3675,11 @@ function uiHelp(){
     "날씨는 <b>맑음과 비</b>가 번갈아 바뀝니다. 화면 위 아이콘(☀🌧️🌨️)으로 지금 날씨를 알 수 있어요.<br>"+
     "🌧️ 비가 오면 <b>작물이 잘 자라고</b>, 밖에 있어도 수분이 덜 마릅니다. 다만 하늘이 어두워집니다.<br>"+
     "기후마다 비가 오는 정도가 다릅니다 — <b>열대</b>는 자주(우기), <b>사막</b>은 거의 오지 않아 비가 오면 아주 귀한 물이 됩니다. 한대·고산은 눈이 내립니다.</p></div></div>"+
+    "<div class='sec'><h3>⚡ 전기와 기후변화 <span class='sm'>사람도 기후를 바꿉니다</span></h3><div class='card'><p class='eff'>"+
+    "기념비를 세우려면 <b>전력</b>이 필요한데, 만드는 길이 <b>두 가지</b>입니다.<br>"+
+    "🏭 <b>화력 발전</b>(연료+구리+철) — 재료가 적게 들지만 만들 때마다 <b>탄소</b>가 나옵니다.<br>"+
+    "🔆 <b>태양광 발전</b>(태양광 패널+구리) — 재료가 더 들지만 <b>탄소가 나오지 않습니다</b>. 패널은 건조의 <b>유리</b>와 고산의 <b>구리·철</b>로 만들어요.<br>"+
+    "탄소가 쌓이면 <b>내 대륙의 기온이 실제로 올라갑니다</b>(최대 +3°C). 얼마나 쌓였는지는 <b>학습(📚)</b> 탭에서 볼 수 있어요.</p></div></div>"+
     "<div class='sec'><h3>거래소가 켜지는 방식 <span class='sm'>선생님용</span></h3><div class='card'><p class='eff'>"+
     "서버 주소와 키는 <b>앱에 이미 들어 있습니다</b>. 학생도 선생님도 아무것도 입력하지 않습니다.<br>"+
     "같은 <b>반 코드</b>를 쓰는 학생끼리 하나의 거래소·하나의 공유 월드를 씁니다. 반 코드는 무역 탭 아래에서 바꿉니다.<br>"+
@@ -3184,7 +3712,8 @@ function newState(name,biome,seed){
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
-    stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
+    carbon:0,quizA:{},
+    stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
 }
 function startKit(s){
   var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
@@ -3231,6 +3760,8 @@ function loadSave(){
     if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
     if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
     if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
+    if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};
+    if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
     if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
     s.isVisiting=false;if(!s.room)s.room=marketRoom();
     /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
@@ -3408,19 +3939,23 @@ function readKeys(){
 /* ---------- 시작 ---------- */
 var picked=null, assignedBiome=null, teacherRoster=[];
 function buildBoot(){
-  /* 대륙 선택 카드 */
+  /* 기후 띠(위도 단면) — 극(위) → 적도(아래) 순서로 세운다.
+     고르는 행위 자체가 "위도가 다르면 기후가 다르다"를 보여 준다. */
   var box=$("bpick"),h="";
-  BKEYS.forEach(function(b){var d=BIOMES[b];
-    h+="<button class='bc' data-b='"+b+"' style='--cc:"+d.c+"' aria-pressed='false'>"+
-      "<span class='n'><i></i>"+d.n+"</span><span class='d'>"+d.diff+" · "+d.dk+"</span>"+
-      "<span class='r'>"+d.role+"</span></button>";
+  LAT_ORDER.forEach(function(b,i){
+    var d=BIOMES[b], L=LAT_INFO[b]||{}, E=CLIMATE_EDU[b]||{};
+    h+="<button class='band"+(b==="alpine"?" alt":"")+"' data-b='"+b+"' style='--cc:"+d.c+
+      ";animation-delay:"+(i*55)+"ms' aria-pressed='false'>"+
+      "<span class='tick mono'>"+L.deg+"<em>"+L.zone+"</em></span>"+
+      "<span class='bmid'><span class='bn'>"+d.n+"<em>"+L.en+"</em></span><span class='br'>"+d.role+"</span></span>"+
+      "<span class='bd'>"+d.dk+"</span></button>";
   });
   box.innerHTML=h;
   box.addEventListener("click",function(e){
-    var b=e.target.closest(".bc");if(!b)return;
+    var b=e.target.closest(".band");if(!b)return;
     if(assignedBiome)return;                 // 교사 배정이 있으면 선택 잠금
     picked=b.dataset.b;document.body.dataset.b=picked;
-    box.querySelectorAll(".bc").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    box.querySelectorAll(".band").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
     refreshStartBtn();
   });
 
@@ -3461,36 +3996,51 @@ function buildBoot(){
     clearTimeout(lookupTimer);
     lookupTimer=setTimeout(studentRosterLookup,450);
   }
-  $("nm").addEventListener("input",function(){assignedBiome=null;refreshStartBtn();scheduleLookup()});
-  $("s_room").addEventListener("input",function(){assignedBiome=null;refreshStartBtn();scheduleLookup()});
+  $("nm").addEventListener("input",function(){assignedBiome=null;unlockPick();refreshStartBtn();scheduleLookup()});
+  $("s_room").addEventListener("input",function(){assignedBiome=null;unlockPick();refreshStartBtn();scheduleLookup()});
+  $("nm").addEventListener("keydown",function(e){if(e.key==="Enter"&&!$("start").disabled)startAsStudent()});
 
   $("start").addEventListener("click",startAsStudent);
   refreshStartBtn();
 }
+/* 교사 배정이 풀렸을 때: 다시 직접 고를 수 있게 되돌린다 */
+function unlockPick(){
+  var lat=$("bpick");if(!lat)return;
+  lat.classList.remove("locked");
+  if(!picked)lat.querySelectorAll(".band").forEach(function(x){x.setAttribute("aria-pressed","false")});
+}
 function refreshStartBtn(){
   var nameOk=$("nm").value.trim().length>0;
   var bio=assignedBiome||picked;
-  $("start").disabled=!(nameOk&&bio);
-  $("pickHint").textContent=assignedBiome?"· 선생님이 "+bN(assignedBiome)+"(으)로 배정":"";
+  var btn=$("start");
+  btn.disabled=!(nameOk&&bio);
+  btn.textContent=bio?(bN(bio)+" 대륙에 도착하기"):"대륙에 도착하기";
+  $("pickHint").textContent=assignedBiome?"선생님이 배정함":"북극 → 적도";
 }
-/* 방 코드+이름으로 교사 배정 조회 → 있으면 기후 강제·선택 숨김 */
+/* 방 코드+이름으로 교사 배정 조회 → 있으면 그 띠만 살리고 나머지는 잠근다 */
 function studentRosterLookup(){
   var room=$("s_room").value.trim(),name=$("nm").value.trim();
-  var info=$("assignInfo"),pick=$("pickWrap");
+  var info=$("assignInfo"),lat=$("bpick");
   assignedBiome=null;
-  if(!room||!name){info.classList.add("hide");pick.classList.remove("hide");refreshStartBtn();return}
+  function open(cls,html){info.className=cls||"";info.innerHTML=html}
+  function clear(){info.className="hide";info.innerHTML="";lat.classList.remove("locked");refreshStartBtn()}
+  if(!room||!name){clear();return}
   /* 오프라인이면 명단 조회 자체를 건너뛴다 */
-  if(!(CloudSvc&&CloudSvc.online)){info.classList.add("hide");pick.classList.remove("hide");refreshStartBtn();return}
-  info.classList.remove("hide");info.textContent="명단 확인 중…";
+  if(!(CloudSvc&&CloudSvc.online)){clear();return}
+  open("","명단을 확인하는 중…");
   CloudSvc.lookupStudent(room,name,function(err,row){
-    if(err){info.textContent="⚠ 명단 서버에 연결하지 못했습니다. 대륙을 직접 골라 시작할 수 있어요.";pick.classList.remove("hide");refreshStartBtn();return}
+    if(err){open("","⚠ 명단 서버에 연결하지 못했습니다. 대륙을 직접 골라 시작할 수 있어요.");
+      lat.classList.remove("locked");refreshStartBtn();return}
     if(row&&row.biome&&BIOMES[row.biome]){
       assignedBiome=row.biome;document.body.dataset.b=row.biome;
-      info.innerHTML="✅ <b>"+esc(name)+"</b> 학생은 <b style='color:"+BIOMES[row.biome].c+"'>"+bN(row.biome)+"</b> 대륙으로 배정되었습니다.";
-      pick.classList.add("hide");
+      open("ok","✅ <b>"+esc(name)+"</b> 학생은 <b style='color:"+BIOMES[row.biome].c+"'>"+bN(row.biome)+
+        "</b> 대륙으로 배정되었습니다.");
+      lat.classList.add("locked");
+      lat.querySelectorAll(".band").forEach(function(x){
+        x.setAttribute("aria-pressed",x.dataset.b===row.biome?"true":"false")});
     }else{
-      info.textContent="이 방 명단에 없는 이름입니다. 대륙을 직접 골라 시작하세요.";
-      pick.classList.remove("hide");
+      open("","이 방 명단에 없는 이름입니다. 오른쪽에서 대륙을 직접 골라 시작하세요.");
+      lat.classList.remove("locked");
     }
     refreshStartBtn();
   });
@@ -3555,35 +4105,144 @@ function newStudentWorld(name,bio){
   logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
   beginWorld(false);
 }
-/* ---------- 선생님 대시보드 ---------- */
-var teacherInited=false;
+/* ==========================================================================
+   선생님 대시보드
+   --------------------------------------------------------------------------
+   [무엇을 고쳤나] 예전 화면은 학생을 한 명씩만 추가할 수 있었고, 기후는 좁은
+   드롭다운으로 골라야 했으며, 저장했는지 아닌지를 알 수 없었다. 30명을 앞두고
+   수업 5분 전에 쓰는 화면으로는 느리다. 그래서
+     · 이름은 엑셀에서 통째로 붙여넣고
+     · 기후는 큼직한 칩으로 한 번에 바꾸고
+     · 저장하지 않은 변경은 항상 눈에 보이게
+   바꿨다. 데이터 구조(teacherRoster)와 저장 경로는 그대로다.
+   ========================================================================== */
+var teacherInited=false, rosterFilter=null, rosterOpen=null, rosterDirty=false, rosterUndo=null;
+
 function initTeacherPane(){
-  /* 기후 select 채우기 */
-  var sel=$("r_biome");
-  if(!sel.options.length){
-    BKEYS.forEach(function(b){var o=document.createElement("option");o.value=b;o.textContent=bN(b);sel.appendChild(o)});
-  }
   if(!teacherInited){
     teacherInited=true;
     $("t_room").value=MarketCfg.room||DEFAULT_ROOM;
     $("t_email").value=Auth.isTeacher()?(Auth.email()||""):"";
     $("t_connect").addEventListener("click",teacherConnect);
     $("t_logout").addEventListener("click",teacherLogout);
-    $("r_add").addEventListener("click",function(){
-      var nm=$("r_name").value.trim(),b=$("r_biome").value;
-      if(!nm){toast("학생 이름을 입력하세요","bad");return}
-      if(teacherRoster.some(function(r){return r.name===nm})){toast("이미 있는 이름입니다","bad");return}
-      teacherRoster.push({name:nm,biome:b});$("r_name").value="";renderRoster();
+    $("r_add").addEventListener("click",rosterAddBulk);
+    $("r_bulk").addEventListener("keydown",function(e){
+      if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();rosterAddBulk()}
     });
     $("t_autofill").addEventListener("click",function(){
-      if(!teacherRoster.length){toast("먼저 학생 이름을 추가하세요","bad");return}
-      teacherRoster.forEach(function(r,i){r.biome=BKEYS[i%BKEYS.length]});renderRoster();
-      toast("6기후로 고르게 분배했습니다","good");
+      if(!teacherRoster.length){toast("먼저 학생 이름을 넣어 주세요","bad");return}
+      teacherRoster.forEach(function(r,i){r.biome=BKEYS[i%BKEYS.length]});
+      markDirty();renderRoster();
+      toast("여섯 기후로 고르게 나눴습니다","good");
+    });
+    $("t_clear").addEventListener("click",function(){
+      if(!teacherRoster.length)return;
+      rosterUndo=teacherRoster.slice();
+      teacherRoster=[];markDirty();renderRoster();
+      toast("명단을 비웠습니다 · 되돌리려면 되돌리기를 누르세요","warn");
     });
     $("t_save").addEventListener("click",teacherSaveRoster);
   }
   renderRoster();
 }
+function markDirty(on){
+  rosterDirty=(on!==false);
+  var d=$("t_dirty");if(!d)return;
+  if(rosterDirty){
+    d.className="tdirty";d.querySelector("span").textContent="저장하지 않은 변경이 있습니다";
+    d.classList.remove("hide");
+  }else{
+    d.className="tdirty saved";d.querySelector("span").textContent="서버에 저장되었습니다";
+    d.classList.remove("hide");
+  }
+}
+/* ---- 이름 한꺼번에 넣기 ---- */
+function rosterAddBulk(){
+  var raw=$("r_bulk").value;
+  var names=raw.split(/[\n,\t;]+/).map(function(s){return s.replace(/^\s*\d+[.)]?\s*/,"").trim()})
+    .filter(function(s){return s.length>0&&s.length<=12});
+  if(!names.length){toast("넣을 이름이 없습니다","bad");return}
+  var added=0,dup=0,start=teacherRoster.length;
+  names.forEach(function(nm){
+    if(teacherRoster.some(function(r){return r.name===nm})){dup++;return}
+    teacherRoster.push({name:nm,biome:BKEYS[(start+added)%BKEYS.length]});added++;
+  });
+  $("r_bulk").value="";
+  markDirty();renderRoster();
+  toast(added+"명을 넣었습니다"+(dup?" · 이미 있는 이름 "+dup+"명은 건너뜀":"")+" · 기후는 자동으로 고르게 나눴어요",added?"good":"warn");
+}
+/* ---- 명단 그리기 ---- */
+function renderRoster(){
+  var box=$("rosterList"),sum=$("r_summary"),cnt=$("r_count");
+  if(!box)return;
+  if(cnt)cnt.textContent=teacherRoster.length+"명";
+
+  /* 기후별 인원 요약 — 눌러서 그 기후만 보기 */
+  if(sum){
+    var tally={};BKEYS.forEach(function(b){tally[b]=0});
+    teacherRoster.forEach(function(r){if(tally[r.biome]!==undefined)tally[r.biome]++});
+    sum.innerHTML=BKEYS.map(function(b){
+      return "<button style='--cc:"+BIOMES[b].c+"' class='"+(tally[b]?"":"zero")+"'"+
+        " aria-pressed='"+(rosterFilter===b)+"' onclick=\"rosterSetFilter('"+b+"')\">"+
+        "<i></i>"+BIOMES[b].n+" <b>"+tally[b]+"</b></button>";
+    }).join("")+(rosterFilter?"<button onclick=\"rosterSetFilter(null)\">전체 보기</button>":"");
+  }
+
+  if(!teacherRoster.length){
+    box.innerHTML="<p class='tempty'>아직 배정된 학생이 없습니다.<br>왼쪽 <b>학생 추가</b>에 반 명단을 붙여넣으면 여섯 기후로 자동으로 나눠 드려요."+
+      (rosterUndo?"<br><button class='mini' style='margin-top:10px' onclick='rosterUndoLast()'>↩ 방금 지운 "+rosterUndo.length+"명 되돌리기</button>":"")+"</p>";
+    return;
+  }
+
+  var rows="";
+  teacherRoster.forEach(function(r,i){
+    if(rosterFilter&&r.biome!==rosterFilter)return;
+    var c=BIOMES[r.biome]?BIOMES[r.biome].c:"var(--bad)";
+    var open=(rosterOpen===i);
+    rows+="<div class='rrow'><div class='rtop'>"+
+      "<input class='rname' value=\""+esc(r.name)+"\" maxlength='12' aria-label='학생 이름' "+
+        "onchange=\"rosterRename("+i+",this.value)\">"+
+      "<button class='rbio"+(BIOMES[r.biome]?"":" none")+"' style='--cc:"+c+";color:"+c+";border-color:"+c+"' "+
+        "aria-expanded='"+open+"' onclick='rosterToggle("+i+")'>"+(BIOMES[r.biome]?bN(r.biome):"기후 없음")+"</button>"+
+      "<button class='rmore' title='기기 바꿈 · 이름 잠금 풀기' onclick=\"teacherRelease('"+encodeURIComponent(r.name)+"')\">↻</button>"+
+      "</div>";
+    if(open){
+      rows+="<div class='rpick'>"+BKEYS.map(function(b){
+        return "<button style='--cc:"+BIOMES[b].c+"' aria-pressed='"+(b===r.biome)+"' "+
+          "onclick=\"rosterSetBiome("+i+",'"+b+"')\">"+BIOMES[b].n+"</button>"}).join("")+
+        "<button class='rdel' onclick='rosterRemove("+i+")'>✕ 명단에서 빼기</button></div>";
+    }
+    rows+="</div>";
+  });
+  box.innerHTML="<div class='rlist'>"+(rows||"<p class='tempty'>이 기후에 배정된 학생이 없습니다.</p>")+"</div>"+
+    (rosterUndo?"<button class='mini' style='margin-top:10px' onclick='rosterUndoLast()'>↩ 되돌리기</button>":"");
+}
+function rosterSetFilter(b){rosterFilter=(rosterFilter===b)?null:b;rosterOpen=null;renderRoster()}
+function rosterToggle(i){rosterOpen=(rosterOpen===i)?null:i;renderRoster()}
+function rosterSetBiome(i,b){
+  if(!teacherRoster[i])return;
+  teacherRoster[i].biome=b;rosterOpen=null;markDirty();renderRoster();
+}
+function rosterRename(i,v){
+  var nm=String(v||"").trim();
+  if(!teacherRoster[i])return;
+  if(!nm){toast("이름은 비울 수 없습니다","bad");renderRoster();return}
+  if(teacherRoster.some(function(r,j){return j!==i&&r.name===nm})){toast("이미 있는 이름입니다","bad");renderRoster();return}
+  teacherRoster[i].name=nm;markDirty();renderRoster();
+}
+function rosterRemove(i){
+  if(!teacherRoster[i])return;
+  rosterUndo=teacherRoster.slice();
+  var nm=teacherRoster[i].name;
+  teacherRoster.splice(i,1);rosterOpen=null;markDirty();renderRoster();
+  toast(nm+" 학생을 명단에서 뺐습니다","warn");
+}
+function rosterUndoLast(){
+  if(!rosterUndo)return;
+  teacherRoster=rosterUndo;rosterUndo=null;markDirty();renderRoster();
+  toast("되돌렸습니다","good");
+}
+/* ---- 로그인 · 저장 ---- */
 function teacherConnect(){
   var email=$("t_email").value.trim(), pw=$("t_pw").value, room=$("t_room").value.trim()||DEFAULT_ROOM;
   var st=$("t_status");
@@ -3601,9 +4260,10 @@ function teacherConnect(){
         return;
       }
       $("t_logout").classList.remove("hide");
-      st.innerHTML="✅ <b>"+esc(Auth.email()||"")+"</b> 로 로그인. 방 <b>"+esc(room)+"</b> · 기존 명단 "+rows.length+"명.";
+      st.innerHTML="✅ <b>"+esc(Auth.email()||"")+"</b> 로 로그인 · 방 <b>"+esc(room)+"</b>";
       teacherRoster=rows.map(function(r){return{name:r.name,biome:r.biome}});
-      renderRoster();
+      rosterUndo=null;rosterFilter=null;rosterOpen=null;
+      markDirty(false);renderRoster();
     });
   }
 
@@ -3622,21 +4282,11 @@ function teacherLogout(){
   var st=$("t_status");
   st.textContent="로그아웃 중…";
   Auth.signOut().then(function(){
-    teacherRoster=[];renderRoster();
+    teacherRoster=[];rosterUndo=null;renderRoster();
     $("t_logout").classList.add("hide");
+    $("t_dirty").classList.add("hide");
     st.textContent="로그아웃했습니다.";
   })["catch"](function(){ st.textContent="로그아웃했습니다."; });
-}
-function renderRoster(){
-  var box=$("rosterList");
-  if(!teacherRoster.length){box.innerHTML="<p class='note'>아직 배정된 학생이 없습니다. 아래에서 이름과 기후를 추가하세요.</p>";return}
-  box.innerHTML=teacherRoster.map(function(r,i){
-    var optS=BKEYS.map(function(b){return "<option value='"+b+"'"+(b===r.biome?" selected":"")+">"+bN(b)+"</option>"}).join("");
-    return "<div class='rosterRow has4'><span class='chip' style='color:"+(BIOMES[r.biome]?BIOMES[r.biome].c:"var(--ink)")+"'>"+esc(r.name)+"</span>"+
-      "<select class='sel' onchange='teacherRoster["+i+"].biome=this.value'>"+optS+"</select>"+
-      "<button class='mini' title='기기 바꿈 — 이름 잠금 풀기' onclick=\"teacherRelease('"+encodeURIComponent(r.name)+"')\">↻</button>"+
-      "<button class='mini' onclick='teacherRoster.splice("+i+",1);renderRoster()'>✕</button></div>";
-  }).join("");
 }
 /* 학생이 다른 기기로 옮겼을 때: 그 이름에 걸린 기기 소유권을 풀어 준다.
    푼 뒤 학생이 새 기기에서 접속하면 그 기기가 다시 주인이 된다. */
@@ -3653,9 +4303,13 @@ function teacherSaveRoster(){
   if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
   if(!Auth.isTeacher()){msg.textContent="명단 저장은 선생님 계정으로 로그인해야 합니다.";return}
   if(!teacherRoster.length){msg.textContent="저장할 명단이 없습니다.";return}
+  var miss=teacherRoster.filter(function(r){return !BIOMES[r.biome]});
+  if(miss.length){msg.textContent="⚠ 기후가 정해지지 않은 학생이 "+miss.length+"명 있습니다.";return}
   msg.textContent="저장 중…";
   CloudSvc.saveRoster(MarketCfg.room,teacherRoster,function(err){
-    msg.textContent=err?"⚠ 저장 실패: "+err:"✅ "+teacherRoster.length+"명을 방 '"+MarketCfg.room+"'에 저장했습니다. 학생들은 방 코드와 이름만 입력하면 됩니다.";
+    if(err){msg.textContent="⚠ 저장 실패: "+err;return}
+    markDirty(false);rosterUndo=null;
+    msg.textContent="✅ "+teacherRoster.length+"명을 방 '"+MarketCfg.room+"'에 저장했습니다. 학생들은 방 코드와 이름만 넣으면 됩니다.";
   });
 }
 function beginWorld(isLoad){
@@ -3744,7 +4398,8 @@ function startVisit(nameEnc,biome){
       hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
       inv:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
       paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
-      stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},monument:false}};
+      carbon:0,quizA:{},
+      stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
     S=vis;document.body.dataset.b=S.biome;
     /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
     if(CloudSvc&&CloudSvc.online)netStart(S.room,S.biome);
