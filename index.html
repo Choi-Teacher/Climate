@@ -1102,7 +1102,8 @@ var LESSON_LABELS={
  traded:"⚖️ 내 대륙에 없는 것은 다른 기후에서 온다 → <b>자연환경이 다르기 때문에 무역이 생긴다</b>.",
  carbon:"🏭 석탄·석유를 태우면 눈에 안 보이는 이산화탄소가 나온다 → 하늘에 쌓여 지구를 덮는다.",
  renew:"🔆 햇빛으로 만든 전기는 탄소를 내뿜지 않는다 → 재생에너지가 기후위기의 답으로 꼽히는 까닭.",
- warming:"🌡️ 쌓인 탄소가 내 대륙의 기온을 올렸다 → 기후는 사람을 바꾸고, 사람도 기후를 바꾼다."
+ warming:"🌡️ 쌓인 탄소가 내 대륙의 기온을 올렸다 → 기후는 사람을 바꾸고, 사람도 기후를 바꾼다.",
+ regrow:"🌱 숲과 풀은 시간이 지나면 다시 자라지만 석탄·철·석유는 돌아오지 않는다 → 재생 가능 자원과 재생 불가능 자원."
 };
 /* 그 배움이 '어느 기후에서 겪을 수 있는 일'인지. 내 대륙에서 못 겪는 것은
    못 한 것이 아니라 '친구의 대륙 이야기'라고 알려 주기 위한 것. b 없으면 어디서나 가능. */
@@ -2044,7 +2045,8 @@ function yieldBlock(x,y,z,b,B){
   else if(b===24)n=ri(1,3);
   else if(b===7||b===22)n=Math.random()<.5?1:0;
   else if(b===11||b===12||b===13)n=ri(1,2);
-  if(!B.infinite){setB(x,y,z,0);S.edits[x+","+y+","+z]=0;markDirty(x,z);
+  if(!B.infinite){regrowRegister(x,y,z,b);
+    setB(x,y,z,0);S.edits[x+","+y+","+z]=0;markDirty(x,z);
     if(S.crops)delete S.crops[x+","+y+","+z];        // 성장 타이머 제거
     netBroadcastEdit(x,y,z,0);}     // [V4] 캐기 실시간 동기화
   if(n>0&&item){add(S,item,n);S.stat.got[item]=(S.stat.got[item]||0)+n;
@@ -2216,6 +2218,82 @@ function refreshHotbar(){
   }
   document.getElementById("hotbar").innerHTML=h;
 }
+/* ==========================================================================
+   [자원 재생] 2차림 — 캔 자리에 숲이 다시 자란다
+   --------------------------------------------------------------------------
+   교과의 구분을 그대로 게임 규칙으로 삼았다.
+     · 재생 가능 자원(숲·덤불·풀) … 시간이 지나면 스스로 돌아온다.
+                                     돌아오는 '속도'는 그 땅의 기후가 정한다.
+     · 재생 불가능 자원(석탄·철·구리·금·원유) … 한 번 캐면 그것으로 끝이다.
+   그리고 돌아오려면 그 자리가 여전히 '빈 땅'이어야 한다. 학생이 집을 지어 두었으면
+   숲은 돌아오지 않는다 — 개발과 자연을 맞바꾼다는 것을 몸으로 겪게 하려는 것이다.
+   ========================================================================== */
+var REGROW_TREE={6:1,19:1,20:1};                     // 되살아날 때 '어린 나무 한 그루'가 되는 기둥
+var REGROW_BLOCKS={6:1,16:1,17:1,18:1,19:1,20:1,21:1,22:1,24:1};
+var REGROW_BASE=100;                                  // 온대에서 한 그루가 돌아오는 데 걸리는 시간(초). 하루=600초
+var REGROW_RATE={tropical:.55,temperate:1,taiga:1.9,alpine:2.2,desert:3.4,tundra:0};  // 0 = 자라지 않음
+/* 식물이 뿌리내릴 수 있는 자연 지면. chainBreakTree 의 rooted() 와 같은 목록을 쓴다 —
+   냉대의 침엽수는 눈(8) 위에, 고산의 나무는 돌(3) 위에 자라기 때문이다. */
+var REGROW_GROUND={1:1,2:1,4:1,3:1,8:1,10:1};
+
+/* 캘 때 호출 — 되살아날 수 있는 것만, 자연 지면 위에 있던 것만 예약한다 */
+function regrowRegister(x,y,z,b){
+  if(!S||S.isVisiting)return;
+  if(!REGROW_BLOCKS[b])return;
+  if(!REGROW_RATE[S.biome])return;                    // 한대: 땅이 얼어 있어 식생이 돌아오지 않는다
+  if(!REGROW_GROUND[getB(x,y-1,z)])return;            // 밑동/뿌리 자리만. 공중의 잘린 기둥·잎은 제외
+  if(!S.regrow)S.regrow={};
+  var k=x+","+y+","+z;
+  if(S.regrow[k])return;
+  S.regrow[k]={b:b,t:REGROW_BASE*REGROW_RATE[S.biome]*(.8+Math.random()*.5)};
+}
+function regrowTick(dt,quiet){
+  if(!S||!S.regrow||S.isVisiting)return;
+  var speed=isRaining()?1.45:1;                       // 비가 오면 더 빨리 자란다
+  for(var k in S.regrow){
+    var e=S.regrow[k],a=k.split(","),x=+a[0],y=+a[1],z=+a[2];
+    var here=getB(x,y,z);
+    if(here!==0){delete S.regrow[k];continue}          // 누가 그 자리를 썼다 → 숲은 돌아오지 않는다
+    if(!REGROW_GROUND[getB(x,y-1,z)]){delete S.regrow[k];continue}  // 땅까지 파냈으면 취소
+    e.t-=dt*speed;
+    if(e.t>0)continue;
+    delete S.regrow[k];
+    regrowPlace(x,y,z,e.b,quiet);
+  }
+}
+function regrowPlace(x,y,z,b,quiet){
+  var made=[];
+  function put(px,py,pz,pb){
+    if(!inW(px,py,pz)||getB(px,py,pz)!==0)return;
+    setB(px,py,pz,pb);S.edits[px+","+py+","+pz]=pb;made.push([px,py,pz,pb]);
+  }
+  if(REGROW_TREE[b]){                                 // 어린 나무 한 그루로 되살아난다
+    var th=3+Math.floor(Math.random()*2);
+    for(var i=0;i<th;i++)put(x,y+i,z,b);
+    var top=y+th-1, leaf=(S.biome==="tropical"&&Math.random()<.5)?22:7;
+    for(var dx=-1;dx<=1;dx++)for(var dz=-1;dz<=1;dz++)for(var dy=0;dy<=1;dy++){
+      if(Math.abs(dx)+Math.abs(dz)+dy>2)continue;
+      put(x+dx,top+dy,z+dz,leaf);
+    }
+  }else put(x,y,z,b);
+  if(!made.length)return;
+  /* 같은 청크를 여러 번 다시 만들지 않도록 정리(청크 경계 칸만 예외로 매번 갱신) */
+  var doneChunk={};
+  made.forEach(function(m){
+    var mx=m[0],mz=m[2];
+    var edge=(mx%CH===0||mx%CH===CH-1||mz%CH===0||mz%CH===CH-1);
+    var ck=Math.floor(mx/CH)+","+Math.floor(mz/CH);
+    if(!edge&&doneChunk[ck])return;
+    markDirty(mx,mz);doneChunk[ck]=1;
+  });
+  made.forEach(function(m){netBroadcastEdit(m[0],m[1],m[2],m[3])});
+  if(typeof cloudDirty==="function")cloudDirty();
+  if(!quiet){
+    teachOnce("regrow","🌱 캐낸 자리에 <b>숲이 다시 자랐습니다</b>. 나무·풀은 <b>재생 가능한 자원</b>이라 기다리면 돌아옵니다.<br>"+
+      "다만 <b>석탄·철·석유</b>는 한 번 캐면 끝이고, 그 자리에 <b>집을 지으면</b> 숲도 돌아오지 않아요.");
+  }
+}
+
 /* ===== [농사] 심은 작물의 성장 처리 =====
    S.crops[key]=자란시간(초). 물이 가까이 있거나 비가 오면 빠르게,
    물이 전혀 없으면 아주 느리게 자란다. 일정 시간이 지나면 다음 단계 블록으로 자란다. */
@@ -2318,6 +2396,7 @@ function simulate(dt,quiet){
   if(S.day>prev){logAdd(S,S.day+"일차 아침이 밝았습니다.");if(!quiet)toast("☀ "+S.day+"일차")}
   updateWeather(dt,quiet);                              // [날씨] 비/맑음 전환
   growCrops(dt,quiet);                                  // [농사] 심은 작물 성장
+  regrowTick(dt,quiet);                                 // [자원] 캔 자리에 숲이 다시 자람
   S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
   /* [날씨] 비가 오면 야외에서 수분이 덜 마른다(습도↑) */
   var hydraMod=m.hydra*(isRaining()&&!shelteredNow()?.6:1);
@@ -3560,6 +3639,11 @@ function uiEdu(){
   h+="<div class='sec'><h3>지구가 더워지면 <span class='sm'>사람도 기후를 바꾼다</span></h3>"+
     (E.warm?"<div class='card'><div class='eff'>🌡️ <b>"+B.n+"에서는</b> · "+E.warm+"</div></div>":"")+
     carbonGauge()+
+    "<div class='card'><div class='eff'>🌱 <b>자원의 두 종류</b> · 이 대륙의 숲과 풀은 "+
+      (REGROW_RATE[b]?("캐도 <b>약 "+Math.round(REGROW_BASE*REGROW_RATE[b])+"초</b> 뒤 다시 자랍니다"+
+        (b==="tropical"?" (여섯 기후 중 가장 빠릅니다)":b==="desert"?" (물이 없어 아주 느립니다)":"")):
+        "<b>다시 자라지 않습니다</b> (땅이 얼어 있어 식물이 뿌리내리지 못합니다)")+
+      ". 하지만 석탄·철·석유는 한 번 캐면 끝이고, 그 자리에 건물을 지으면 숲도 돌아오지 않아요.</div></div>"+
     "<div class='card'><div class='eff'>💡 <b>내가 할 수 있는 일</b> · 필요한 만큼만 만들기 · 화력 대신 <b>태양광 발전</b> 쓰기 · "+
     "부족한 것은 남에게서 <b>사 오기</b>(각자 잘 만드는 것을 나누면 전체가 덜 만들어도 됩니다).</div></div></div>";
 
@@ -3675,6 +3759,12 @@ function uiHelp(){
     "날씨는 <b>맑음과 비</b>가 번갈아 바뀝니다. 화면 위 아이콘(☀🌧️🌨️)으로 지금 날씨를 알 수 있어요.<br>"+
     "🌧️ 비가 오면 <b>작물이 잘 자라고</b>, 밖에 있어도 수분이 덜 마릅니다. 다만 하늘이 어두워집니다.<br>"+
     "기후마다 비가 오는 정도가 다릅니다 — <b>열대</b>는 자주(우기), <b>사막</b>은 거의 오지 않아 비가 오면 아주 귀한 물이 됩니다. 한대·고산은 눈이 내립니다.</p></div></div>"+
+    "<div class='sec'><h3>🌱 자원은 다시 생길까? <span class='sm'>재생 가능 · 재생 불가능</span></h3><div class='card'><p class='eff'>"+
+    "🌳 <b>숲·덤불·풀</b>은 캐고 나면 시간이 지나 <b>그 자리에 다시 자랍니다</b>(재생 가능 자원).<br>"+
+    "다만 <b>기후마다 회복 속도가 다릅니다</b> — 덥고 비가 많은 <b>열대</b>는 빠르고, <b>냉대·고산</b>은 느리며, <b>사막</b>은 아주 느립니다. "+
+    "<b>한대</b>는 땅이 얼어 있어 아예 자라지 않아요. 비가 오는 날엔 더 빨리 자랍니다.<br>"+
+    "⛏️ 반대로 <b>석탄·철·구리·금·석유</b>는 한 번 캐면 <b>다시 생기지 않습니다</b>(재생 불가능 자원).<br>"+
+    "🏠 그리고 캔 자리에 <b>집이나 길을 지으면 숲은 돌아오지 않습니다</b>. 땅을 어디에 쓸지 정하는 것은 여러분입니다.</p></div></div>"+
     "<div class='sec'><h3>⚡ 전기와 기후변화 <span class='sm'>사람도 기후를 바꿉니다</span></h3><div class='card'><p class='eff'>"+
     "기념비를 세우려면 <b>전력</b>이 필요한데, 만드는 길이 <b>두 가지</b>입니다.<br>"+
     "🏭 <b>화력 발전</b>(연료+구리+철) — 재료가 적게 들지만 만들 때마다 <b>탄소</b>가 나옵니다.<br>"+
@@ -3712,7 +3802,7 @@ function newState(name,biome,seed){
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
-    carbon:0,quizA:{},
+    carbon:0,quizA:{},regrow:{},
     stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
 }
 function startKit(s){
@@ -3760,7 +3850,7 @@ function loadSave(){
     if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
     if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
     if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
-    if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};
+    if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
     if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
     if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
     s.isVisiting=false;if(!s.room)s.room=marketRoom();
@@ -4132,20 +4222,20 @@ function initTeacherPane(){
     $("t_autofill").addEventListener("click",function(){
       if(!teacherRoster.length){toast("먼저 학생 이름을 넣어 주세요","bad");return}
       teacherRoster.forEach(function(r,i){r.biome=BKEYS[i%BKEYS.length]});
-      markDirty();renderRoster();
+      rosterMarkDirty();renderRoster();
       toast("여섯 기후로 고르게 나눴습니다","good");
     });
     $("t_clear").addEventListener("click",function(){
       if(!teacherRoster.length)return;
       rosterUndo=teacherRoster.slice();
-      teacherRoster=[];markDirty();renderRoster();
+      teacherRoster=[];rosterMarkDirty();renderRoster();
       toast("명단을 비웠습니다 · 되돌리려면 되돌리기를 누르세요","warn");
     });
     $("t_save").addEventListener("click",teacherSaveRoster);
   }
   renderRoster();
 }
-function markDirty(on){
+function rosterMarkDirty(on){
   rosterDirty=(on!==false);
   var d=$("t_dirty");if(!d)return;
   if(rosterDirty){
@@ -4168,7 +4258,7 @@ function rosterAddBulk(){
     teacherRoster.push({name:nm,biome:BKEYS[(start+added)%BKEYS.length]});added++;
   });
   $("r_bulk").value="";
-  markDirty();renderRoster();
+  rosterMarkDirty();renderRoster();
   toast(added+"명을 넣었습니다"+(dup?" · 이미 있는 이름 "+dup+"명은 건너뜀":"")+" · 기후는 자동으로 고르게 나눴어요",added?"good":"warn");
 }
 /* ---- 명단 그리기 ---- */
@@ -4221,25 +4311,25 @@ function rosterSetFilter(b){rosterFilter=(rosterFilter===b)?null:b;rosterOpen=nu
 function rosterToggle(i){rosterOpen=(rosterOpen===i)?null:i;renderRoster()}
 function rosterSetBiome(i,b){
   if(!teacherRoster[i])return;
-  teacherRoster[i].biome=b;rosterOpen=null;markDirty();renderRoster();
+  teacherRoster[i].biome=b;rosterOpen=null;rosterMarkDirty();renderRoster();
 }
 function rosterRename(i,v){
   var nm=String(v||"").trim();
   if(!teacherRoster[i])return;
   if(!nm){toast("이름은 비울 수 없습니다","bad");renderRoster();return}
   if(teacherRoster.some(function(r,j){return j!==i&&r.name===nm})){toast("이미 있는 이름입니다","bad");renderRoster();return}
-  teacherRoster[i].name=nm;markDirty();renderRoster();
+  teacherRoster[i].name=nm;rosterMarkDirty();renderRoster();
 }
 function rosterRemove(i){
   if(!teacherRoster[i])return;
   rosterUndo=teacherRoster.slice();
   var nm=teacherRoster[i].name;
-  teacherRoster.splice(i,1);rosterOpen=null;markDirty();renderRoster();
+  teacherRoster.splice(i,1);rosterOpen=null;rosterMarkDirty();renderRoster();
   toast(nm+" 학생을 명단에서 뺐습니다","warn");
 }
 function rosterUndoLast(){
   if(!rosterUndo)return;
-  teacherRoster=rosterUndo;rosterUndo=null;markDirty();renderRoster();
+  teacherRoster=rosterUndo;rosterUndo=null;rosterMarkDirty();renderRoster();
   toast("되돌렸습니다","good");
 }
 /* ---- 로그인 · 저장 ---- */
@@ -4263,7 +4353,7 @@ function teacherConnect(){
       st.innerHTML="✅ <b>"+esc(Auth.email()||"")+"</b> 로 로그인 · 방 <b>"+esc(room)+"</b>";
       teacherRoster=rows.map(function(r){return{name:r.name,biome:r.biome}});
       rosterUndo=null;rosterFilter=null;rosterOpen=null;
-      markDirty(false);renderRoster();
+      rosterMarkDirty(false);renderRoster();
     });
   }
 
@@ -4308,7 +4398,7 @@ function teacherSaveRoster(){
   msg.textContent="저장 중…";
   CloudSvc.saveRoster(MarketCfg.room,teacherRoster,function(err){
     if(err){msg.textContent="⚠ 저장 실패: "+err;return}
-    markDirty(false);rosterUndo=null;
+    rosterMarkDirty(false);rosterUndo=null;
     msg.textContent="✅ "+teacherRoster.length+"명을 방 '"+MarketCfg.room+"'에 저장했습니다. 학생들은 방 코드와 이름만 넣으면 됩니다.";
   });
 }
@@ -4398,7 +4488,7 @@ function startVisit(nameEnc,biome){
       hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
       inv:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
       paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
-      carbon:0,quizA:{},
+      carbon:0,quizA:{},regrow:{},
       stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
     S=vis;document.body.dataset.b=S.biome;
     /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
