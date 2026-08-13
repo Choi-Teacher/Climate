@@ -191,6 +191,12 @@ summary:hover{color:var(--ink2)}
 #tabs button .lab{position:absolute;bottom:1px;left:0;right:0;font-size:8px;color:var(--ink3)}
 #tabs button .n{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-family:var(--m);
   font-size:9px;border-radius:999px;padding:0 4px;font-weight:700}
+/* [V7.1] 이 기기의 다른 저장 목록 */
+#slots{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.slotcap{width:100%;font-size:11px;color:var(--ink3);margin-bottom:2px}
+.slotbtn{background:#0e1720;border:1px solid var(--edge);border-radius:999px;padding:7px 13px;
+  font-size:12.5px;color:var(--ink2);transition:border-color .15s,color .15s}
+.slotbtn:hover{border-color:var(--accent);color:var(--ink)}
 /* [V7] 나가기 버튼 — 다른 탭과 헷갈리지 않게 붉은 계열로 떼어 둔다 */
 #tabs button.exit{margin-top:6px;border-color:#57303a;color:#f0a9a9;background:#1a1219e6}
 #tabs button.exit:hover{border-color:var(--bad);color:#ffd0d0}
@@ -514,6 +520,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
     <div class="bgo">
       <button class="go" id="start" disabled>대륙에 도착하기</button>
       <button class="go ghost sm hide" id="cont">이어서 하기</button>
+      <div id="slots" class="hide"></div>
     </div>
   </div>
 
@@ -3385,7 +3392,16 @@ function acceptOffer(id){
       /* [V7 수정 6] "왜" 실패했는지 알려준다. 예전엔 원인이 무엇이든
          '거래 연결에 실패했습니다' 한 줄이라 교실에서 손쓸 방법이 없었다. */
       if(err==="taken"||err==="gone"){
-        toast(err==="taken"?"방금 다른 사람이 먼저 가져갔습니다":"이 거래는 이미 사라졌습니다","bad");
+        /* [V7.1] 같은 브라우저 두 창으로 시연하면 익명 계정이 공유돼, 서버가
+           '자기 물건을 자기가 사려 한다'고 보고 거절한다. 이때 "다른 사람이
+           먼저 가져갔다"고 말하면 완전히 엉뚱한 안내가 된다. */
+        var myUid=null;try{myUid=Auth.uid()}catch(e2){}
+        if(myUid&&o.owner&&o.owner===myUid){
+          toast("같은 계정(같은 브라우저)에서 올린 물건이라 거래되지 않습니다","bad");
+          teachOnce("sameacct","🪟 <b>같은 브라우저의 두 창</b>은 같은 계정으로 접속됩니다. 서로 거래하려면 한쪽을 <b>시크릿 창</b>이나 <b>다른 브라우저·다른 기기</b>에서 여세요.");
+        }else{
+          toast(err==="taken"?"방금 다른 사람이 먼저 가져갔습니다":"이 거래는 이미 사라졌습니다","bad");
+        }
       }else{
         toast("거래 실패 · "+marketErrText(err),"bad");
       }
@@ -3452,7 +3468,10 @@ function cancelPending(id){
   toast("등록을 취소하고 물건을 돌려받았습니다");refreshHotbar();drawPanel();
 }
 /* ---- 거래소 폴링: 남의 열린 제안 목록 + 내가 판 물건 정산 ---- */
-var pollAcc=0,pollBusy=false,pollSig="";
+var pollAcc=0,pollBusy=false,pollSig="",diagOpen=false;
+/* [V7.1] 마지막 조회 결과를 그대로 남겨 둔다. "왜 친구 물건이 안 보이지?" 를
+   교실에서 그 자리에서 답할 수 있게 하기 위한 것이다. */
+var MarketDiag=null;
 function pollMarket(force){
   if(!Market)return;
   if(pollBusy&&!force)return;                    // [V7] '새로고침' 버튼은 대기 중이어도 통한다
@@ -3460,17 +3479,38 @@ function pollMarket(force){
   var room=marketRoom();
   Market.listOffers(room,function(err,list){
     pollBusy=false;
-    if(err||!list){return}
-    /* 내 것/이미 처리한 것 제외, 최신 20개.
-       [V7] 이름뿐 아니라 계정(uid)으로도 걸러야 '한 사람이 이름만 바꿔 자기 물건을
-       자기가 사는' 일이 막힌다(서버 규칙도 이걸 막으므로 눌러도 실패할 뿐이다). */
+    if(err||!list){
+      MarketDiag={total:-1,err:marketErrText(err),room:room,at:Date.now(),
+                  uid:(function(){try{return Auth.uid()}catch(e){return null}})(),
+                  biome:S?S.biome:"",name:S?S.name:"",mineCnt:0,sameName:0,sameBiome:0,sameAcct:0,shown:0};
+      if(panelTab==="trade")drawPanel();
+      return;
+    }
+    /* ── 무엇을 화면에 보일지 고르고, '왜 걸렀는지'를 함께 기록한다 ──────────
+       [V7.1 수정 · 중요] 지난 판에서 넣었던 "계정(uid)이 같으면 숨긴다"는 규칙을
+       걷어냈다. 그 규칙은 한 사람이 이름만 바꿔 자기 물건을 자기가 사는 일을
+       막으려던 것이었는데, 실제로는 훨씬 흔한 상황을 망가뜨렸다.
+
+         같은 브라우저에서 창을 두 개 띄우면 두 창이 localStorage 를 공유하므로
+         익명 로그인 계정(uid)까지 똑같아진다. 교실에서 선생님이 온대 창과 건조
+         창을 나란히 띄워 시연하는 바로 그 방법이다. 그러면 서로가 올린 물건이
+         "내 계정 것"으로 판정돼 양쪽 목록에서 사라졌다.
+
+       자기 물건은 이름(o.name)과 등록 목록(S.pending)으로 이미 걸러진다.
+       계정까지 볼 필요가 없다. 대신 계정이 같다는 사실은 기록해 두었다가,
+       실제로 거래가 거부됐을 때 그 이유를 설명하는 데 쓴다. */
     var mine=S.pending.map(function(p){return p.id});
     var myUid=null;try{myUid=Auth.uid()}catch(e){}
+    var dg={total:list.length,mineCnt:0,sameName:0,sameBiome:0,shown:0,sameAcct:0,
+            room:room,uid:myUid,biome:S.biome,name:S.name,at:Date.now(),err:""};
     var live=list.filter(function(o){
-      if(o.name===S.name)return false;
-      if(myUid&&o.owner&&o.owner===myUid)return false;
-      return mine.indexOf(o.id)<0 && o.from!==S.biome;
+      if(mine.indexOf(o.id)>=0){dg.mineCnt++;return false}         // 내가 올린 것
+      if(o.name===S.name){dg.sameName++;return false}              // 이름이 나와 같음
+      if(o.from===S.biome){dg.sameBiome++;return false}            // 같은 기후끼리는 무역이 아니다
+      if(myUid&&o.owner&&o.owner===myUid)dg.sameAcct++;            // 숨기지는 않고 표시만 해 둔다
+      dg.shown++;return true;
     }).slice(0,20).map(function(o){o.player=true;return o});
+    MarketDiag=dg;
     /* 새 제안 알림 */
     var prevIds={};S.offers.forEach(function(o){if(o.player)prevIds[o.id]=1});
     var fresh=live.filter(function(o){return !prevIds[o.id]}).length;
@@ -3702,6 +3742,49 @@ function uiBag(){
   h+="</div>";
   return h;
 }
+/* [V7.1] 거래소 진단 — "서버는 몇 건을 줬고, 그중 무엇을 왜 걸렀는지"를 그대로 보여준다.
+   거래가 안 될 때 추측하지 않고 원인을 짚기 위한 화면이다. */
+function toggleDiag(){diagOpen=!diagOpen;if(!diagOpen)drawPanel();else pollMarket(true)}
+function diagCard(){
+  var d=MarketDiag;
+  if(!d)return "<div class='card' style='margin-top:8px'><p class='eff'>아직 조회한 적이 없습니다. <b>새로고침</b>을 눌러 보세요.</p></div>";
+  var line=function(k,v,warn){
+    return "<div class='rw' style='padding:3px 0'><span class='eff' style='margin:0;min-width:148px'>"+k+"</span>"+
+      "<b class='mono' style='font-size:12px;color:"+(warn?"var(--warn)":"var(--ink)")+"'>"+v+"</b></div>";
+  };
+  var h="<div class='card' style='margin-top:8px'>";
+  h+="<div class='eff' style='margin:0 0 8px'><b>마지막 조회 결과</b> · "+
+     new Date(d.at).toLocaleTimeString("ko-KR")+"</div>";
+  h+=line("내 이름 / 기후",esc(d.name)+" / "+bN(d.biome));
+  h+=line("방 코드",esc(d.room));
+  h+=line("내 계정 번호",d.uid?esc(String(d.uid).slice(0,8))+"…":"없음(로그인 전)",!d.uid);
+  if(d.total<0){
+    h+="<div class='why' style='margin-top:9px'>⚠ 서버에서 목록을 받지 못했습니다 · "+esc(d.err)+"</div>";
+    return h+"</div>";
+  }
+  h+="<div style='height:1px;background:var(--line);margin:9px 0'></div>";
+  h+=line("서버가 준 열린 거래",d.total+"건");
+  h+=line("→ 내가 올린 것",d.mineCnt+"건");
+  h+=line("→ 이름이 나와 같아 제외",d.sameName+"건",d.sameName>0);
+  h+=line("→ 나와 같은 기후라 제외",d.sameBiome+"건");
+  h+=line("→ 화면에 보이는 것",d.shown+"건",d.shown===0&&d.total>0);
+  if(d.sameAcct>0){
+    h+="<div class='why' style='margin-top:9px'>⚠ 그중 "+d.sameAcct+"건은 <b>나와 같은 계정</b>으로 올라온 것입니다."+
+       "<br>같은 브라우저에서 창을 두 개 띄우면 익명 계정이 공유됩니다. 목록에는 보이지만 "+
+       "서버가 <b>자기 물건을 자기가 사는 것</b>으로 보고 거절할 수 있습니다."+
+       "<br>제대로 시연하려면 한쪽을 <b>시크릿 창</b>이나 <b>다른 브라우저</b>에서 여세요.</div>";
+  }
+  if(d.total>0&&d.shown===0){
+    h+="<div class='why' style='margin-top:9px'>⚠ 서버에는 거래가 있는데 하나도 보이지 않습니다. "+
+       "위 항목에서 몇 건이 어디로 빠졌는지 확인하세요. "+
+       (d.sameBiome>0?"<b>같은 기후끼리는 무역 상대가 아닙니다</b> — 서로 다른 대륙을 골랐는지 보세요.":"")+"</div>";
+  }
+  if(d.total===0){
+    h+="<div class='why' style='margin-top:9px'>⚠ 이 방(<b>"+esc(d.room)+"</b>)에 올라온 거래가 하나도 없습니다. "+
+       "친구와 <b>방 코드가 같은지</b> 확인하세요. 방이 다르면 서로의 물건이 보이지 않습니다.</div>";
+  }
+  return h+"</div>";
+}
 function uiTrade(){
   var h="";
   var online=Market&&Market.online;
@@ -3717,7 +3800,10 @@ function uiTrade(){
       :(online?
       "여섯 대륙의 실제 친구들과 같은 거래소를 공유합니다. 올린 물건은 DB에 저장되어 다른 대륙 친구에게 실시간으로 보입니다."
       :"백엔드가 연결되지 않아 오프라인 거래소로 동작합니다(같은 기기의 다른 탭끼리는 실시간 동기화). 아래에서 글로벌 거래소를 켤 수 있습니다."))+
-    "</div></div></div>";
+    "</div>"+
+    "<div style='margin-top:9px'><button class='mini' onclick='toggleDiag()'>"+(diagOpen?"진단 닫기":"🔍 왜 안 보이지? 진단")+"</button></div>"+
+    (diagOpen?diagCard():"")+
+    "</div></div>";
 
   /* 들어온 제안 (AI + 실 플레이어) */
   h+="<div class='sec'><h3>들어온 거래 제안 <span class='sm'>다른 대륙</span></h3>";
@@ -3725,8 +3811,14 @@ function uiTrade(){
   S.offers.forEach(function(o){
     var ok=canPay(S,o.want),gk=Object.keys(o.give)[0];
     var tag=o.ai?"🤖 상인":"🧑 "+esc(o.name||"친구");
+    /* [V7.1] 같은 브라우저(같은 익명 계정)에서 올라온 것은 미리 표시해 둔다.
+       눌러 보고 실패하는 것보다, 누르기 전에 아는 편이 낫다. */
+    var myUid=null;try{myUid=Auth.uid()}catch(e){}
+    var self=!o.ai&&myUid&&o.owner&&o.owner===myUid;
     h+="<div class='card'><div style='font-family:var(--m);font-size:10px;color:"+(BIOMES[o.from]?BIOMES[o.from].c:"var(--ink3)")+"'>"+
-      tag+" · "+bN(o.from)+" 대륙</div><div class='rw' style='margin-top:7px;flex-wrap:wrap'>"+
+      tag+" · "+bN(o.from)+" 대륙"+
+      (self?" <span style='color:var(--warn)'>· ⚠ 같은 계정(같은 브라우저)</span>":"")+
+      "</div><div class='rw' style='margin-top:7px;flex-wrap:wrap'>"+
       "<span class='chip t"+iT(gk)+"'>"+bagLine(o.give)+"</span><span style='color:var(--ink3)'>받고 →</span>"+
       "<span class='chip "+(ok?"ok":"no")+"'>"+bagLine(o.want)+"</span><span style='flex:1'></span>"+
       "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+esc(String(o.id))+"')\""+(ok?"":" disabled")+">거래</button></div></div>";
@@ -4160,7 +4252,13 @@ function askReset(){
     "<div class='rw' style='margin-top:10px'><button class='mini acc' onclick='doReset()'>네, 처음부터</button>"+
     "<button class='mini' onclick='drawPanel()'>아니요</button></div></div>";
 }
-function doReset(){try{localStorage.removeItem(SAVE)}catch(e){}location.reload()}
+function doReset(){
+  try{
+    localStorage.removeItem(SAVE);
+    allSlots().forEach(function(x){try{localStorage.removeItem(x.key)}catch(e){}});
+  }catch(e){}
+  location.reload();
+}
 function winScreen(){
   openPanel("record");
   setTimeout(function(){
@@ -4245,22 +4343,41 @@ function exitToTitle(){
    addEventListener 대신 onclick 을 쓴다 — 여러 번 불려도 핸들러가 겹치지 않는다. */
 function setupContinue(){
   var c=$("cont");if(!c)return;
-  var sv=loadSave();
-  if(!sv){c.classList.add("hide");c.onclick=null;return}
+  var slots=allSlots();
+  if(!slots.length){c.classList.add("hide");c.onclick=null;renderSlotList([]);return}
+  var sv=normalizeSave(slots[0].s);
+  if(!sv){c.classList.add("hide");c.onclick=null;renderSlotList([]);return}
   c.classList.remove("hide");c.disabled=false;
   c.textContent="이어서 하기 — "+sv.name+" · "+bN(sv.biome)+" "+sv.day+"일차";
   if(sv.room){var rm=$("s_room");if(rm)rm.value=sv.room}
-  c.onclick=function(){
-    S=sv;document.body.dataset.b=S.biome;
-    /* 온라인이면 이어서 할 때도 방 참가를 먼저 등록한다(월드 저장 권한의 근거) */
-    if(CloudSvc&&CloudSvc.online&&S.room){
-      c.disabled=true;
-      CloudSvc.joinRoom(S.room,S.name,S.biome,function(jerr){
-        if(jerr==="name_taken")toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
-        beginWorld(true);
-      });
-    }else beginWorld(true);
-  };
+  c.onclick=function(){resumeSave(sv,c)};
+  renderSlotList(slots.slice(1));       // 나머지 저장도 고를 수 있게
+}
+/* [V7.1] 같은 기기에 저장이 여러 개면(창 두 개로 시연했을 때) 모두 보여 준다 */
+function renderSlotList(rest){
+  var box=$("slots");if(!box)return;
+  if(!rest||!rest.length){box.innerHTML="";box.classList.add("hide");return}
+  box.classList.remove("hide");
+  box.innerHTML="<div class='slotcap'>이 기기의 다른 저장</div>"+rest.map(function(x,i){
+    return "<button class='slotbtn' data-i='"+i+"'>"+esc(x.s.name)+" · "+bN(x.s.biome)+" "+(x.s.day||1)+"일차</button>";
+  }).join("");
+  Array.prototype.forEach.call(box.querySelectorAll(".slotbtn"),function(b){
+    b.onclick=function(){
+      var sv=normalizeSave(rest[+b.dataset.i].s);
+      if(sv)resumeSave(sv,b);
+    };
+  });
+}
+function resumeSave(sv,btn){
+  S=sv;document.body.dataset.b=S.biome;
+  /* 온라인이면 이어서 할 때도 방 참가를 먼저 등록한다(월드 저장 권한의 근거) */
+  if(CloudSvc&&CloudSvc.online&&S.room){
+    if(btn)btn.disabled=true;
+    CloudSvc.joinRoom(S.room,S.name,S.biome,function(jerr){
+      if(jerr==="name_taken")toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
+      beginWorld(true);
+    });
+  }else beginWorld(true);
 }
 function newState(name,biome,seed){
   return{ver:VER,name:name,biome:biome,seed:seed,
@@ -4313,33 +4430,73 @@ function cloudSaveWorld(force,cb){
     });
   });
 }
+/* ==========================================================================
+   [V7.1] 저장 슬롯 — 창을 두 개 띄워도 서로 덮어쓰지 않게
+   --------------------------------------------------------------------------
+   예전에는 저장 자리가 "sixcont5_v5" 하나뿐이었다. 그런데 교실 시연에서는
+   한 컴퓨터에 온대 창·건조 창을 나란히 띄운다. 두 창이 같은 localStorage 를
+   쓰므로 나중에 저장한 쪽이 앞 쪽을 통째로 덮어썼다 — 한쪽 학생의 진행이
+   소리 없이 사라지는 것이다.
+   이제 (방 코드 + 이름) 마다 자리를 따로 쓰고, '이어서 하기'는 가장 최근에
+   저장된 자리를 집는다. 예전 저장은 처음 한 번 자기 자리로 옮겨 준다.
+   ========================================================================== */
+function slotKey(name,room){return SAVE+"::"+(room||DEFAULT_ROOM)+"::"+(name||"")}
+function allSlots(){
+  var out=[];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(!k||k.indexOf(SAVE+"::")!==0)continue;
+      var s=null;try{s=JSON.parse(localStorage.getItem(k))}catch(e){}
+      if(s&&s.ver===VER&&BIOMES[s.biome])out.push({key:k,s:s,at:s.seen||0});
+    }
+  }catch(e){}
+  out.sort(function(a,b){return b.at-a.at});
+  return out;
+}
+/* 예전 단일 저장을 제 자리로 옮긴다(한 번만) */
+function migrateLegacySave(){
+  try{
+    var r=localStorage.getItem(SAVE);if(!r)return;
+    var s=JSON.parse(r);
+    if(s&&s.ver===VER&&BIOMES[s.biome]){
+      var k=slotKey(s.name,s.room);
+      if(!localStorage.getItem(k))localStorage.setItem(k,r);
+    }
+    localStorage.removeItem(SAVE);
+  }catch(e){}
+}
 function save(){
   if(!S)return;
   if(S.isVisiting)return;                           // 관전 중에는 저장하지 않음
   S.yaw=look.yaw;S.pitch=look.pitch;S.seen=Date.now();
-  try{localStorage.setItem(SAVE,JSON.stringify(S))}catch(e){}
+  try{localStorage.setItem(slotKey(S.name,S.room),JSON.stringify(S))}catch(e){}
+}
+function normalizeSave(s){
+  if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
+  if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
+  if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
+  if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
+  if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
+  if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
+  if(!s.dur)s.dur={};                                  // [V7] 도구 내구도
+  /* [V7 수정 5] 저장에 남아 있던 '남의 거래' 카드는 버린다.
+     그 거래는 내가 껐다 켜는 사이에 이미 팔렸거나 만료됐을 가능성이 크고,
+     그걸 누르면 곧바로 '거래 실패'가 떴다. AI 상인 제안만 이어받는다. */
+  s.offers=s.offers.filter(function(o){return o&&o.ai});
+  s.isVisiting=false;if(!s.room)s.room=marketRoom();
+  /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
+  s.pending=s.pending.filter(function(p){
+    if(p.code&&!p.sold){for(var k in p.give)s.inv[k]=(s.inv[k]||0)+p.give[k];return false}
+    delete p.code;delete p.codeText;return true;
+  });
+  return s;
 }
 function loadSave(){
-  try{var r=localStorage.getItem(SAVE);if(!r)return null;var s=JSON.parse(r);
-    if(!(s&&s.ver===VER&&BIOMES[s.biome]))return null;
-    if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
-    if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
-    if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
-    if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
-    if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
-    if(!s.dur)s.dur={};                                  // [V7] 도구 내구도
-    /* [V7 수정 5] 저장에 남아 있던 '남의 거래' 카드는 버린다.
-       그 거래는 내가 껐다 켜는 사이에 이미 팔렸거나 만료됐을 가능성이 크고,
-       그걸 누르면 곧바로 '거래 실패'가 떴다. AI 상인 제안만 이어받는다. */
-    s.offers=s.offers.filter(function(o){return o&&o.ai});
-    s.isVisiting=false;if(!s.room)s.room=marketRoom();
-    /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
-    s.pending=s.pending.filter(function(p){
-      if(p.code&&!p.sold){for(var k in p.give)s.inv[k]=(s.inv[k]||0)+p.give[k];return false}
-      delete p.code;delete p.codeText;return true;
-    });
-    return s;
-  }catch(e){return null}
+  migrateLegacySave();
+  var slots=allSlots();
+  if(!slots.length)return null;
+  try{return normalizeSave(slots[0].s)}catch(e){return null}
 }
 function catchUp(){
   var gap=Math.min((Date.now()-(S.seen||Date.now()))/1000,4*3600);
