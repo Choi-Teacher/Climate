@@ -191,6 +191,27 @@ summary:hover{color:var(--ink2)}
 #tabs button .lab{position:absolute;bottom:1px;left:0;right:0;font-size:8px;color:var(--ink3)}
 #tabs button .n{position:absolute;top:-4px;right:-4px;background:var(--bad);color:#fff;font-family:var(--m);
   font-size:9px;border-radius:999px;padding:0 4px;font-weight:700}
+/* [V7] 나가기 버튼 — 다른 탭과 헷갈리지 않게 붉은 계열로 떼어 둔다 */
+#tabs button.exit{margin-top:6px;border-color:#57303a;color:#f0a9a9;background:#1a1219e6}
+#tabs button.exit:hover{border-color:var(--bad);color:#ffd0d0}
+@media(max-height:460px) and (orientation:landscape){#tabs button.exit{margin-top:0;margin-left:6px}}
+/* [V7] 확인 창 — 실수로 눌러도 되돌릴 수 있게 한 번 더 묻는다 */
+#confirm{position:fixed;inset:0;z-index:60;background:#060a0ed6;backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:16px}
+.cbox{width:100%;max-width:420px;background:#141d26;border:1px solid var(--line2);border-radius:16px;
+  padding:22px 20px 18px;box-shadow:0 24px 60px #000a;animation:pop .18s ease-out}
+@keyframes pop{from{opacity:0;transform:scale(.96)}}
+.cbox h3{font-size:19px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.cbox p{font-size:13px;color:var(--ink2);line-height:1.65;margin-top:11px}
+.cbox .who{display:flex;flex-wrap:wrap;gap:6px;margin-top:13px}
+.cbox .crow{display:flex;gap:9px;margin-top:20px}
+.cbox .crow button{flex:1;border-radius:11px;padding:13px 10px;font-weight:800;font-size:14.5px;
+  border:1px solid var(--line2);color:var(--ink);transition:filter .15s,border-color .15s}
+.cbox .crow button.no{background:#1b2733}
+.cbox .crow button.no:hover{border-color:var(--accent)}
+.cbox .crow button.yes{background:var(--bad);border-color:var(--bad);color:#fff}
+.cbox .crow button.yes:hover{filter:brightness(1.1)}
+.cbox .crow button:disabled{opacity:.55;cursor:progress}
 /* 모바일 조작 */
 #touch{position:absolute;inset:0;pointer-events:none}
 #stick{position:absolute;left:calc(16px + env(safe-area-inset-left));bottom:calc(76px + env(safe-area-inset-bottom));
@@ -433,6 +454,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
     <button data-p="record" title="기록 (R)">🏅<span class="lab">기록</span></button>
     <button data-p="edu" title="학습 (G)">📚<span class="lab">학습</span></button>
     <button data-p="help" title="도움말 (H)">❓<span class="lab">도움</span></button>
+    <button id="bExit" class="exit" title="게임 나가기">🚪<span class="lab">나가기</span></button>
   </div>
   <div id="hotbar"></div>
   <div id="touch" class="hide">
@@ -552,6 +574,16 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
       <p class="note">선생님 계정은 <b>Authentication → Users → Add user</b>에서 이메일·비밀번호로 하나 만들면 됩니다.
       이 계정으로 로그인해야 명단을 저장하고 학생 데이터를 정리할 수 있습니다.</p>
     </details>
+  </div>
+</div></div>
+
+<div id="confirm" class="hide"><div class="cbox" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+  <h3 id="cTitle">🚪 정말로 나가시겠습니까?</h3>
+  <p id="cMsg"></p>
+  <div class="who" id="cWho"></div>
+  <div class="crow">
+    <button class="no" id="cNo">아니요, 계속하기</button>
+    <button class="yes" id="cYes">네, 나가기</button>
   </div>
 </div></div>
 
@@ -721,6 +753,28 @@ function sbJson(url,opts){
     });
   });
 }
+/* ---- [V7 수정 1] uid 를 '기다렸다가' 몸통을 만든다 --------------------------
+   [무엇이 문제였나 — 거래 실패의 진짜 원인]
+   예전 코드는 이렇게 썼다.
+
+       var row=offerToRow(o); row.owner=Auth.uid();   // ← 여기!
+       sbJson(this.base,{method:"POST", body:...})    // ← 로그인은 이 안에서 일어남
+
+   Auth.uid() 는 '지금 이 순간' 세션이 있어야 값을 준다. 그런데 실제 로그인
+   (익명 가입)은 그 다음 줄 sbFetch 안의 Auth.ensure() 에서 비로소 일어난다.
+   즉 접속 직후 처음 거래를 걸면 owner 에 null 이 담긴 채로 서버에 올라갔다.
+
+   그러면 서버(RLS)는 "owner = auth.uid() 인 행만 넣을 수 있다"는 규칙에 걸려
+   등록을 거부하거나(등록 실패), 어쩌다 들어가더라도 owner 가 null 이라
+     · accept_offer 가 "내 것이 아닌 열린 거래"를 못 찾아 0행을 돌려주고 → 거래 실패
+     · myTaken 의 owner=eq.<내 uid> 조회에 영영 걸리지 않아 → 판 대금도 못 받는다
+   같은 실수가 joinRoom·savePlayer 에도 있었다(방 참가·클라우드 세이브 실패의 원인).
+
+   그래서 uid 가 필요한 요청은 전부 이 헬퍼를 거치게 했다. 세션을 먼저 확보하고,
+   그 uid 로 몸통을 만든 다음 요청한다. */
+function withUid(build){
+  return Auth.ensure().then(function(){ return build(Auth.uid()); });
+}
 /* ==========================================================================
    여섯 대륙 — 기후와 무역 (3D 복셀) · 단일 파일
    Part 1. 데이터
@@ -842,8 +896,51 @@ var ITEMS={
  power:{n:"전력",em:"⚡",tier:3,val:12},
  tradepost:{n:"무역소",em:"⚖️",tier:2,val:8},
  well:{n:"우물",em:"🪣",tier:2,val:5},
- monument:{n:"기념비",em:"🗽",tier:3,val:99}
+ monument:{n:"기념비",em:"🗽",tier:3,val:99},
+ /* ---- 도구 ----------------------------------------------------------------
+    맨손으로 하나하나 캐는 대신, 알맞은 도구를 쓰면 빠르고 힘도 덜 든다.
+    수업과 이어지는 지점: 철(iron)은 고산에서만 나는 광물이라, 가장 좋은
+    '철 도구'를 쓰려면 반드시 다른 대륙과 무역해야 한다.                     */
+ pick_wood:{n:"나무 곡괭이",em:"⛏️",tier:2,val:3.5,tool:true},
+ axe_wood:{n:"나무 도끼",em:"🪓",tier:2,val:3.5,tool:true},
+ shovel_wood:{n:"나무 삽",em:"🥄",tier:2,val:2.6,tool:true},
+ pick_stone:{n:"돌 곡괭이",em:"⛏️",tier:2,val:6,tool:true},
+ axe_stone:{n:"돌 도끼",em:"🪓",tier:2,val:6,tool:true},
+ shovel_stone:{n:"돌 삽",em:"🥄",tier:2,val:4.6,tool:true},
+ pick_iron:{n:"철 곡괭이",em:"⛏️",tier:3,val:14,tool:true},
+ axe_iron:{n:"철 도끼",em:"🪓",tier:3,val:14,tool:true},
+ shovel_iron:{n:"철 삽",em:"🥄",tier:3,val:11,tool:true}
 };
+
+/* ==========================================================================
+   [V7 추가] 도구 — 마인크래프트식 곡괭이·도끼·삽
+   --------------------------------------------------------------------------
+   · kind  : 어떤 종류인가(곡괭이/도끼/삽) — 잘 듣는 블록 묶음이 다르다
+   · speed : 맞는 블록을 캘 때 몇 배 빨라지는가
+   · save  : 기력(스태미나) 소모가 몇 분의 1로 줄어드는가
+   · dur   : 몇 번 캘 수 있는가(내구도). 다 닳으면 부러진다.
+   맞지 않는 블록(예: 삽으로 돌)에는 보너스가 없다 — 도구를 '고르는' 재미를 남긴다.
+   도구는 자동으로 가장 좋은 것이 골라진다. 초등학생이 장비 교체에 헤매지 않도록.
+   ========================================================================== */
+var TOOL_KIND={
+  pick  :{n:"곡괭이",em:"⛏️",for:"돌·광물",  blocks:{3:1,10:1,11:1,12:1,13:1,14:1,15:1,9:1,31:1,33:1,34:1,32:1,44:1,35:1,36:1}},
+  axe   :{n:"도끼",  em:"🪓",for:"나무·덤불",blocks:{6:1,7:1,16:1,17:1,18:1,19:1,20:1,21:1,22:1,30:1,37:1}},
+  shovel:{n:"삽",    em:"🥄",for:"흙·모래·눈",blocks:{1:1,2:1,4:1,8:1,24:1}}
+};
+var TOOL_MAT={
+  wood :{n:"나무",speed:2.0,save:1.6,dur:60 },
+  stone:{n:"돌",  speed:3.4,save:2.2,dur:170},
+  iron :{n:"철",  speed:6.0,save:3.2,dur:480}
+};
+var TOOLS={};   // { pick_wood:{kind:"pick",mat:"wood",...}, ... }
+(function(){
+  for(var kd in TOOL_KIND)for(var mt in TOOL_MAT){
+    TOOLS[kd+"_"+mt]={key:kd+"_"+mt,kind:kd,mat:mt,
+      speed:TOOL_MAT[mt].speed,save:TOOL_MAT[mt].save,dur:TOOL_MAT[mt].dur};
+  }
+})();
+/* 좋은 순서(같은 종류 안에서) — 자동 선택이 늘 최선을 집도록 */
+var TOOL_RANK={wood:1,stone:2,iron:3};
 function iN(k){return ITEMS[k]?ITEMS[k].n:k}
 function iE(k){return ITEMS[k]?ITEMS[k].em:"❔"}
 function iV(k){return ITEMS[k]?ITEMS[k].val:1}
@@ -1132,7 +1229,20 @@ var RECIPES=[
  {id:"seed_rice",out:{seed_rice:3},need:{rice:1},eff:"쌀로 볍씨 · 온대·열대 물가(논)에 심기"},
  {id:"tradepost",out:{tradepost:1},need:{plank:4,stone:2},eff:"놓으면 그 자리에서 무역할 수 있습니다"},
  {id:"monument",out:{monument:1},need:{power:3,iron:5,glass:3,brick:4,rubber:2,gold:2,spice:2,ice:2,chocolate:1,brew:1},
-  eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"}
+  eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"},
+
+ /* ---- 도구 [V7 추가] ----
+    나무 → 돌 → 철 순으로 좋아진다. 철은 고산에서만 나므로,
+    가장 좋은 도구를 가지려면 반드시 무역을 해야 한다. */
+ {id:"pick_wood",  cat:"tool",out:{pick_wood:1},  need:{plank:3,wood:2}, eff:"⛏️ 돌·광물이 2배 빨리 캐집니다 · 내구도 60"},
+ {id:"axe_wood",   cat:"tool",out:{axe_wood:1},   need:{plank:3,wood:2}, eff:"🪓 나무·덤불이 2배 빨리 캐집니다 · 내구도 60"},
+ {id:"shovel_wood",cat:"tool",out:{shovel_wood:1},need:{plank:2,wood:1}, eff:"🥄 흙·모래·눈이 2배 빨리 캐집니다 · 내구도 60"},
+ {id:"pick_stone",  cat:"tool",out:{pick_stone:1},  need:{stone:3,plank:2},eff:"⛏️ 3.4배 · 내구도 170 · 기력도 훨씬 덜 듭니다"},
+ {id:"axe_stone",   cat:"tool",out:{axe_stone:1},   need:{stone:3,plank:2},eff:"🪓 3.4배 · 내구도 170"},
+ {id:"shovel_stone",cat:"tool",out:{shovel_stone:1},need:{stone:2,plank:1},eff:"🥄 3.4배 · 내구도 170"},
+ {id:"pick_iron",  cat:"tool",out:{pick_iron:1},  need:{iron:3,plank:2},eff:"⛏️ 6배 · 내구도 480 · 철은 고산 대륙에서 옵니다"},
+ {id:"axe_iron",   cat:"tool",out:{axe_iron:1},   need:{iron:3,plank:2},eff:"🪓 6배 · 내구도 480 · 철은 고산 대륙에서 옵니다"},
+ {id:"shovel_iron",cat:"tool",out:{shovel_iron:1},need:{iron:2,plank:1},eff:"🥄 6배 · 내구도 480 · 철은 고산 대륙에서 옵니다"}
 ];
 var TITLES=[
  {id:"first_trade",n:"첫 거래",d:"거래 1회",f:function(s){return s.stat.trades>=1}},
@@ -1883,8 +1993,30 @@ function teachOnce(key,msg){
 }
 
 function clamp(v,a,b){return v<a?a:v>b?b:v}
+/* [V7] 한국어 조사 자동 선택 — "곡괭이이(가)" 같은 어색한 문장을 막는다.
+   받침이 있으면 앞의 것, 없으면 뒤의 것을 붙인다. josa("곡괭이","이","가") → "곡괭이가" */
+function hasJong(w){
+  w=String(w);var c=w.charCodeAt(w.length-1);
+  if(c<0xAC00||c>0xD7A3)return true;             // 한글이 아니면 받침 있는 쪽으로
+  return (c-0xAC00)%28!==0;
+}
+function josa(w,withJong,noJong){return w+(hasJong(w)?withJong:noJong)}
 function ri(a,b){return a+Math.floor(Math.random()*(b-a+1))}
-function uuid(){return (Date.now().toString(36)+Math.random().toString(36).slice(2,8))}
+/* [V7 수정 2] 진짜 UUID(v4) 를 만든다.
+   예전 uuid() 는 "mspgs1v816ld9u" 같은 문자열이라, offers.id 열이 Postgres 의
+   uuid 타입이면 등록이 400(invalid input syntax for type uuid)으로 튕겼다. */
+function uuid(){
+  try{ if(crypto&&crypto.randomUUID)return crypto.randomUUID(); }catch(e){}
+  var b=null;
+  try{ b=new Uint8Array(16); crypto.getRandomValues(b); }catch(e){ b=null }
+  if(!b){ b=new Uint8Array(16); for(var i=0;i<16;i++)b[i]=Math.floor(Math.random()*256) }
+  b[6]=(b[6]&0x0f)|0x40; b[8]=(b[8]&0x3f)|0x80;          // version 4 · variant 10
+  var h=[];for(var j=0;j<16;j++)h.push((b[j]+0x100).toString(16).slice(1));
+  return h.slice(0,4).join("")+"-"+h.slice(4,6).join("")+"-"+h.slice(6,8).join("")+
+         "-"+h.slice(8,10).join("")+"-"+h.slice(10,16).join("");
+}
+/* AI 상인처럼 서버에 올리지 않는 임시 id 용(짧아도 되는 것) */
+function localId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
 function qty(s,k){return s.inv[k]||0}
 function add(s,k,n){if(n>0)s.inv[k]=(s.inv[k]||0)+n}
 function take(s,k,n){var h=qty(s,k);if(h<n)return false;s.inv[k]=h-n;if(s.inv[k]<=0)delete s.inv[k];return true}
@@ -1979,6 +2111,82 @@ function raycast(maxD){
   }
   return null;
 }
+/* ==========================================================================
+   [V7 추가] 도구 시스템 런타임
+   --------------------------------------------------------------------------
+   설계 원칙: 초등 6학년이 장비창을 오가지 않게 한다.
+   조준한 블록에 가장 잘 듣는 도구를 게임이 알아서 집는다. 학생이 할 일은
+   "도구를 만든다 / 닳으면 다시 만든다 / 철 도구는 무역으로 재료를 구한다" 뿐이다.
+
+   내구도는 S.dur[도구키] 에 '지금 쓰고 있는 한 자루의 남은 횟수'로 둔다.
+   0 이 되면 그 한 자루가 부러지고(S.inv 에서 1 감소), 남은 자루가 있으면
+   새것으로 자동 교체된다. 창고 표시는 "⛏️ 돌 곡괭이 ×2 · 92/170" 처럼 읽힌다.
+   ========================================================================== */
+function toolMax(k){return TOOLS[k]?TOOLS[k].dur:0}
+/* 내구도 값이 없거나(무역으로 받은 도구) 이상하면 바로잡는다 */
+function syncToolDur(k){
+  if(!S)return 0;
+  if(!S.dur)S.dur={};
+  var have=qty(S,k);
+  if(have<=0){delete S.dur[k];return 0}
+  var mx=toolMax(k);
+  if(typeof S.dur[k]!=="number"||S.dur[k]<=0||S.dur[k]>mx)S.dur[k]=mx;
+  return S.dur[k];
+}
+/* 이 블록에 쓸 수 있는 가장 좋은 도구를 고른다(없으면 null = 맨손) */
+function bestToolFor(blockId){
+  if(!S||!S.inv)return null;
+  var best=null;
+  for(var k in TOOLS){
+    if(qty(S,k)<=0)continue;
+    var t=TOOLS[k];
+    if(!TOOL_KIND[t.kind].blocks[blockId])continue;        // 이 블록엔 안 듣는 종류
+    if(!best||TOOL_RANK[t.mat]>TOOL_RANK[best.mat])best=t;
+  }
+  if(best)syncToolDur(best.key);
+  return best;
+}
+/* 도구를 한 번 쓴다 → 내구도 1 감소, 다 닳으면 부러진다 */
+function useTool(t){
+  if(!t)return;
+  var k=t.key;
+  syncToolDur(k);
+  S.dur[k]-=1;
+  if(S.dur[k]<=0){
+    take(S,k,1);
+    delete S.dur[k];
+    if(qty(S,k)>0){
+      syncToolDur(k);
+      toast("🔧 "+josa(iN(k),"이","가")+" 부러져 새것으로 바꿨습니다","warn");
+    }else{
+      toast("💥 "+josa(iN(k),"이","가")+" 부러졌습니다. 가방에서 다시 만드세요","bad");
+      teachOnce("toolbreak","🔧 도구는 <b>쓸수록 닳습니다</b>. 나무 → 돌 → <b>철</b> 순으로 오래 가는데, 철은 <b>고산 대륙</b>에서만 나는 광물이라 다른 기후에서는 <b>무역</b>으로 구해야 합니다.");
+    }
+    refreshHotbar();
+    if(panelTab==="bag")drawPanel();
+  }else if(S.dur[k]===Math.ceil(toolMax(k)*0.15)){
+    toast("⚠ "+josa(iN(k),"이","가")+" 거의 다 닳았습니다","warn");
+  }
+}
+/* 도구가 이 블록에서 내는 속도 배수 / 기력 절약 배수 */
+function toolSpeed(t,blockId){
+  return (t&&TOOL_KIND[t.kind].blocks[blockId])?t.speed:1;
+}
+function toolSave(t,blockId){
+  return (t&&TOOL_KIND[t.kind].blocks[blockId])?t.save:1;
+}
+/* 가진 도구 목록(창고·HUD 표시용) */
+function myTools(){
+  var out=[];
+  for(var k in TOOLS)if(qty(S,k)>0){syncToolDur(k);out.push(k)}
+  out.sort(function(a,b){
+    var ka=TOOLS[a],kb=TOOLS[b];
+    var ord={pick:0,axe:1,shovel:2};
+    return (ord[ka.kind]-ord[kb.kind])||(TOOL_RANK[kb.mat]-TOOL_RANK[ka.mat]);
+  });
+  return out;
+}
+
 /* --- 캐기 --- */
 /* [V6 수정 2] Target Lock: 채집 중 마우스가 미세하게 흔들려 조준이 잠깐 빗나가도
    진행도를 즉시 버리지 않고 MINE_TOLER(0.3초) 동안 기존 대상을 붙잡아 둔다.
@@ -2001,7 +2209,11 @@ function tryMine(dt){
     /* 진행 중인 채집이 없으면 새로 시작(유효 대상이 있을 때만) */
     if(!aimKey){return}
     if(S.stam<3){toast("스태미나가 없습니다. 잠시 쉬세요","bad");return}
-    mining={key:aimKey,t:0,need:aimB.hard*(1+(mod-1)*.5),grace:0};
+    /* [V7] 조준한 블록에 가장 잘 듣는 도구를 자동으로 집는다 */
+    var tl=bestToolFor(target.b);
+    mining={key:aimKey,t:0,
+      need:aimB.hard*(1+(mod-1)*.5)/toolSpeed(tl,target.b),
+      tool:tl?tl.key:null,grace:0};
   }else if(aimKey===mining.key){
     /* 여전히 같은 블록을 조준 → 정상 진행, 유예 타이머 리셋 */
     mining.grace=0;
@@ -2014,9 +2226,12 @@ function tryMine(dt){
 
   if(S.stam<3){toast("스태미나가 없습니다. 잠시 쉬세요","bad");mining=null;return}
   mining.t+=dt;
-  S.stam=clamp(S.stam-aimB.hard*3.2*mod*dt,0,100);
+  var mt=mining.tool?TOOLS[mining.tool]:null;
+  S.stam=clamp(S.stam-aimB.hard*3.2*mod*dt/toolSave(mt,target.b),0,100);   // [V7] 도구를 쓰면 덜 지친다
   if(mining.t>=mining.need){
+    var usedTool=mt;
     breakBlock(target.x,target.y,target.z);
+    if(usedTool&&qty(S,usedTool.key)>0)useTool(usedTool);                  // [V7] 내구도 1 소모
     mining=null;
   }
 }
@@ -2068,6 +2283,8 @@ var STAM_PER_LOG=2.2, STAM_PER_LEAF=0.5;
 function chainBreakTree(sx,sy,sz){
   var TREE={6:1,7:1,22:1};
   var seen={}, stack=[], broke=0, MAX=400, stoppedByStam=false;
+  /* [V7] 도끼를 들고 있으면 한 그루 통째로 베는 데 드는 기력이 크게 줄어든다 */
+  var axe=bestToolFor(6), save=axe?axe.save:1;
   function push(x,y,z){var k=x+","+y+","+z;if(!seen[k]){seen[k]=1;stack.push([x,y,z])}}
   /* 이 기둥이 땅(흙/풀)까지 통짜 기둥으로 이어져 서 있으면 '뿌리내린 나무'로 보고 보호한다 */
   function rooted(x,y,z){
@@ -2086,7 +2303,7 @@ function chainBreakTree(sx,sy,sz){
     if(!TREE[bb])continue;
     if(bb===6&&rooted(x,y,z))continue;   // 옆에 뿌리내린 다른 나무 기둥은 보호
     /* 이 블록을 부수기 전에 기력 체크 → 부족하면 연쇄 중단 */
-    var cost=(bb===6)?STAM_PER_LOG:STAM_PER_LEAF;
+    var cost=((bb===6)?STAM_PER_LOG:STAM_PER_LEAF)/save;
     if(S.stam<cost){stoppedByStam=true;break}
     S.stam=clamp(S.stam-cost,0,100);
     yieldBlock(x,y,z,bb,BL[bb]);broke++;
@@ -2099,6 +2316,11 @@ function chainBreakTree(sx,sy,sz){
     if(bb===7||bb===22){push(x,y-1,z);push(x+1,y,z);push(x-1,y,z);push(x,y,z+1);push(x,y,z-1)}
   }
   if(stoppedByStam)toast("기력이 부족해 벌목을 멈췄습니다","bad");
+  /* 통나무를 여러 칸 벤 만큼 도끼도 조금 더 닳는다(3칸당 1) */
+  if(axe&&broke>1){
+    var extra=Math.min(4,Math.floor(broke/3));
+    for(var u=0;u<extra&&qty(S,axe.key)>0;u++)useTool(axe);
+  }
 }
 /* --- 놓기 --- */
 function tryPlace(){
@@ -2375,10 +2597,12 @@ function updateRot(dt,rotMod,quiet){
 /* 티어1 생존 자원 위주로 일정 비율을 잃는다. 가공식품/고급재는 지킨다. */
 function applyDeathPenalty(){
   var lost=[];
-  var t1=Object.keys(S.inv).filter(function(k){return S.inv[k]>0&&iT(k)===1});
+  /* [V7] 도구는 절대 잃지 않는다. 애써 만든 도구가 탈진 한 번에 사라지면
+     아이들이 캐기를 그만두게 된다(그리고 도구는 티어2·3이라 원래도 제외 대상이다). */
+  var t1=Object.keys(S.inv).filter(function(k){return S.inv[k]>0&&iT(k)===1&&!TOOLS[k]});
   /* 티어1이 하나도 없으면 가장 흔한 아이템 중 하나를 대신 잃는다 */
   if(!t1.length){
-    var all=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
+    var all=Object.keys(S.inv).filter(function(k){return S.inv[k]>0&&!TOOLS[k]});
     if(all.length)t1=[all.sort(function(a,b){return S.inv[b]-S.inv[a]})[0]];
   }
   t1.forEach(function(k){
@@ -2623,23 +2847,37 @@ function SupabaseMarket(){
 SupabaseMarket.prototype.listOffers=function(room,cb){
   var u=this.base+"?room=eq."+encodeURIComponent(room)+"&status=eq.open&order=ts.desc&limit=60";
   sbJson(u).then(function(rows){
+    marketHealth(true);
     cb(null,(rows||[]).map(rowToOffer));
-  })["catch"](function(e){cb(e)});
+  })["catch"](function(e){marketHealth(false,e);cb(e)});
 };
 SupabaseMarket.prototype.postOffer=function(o,cb){
-  var row=offerToRow(o); row.owner=Auth.uid();
-  sbJson(this.base,{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(row)})
-    .then(function(){cb&&cb(null,o)})["catch"](function(e){cb&&cb(e)});
+  var self=this;
+  /* [V7 수정 1] 로그인이 끝난 뒤에 owner 를 채운다 */
+  withUid(function(uid){
+    var row=offerToRow(o); row.owner=uid;
+    return sbJson(self.base,{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify(row)});
+  }).then(function(){marketHealth(true);cb&&cb(null,o)})
+    ["catch"](function(e){marketHealth(false,e);cb&&cb(e)});
 };
 SupabaseMarket.prototype.acceptOffer=function(id,taker,cb){
   /* 서버 함수가 open 상태일 때만 taken 으로 바꾼다(먼저 누른 사람이 이김).
      남의 행을 직접 수정할 권한이 없으므로 동시성도 서버 한 곳에서만 판정된다. */
-  sbJson(SUPABASE_URL+"/rest/v1/rpc/accept_offer",{method:"POST",
-    body:JSON.stringify({p_id:id,p_taker:taker})
-  }).then(function(rows){
-    if(!rows||!rows.length){cb&&cb("taken");return}
-    cb&&cb(null,rowToOffer(rows[0]));
-  })["catch"](function(e){cb&&cb(e)});
+  withUid(function(){
+    return sbJson(SUPABASE_URL+"/rest/v1/rpc/accept_offer",{method:"POST",
+      body:JSON.stringify({p_id:id,p_taker:taker})});
+  }).then(function(res){
+    marketHealth(true);
+    /* [V7 수정 3] 응답 모양을 가리지 않는다.
+       accept_offer 가 `returns setof offers` 면 배열, `returns offers` 면 객체 하나가 온다.
+       예전 코드는 배열만 가정해서(rows.length) 객체가 오면 성공을 '이미 팔림'으로
+       오해하고 거래를 취소해 버렸다. */
+    var row=null;
+    if(res&&res.length!==undefined)row=res.length?res[0]:null;
+    else if(res&&typeof res==="object")row=res;
+    if(!row){cb&&cb("taken");return}
+    cb&&cb(null,rowToOffer(row));
+  })["catch"](function(e){marketHealth(false,e);cb&&cb(e)});
 };
 SupabaseMarket.prototype.cancelOffer=function(id,owner,cb){
   /* 내 것만 지워진다 — 조건은 서버 규칙(owner = auth.uid())이 최종 판단한다 */
@@ -2648,19 +2886,52 @@ SupabaseMarket.prototype.cancelOffer=function(id,owner,cb){
 };
 SupabaseMarket.prototype.myTaken=function(owner,room,cb){
   var self=this;
-  var u=this.base+"?room=eq."+encodeURIComponent(room)+"&owner=eq."+encodeURIComponent(Auth.uid()||"")+
-        "&status=eq.taken&claimed=eq.false";
-  sbJson(u).then(function(rows){
+  /* [V7 수정 1] uid 없이 owner=eq. 로 물어보면 PostgREST 가 400 을 낸다 → 판 대금이 영영 안 들어옴 */
+  withUid(function(uid){
+    if(!uid)return [];
+    var u=self.base+"?room=eq."+encodeURIComponent(room)+"&owner=eq."+encodeURIComponent(uid)+
+          "&status=eq.taken&claimed=eq.false";
+    return sbJson(u);
+  }).then(function(rows){
     rows=rows||[]; if(!rows.length){cb(null,[]);return}
     var ids=rows.map(function(r){return '"'+r.id+'"'}).join(",");
     sbFetch(self.base+"?id=in.("+ids+")",{method:"PATCH",body:JSON.stringify({claimed:true})})
       .then(function(){cb(null,rows.map(rowToOffer))})["catch"](function(){cb(null,rows.map(rowToOffer))});
   })["catch"](function(e){cb(e)});
 };
+/* ---- [V7 수정 4] 거래소 실제 연결 상태 -------------------------------------
+   예전에는 "설정이 supabase 면 온라인"이라고 표시했다. 서버가 죽어 있어도 화면에는
+   '🌐 온라인'이라 적혀 있으니, 아무것도 안 되는데 왜 안 되는지 알 길이 없었다.
+   이제는 실제 요청의 성패를 기록해 화면과 진단 문구에 그대로 보여준다. */
+var MarketNet={ok:null,err:"",errAt:0,at:0};
+function marketHealth(ok,e){
+  MarketNet.ok=!!ok; MarketNet.at=Date.now();
+  if(!ok&&e){
+    MarketNet.err=marketErrText(e); MarketNet.errAt=Date.now();
+    try{console.warn("[거래소]",e&&e.status,e&&e.message)}catch(x){}
+  }
+}
+/* 최근 2분 안에 난 오류만 화면에 남긴다 — 읽기는 되는데 '거래 수락'만 막히는
+   경우(권한 규칙 누락)를 선생님이 바로 알아볼 수 있게 하기 위한 것이다. */
+function marketRecentErr(){
+  return (MarketNet.err&&Date.now()-MarketNet.errAt<120000)?MarketNet.err:"";
+}
+/* 서버가 준 오류를 교실에서 알아볼 수 있는 말로 바꾼다 */
+function marketErrText(e){
+  if(!e)return "알 수 없는 오류";
+  if(typeof e==="string")return e;
+  var s=e.status||0, m=e.message||"";
+  if(s===401)return "로그인이 풀렸습니다(401). 새로고침해 보세요.";
+  if(s===403)return "서버 권한 규칙에 막혔습니다(403). schema.sql 의 offers 정책을 확인하세요.";
+  if(s===404)return "서버에 offers 표나 accept_offer 함수가 없습니다(404). schema.sql 을 실행했는지 확인하세요.";
+  if(s===400)return "요청 형식이 서버와 맞지 않습니다(400). "+m;
+  if(!s)return "서버에 닿지 못했습니다(네트워크·학교망 차단). "+m;
+  return "HTTP "+s+" "+m;
+}
 function offerToRow(o){return{id:o.id,room:o.room,biome:o.from,trader:o.name,give:o.give,want:o.want,
   status:o.status||"open",taker:o.taker||null,claimed:!!o.claimed}}
 function rowToOffer(r){return{id:r.id,room:r.room,from:r.biome,name:r.trader,give:r.give,want:r.want,
-  status:r.status,taker:r.taker,claimed:r.claimed,ts:r.ts?Date.parse(r.ts):Date.now()}}
+  status:r.status,taker:r.taker,claimed:r.claimed,owner:r.owner,ts:r.ts?Date.parse(r.ts):Date.now()}}
 
 /* ---- 현재 활성 어댑터 선택 ---- */
 var Market=null;
@@ -2746,10 +3017,12 @@ Cloud.prototype.deleteRosterRow=function(room,name,cb){
    worlds·offers 읽기 권한이 이 행을 근거로 판정되므로, 월드를 불러오기 전에 반드시 먼저 부른다.
    inv·stat·pos 는 보내지 않으므로 기존 저장 내용은 그대로 남는다(보낸 열만 갱신됨). */
 Cloud.prototype.joinRoom=function(room,name,biome,cb){
-  var body=[{room:room,name:name,biome:biome,owner:Auth.uid()}];
-  sbFetch(this._rest("players"),{method:"POST",
-    headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
-    body:JSON.stringify(body)
+  var self=this;
+  withUid(function(uid){                                   /* [V7 수정 1] */
+    var body=[{room:room,name:name,biome:biome,owner:uid}];
+    return sbFetch(self._rest("players"),{method:"POST",
+      headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify(body)});
   }).then(function(r){
     if(r.ok){cb&&cb(null);return}
     /* 403 = 같은 방에 같은 이름이 이미 다른 기기 소유로 존재 */
@@ -2770,11 +3043,15 @@ Cloud.prototype.loadWorld=function(room,biome,cb){
 };
 /* --- players: 개인 인벤토리·스탯·마지막 위치를 (room,name) 로 저장 --- */
 Cloud.prototype.savePlayer=function(room,rec,cb){
-  var body=[{room:room,name:rec.name,biome:rec.biome,inv:rec.inv,stat:rec.stat,pos:rec.pos,day:rec.day,
-             owner:Auth.uid()}];
-  sbFetch(this._rest("players"),{method:"POST",
-    headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
-    body:JSON.stringify(body)
+  var self=this;
+  withUid(function(uid){                                   /* [V7 수정 1] */
+    /* 도구 내구도(dur)는 새 열을 만들지 않고 기존 stat(jsonb) 안에 얹어 보낸다.
+       → 이미 배포된 schema.sql 을 고치지 않아도 그대로 동작한다. */
+    var body=[{room:room,name:rec.name,biome:rec.biome,inv:rec.inv,stat:rec.stat,pos:rec.pos,day:rec.day,
+               owner:uid}];
+    return sbFetch(self._rest("players"),{method:"POST",
+      headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify(body)});
   }).then(function(r){cb&&cb(r.ok?null:"http "+r.status)})["catch"](function(e){cb&&cb(e)});
 };
 Cloud.prototype.loadPlayer=function(room,name,cb){
@@ -2963,9 +3240,13 @@ function onNetEvent(event,p){
 }
 /* 원격 블록 변경 적용: edits 갱신 + 청크 재빌드(설치=blockId>0, 캐기=0) */
 function applyRemoteEdit(x,y,z,b){
+  if(!S||!world)return;
   if(!inW(x,y,z))return;
   setB(x,y,z,b);
-  S.edits[x+","+y+","+z]=b;
+  /* [V7 수정 9] 구경(관전) 중에는 임시 상태를 건드리지 않는다.
+     예전엔 남의 월드를 보는 동안 들어온 변경이 임시 S.edits 에 쌓였고,
+     복귀할 때 그 흔적이 섞여 내 월드가 이상해질 수 있었다. */
+  if(!S.isVisiting)S.edits[x+","+y+","+z]=b;
   markDirty(x,z);
 }
 /* [V5 수정 2] 블록 변경을 즉시 쏘지 않고 버퍼에 모았다가 배치로 전송한다.
@@ -3037,7 +3318,7 @@ function mkOffer(){
   var gn=ri(2,5),fair=.85+Math.random()*.5;
   var wn=Math.max(1,Math.round(iV(give)*gn/iV(want)*fair));
   var g={},w={};g[give]=gn;w[want]=wn;
-  return{id:"ai_"+uuid().slice(0,8),ai:true,from:from,name:AI_NAMES[from][Math.floor(Math.random()*3)],give:g,want:w,age:0};
+  return{id:"ai_"+localId(),ai:true,from:from,name:AI_NAMES[from][Math.floor(Math.random()*3)],give:g,want:w,age:0};
 }
 /* AI 상인은 오프라인/온라인 상관없이 시장을 마르지 않게 하는 보조 역할.
    온라인일 때는 빈도를 낮춰 실제 플레이어 거래가 우선되게 한다. */
@@ -3075,35 +3356,61 @@ function aiTrade(dt,quiet){
       }
     });
   }
-  /* 온라인이면 주기적으로 거래소 폴링 */
-  if(Market&&Market.online){pollAcc+=dt;if(pollAcc>=6){pollAcc=0;pollMarket()}}
+  /* [V7 수정 8] 오프라인(로컬 거래소)에서도 주기적으로 목록을 새로 읽는다.
+     예전엔 온라인일 때만 폴링해서, 오프라인 시연 중에는 이미 팔리거나 사라진
+     거래 카드가 화면에 계속 남아 있었고 그걸 누르면 '거래 실패'가 떴다. */
+  pollAcc+=dt;
+  if(pollAcc>=(Market&&Market.online?6:4)){pollAcc=0;pollMarket()}
 }
 /* ---- 거래 수락: AI 제안이든 실 플레이어 글로벌 제안이든 동일 경로 ----
    S.offers 에는 AI 제안(o.ai=true)과 글로벌 거래소 제안이 함께 들어온다. */
+var acceptBusy=false;                          // [V7] 같은 거래를 두 번 누르는 것 방지
 function acceptOffer(id){
   var o=null;S.offers.forEach(function(x){if(x.id===id)o=x});
-  if(!o)return;
+  if(!o){                                      /* [V7 수정 5] 이미 사라진 카드를 눌렀을 때 */
+    toast("이 거래는 이미 사라졌습니다","bad");pollMarket();drawPanel();return;
+  }
   if(!canPay(S,o.want)){toast("내줄 물건이 부족합니다","bad");return}
 
   if(o.ai){                                   // AI 상인: 즉시 정산
     settleBuy(o);return;
   }
+  if(acceptBusy){toast("앞의 거래를 처리하는 중입니다");return}
   /* 실제 플레이어 글로벌 제안: 서버에 '내가 가져간다'고 예약(동시성 처리) */
+  acceptBusy=true;
   toast("거래 확인 중…");
   Market.acceptOffer(o.id,S.name+"("+S.biome+")",function(err,taken){
+    acceptBusy=false;
     if(err){
-      toast(err==="taken"?"방금 다른 사람이 가져갔습니다":"거래 연결에 실패했습니다","bad");
+      /* [V7 수정 6] "왜" 실패했는지 알려준다. 예전엔 원인이 무엇이든
+         '거래 연결에 실패했습니다' 한 줄이라 교실에서 손쓸 방법이 없었다. */
+      if(err==="taken"||err==="gone"){
+        toast(err==="taken"?"방금 다른 사람이 먼저 가져갔습니다":"이 거래는 이미 사라졌습니다","bad");
+      }else{
+        toast("거래 실패 · "+marketErrText(err),"bad");
+      }
       S.offers=S.offers.filter(function(x){return x.id!==o.id});
-      pollMarket();return;
+      drawPanel();pollMarket();return;
     }
-    settleBuy(o);                              // 성공 → 정산
+    /* 서버가 '네 것'이라고 확정해 준 뒤에는 반드시 물건을 넘겨준다 */
+    settleBuy(taken&&taken.give?taken:o,true);
     pollMarket();
   });
 }
-/* 구매 정산: want를 내주고 give를 받는다 */
-function settleBuy(o){
-  if(!canPay(S,o.want)){toast("내줄 물건이 부족합니다","bad");return}
-  payFor(S,o.want);
+/* 구매 정산: want를 내주고 give를 받는다
+   confirmed=true 면 서버가 이미 이 거래를 내 것으로 확정한 상태다. 이때는
+   재료가 모자라더라도 물건을 안 주고 끝내면 안 된다(판 사람은 이미 대금을 받는다).
+   [V7 수정 7] 예전에는 여기서 그냥 return 해 버려, 통신 중에 재료를 먹거나 쓰면
+   거래가 서버에선 성립했는데 내 창고에는 아무것도 안 들어오는 구멍이 있었다. */
+function settleBuy(o,confirmed){
+  if(!canPay(S,o.want)){
+    if(!confirmed){toast("내줄 물건이 부족합니다","bad");return}
+    /* 확정된 거래: 가진 만큼만 치르고 모자란 몫은 외상으로 기록한다 */
+    for(var q in o.want){var have=qty(S,q);if(have>0)take(S,q,Math.min(have,o.want[q]))}
+    toast("재료가 모자랐지만 거래는 이미 성립해 물건을 받았습니다","warn");
+  }else{
+    payFor(S,o.want);
+  }
   for(var k in o.give){add(S,k,o.give[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+o.give[k]}
   for(var w in o.want)if(ITEMS[w]&&ITEMS[w].food)S.stat.foodOut+=o.want[w];
   S.stat.trades++;
@@ -3115,9 +3422,10 @@ function settleBuy(o){
 /* ---- 내 물건을 글로벌 거래소에 등록 ---- */
 function postOffer(gi,gn,wi,wn){
   if(!gi||!wi||gi===wi){toast("서로 다른 물건을 골라주세요","bad");return}
-  gn=Math.max(1,gn|0);wn=Math.max(1,wn|0);
+  gn=Math.max(1,Math.min(999,gn|0));wn=Math.max(1,Math.min(999,wn|0));
   if(qty(S,gi)<gn){toast(iN(gi)+"이(가) 부족합니다","bad");return}
   take(S,gi,gn);                               // 등록하는 순간 창고에서 빠진다(에스크로)
+  if(TOOLS[gi])syncToolDur(gi);                // 도구를 내놓으면 내구도도 정리
   var g={},w={};g[gi]=gn;w[wi]=wn;
   var o={id:uuid(),room:marketRoom(),from:S.biome,name:S.name,give:g,want:w,
     status:"open",claimed:false,ts:Date.now()};
@@ -3128,7 +3436,7 @@ function postOffer(gi,gn,wi,wn){
     if(err){                                   // 등록 실패 시 물건 반환
       for(var k in g)add(S,k,g[k]);
       S.pending=S.pending.filter(function(x){return x.id!==p.id});
-      toast("거래소 등록에 실패했습니다. 물건을 돌려받았습니다","bad");refreshHotbar();drawPanel();
+      toast("등록 실패 · "+marketErrText(err),"bad");refreshHotbar();drawPanel();
     }else{
       toast(marketLabel()+"에 등록했습니다","good");
     }
@@ -3144,18 +3452,24 @@ function cancelPending(id){
   toast("등록을 취소하고 물건을 돌려받았습니다");refreshHotbar();drawPanel();
 }
 /* ---- 거래소 폴링: 남의 열린 제안 목록 + 내가 판 물건 정산 ---- */
-var pollAcc=0,pollBusy=false;
+var pollAcc=0,pollBusy=false,pollSig="";
 function pollMarket(force){
-  if(!Market||pollBusy)return;
+  if(!Market)return;
+  if(pollBusy&&!force)return;                    // [V7] '새로고침' 버튼은 대기 중이어도 통한다
   pollBusy=true;
   var room=marketRoom();
   Market.listOffers(room,function(err,list){
     pollBusy=false;
     if(err||!list){return}
-    /* 내 것/이미 처리한 것 제외, 최신 20개 */
+    /* 내 것/이미 처리한 것 제외, 최신 20개.
+       [V7] 이름뿐 아니라 계정(uid)으로도 걸러야 '한 사람이 이름만 바꿔 자기 물건을
+       자기가 사는' 일이 막힌다(서버 규칙도 이걸 막으므로 눌러도 실패할 뿐이다). */
     var mine=S.pending.map(function(p){return p.id});
+    var myUid=null;try{myUid=Auth.uid()}catch(e){}
     var live=list.filter(function(o){
-      return o.name!==S.name && mine.indexOf(o.id)<0 && o.from!==S.biome;
+      if(o.name===S.name)return false;
+      if(myUid&&o.owner&&o.owner===myUid)return false;
+      return mine.indexOf(o.id)<0 && o.from!==S.biome;
     }).slice(0,20).map(function(o){o.player=true;return o});
     /* 새 제안 알림 */
     var prevIds={};S.offers.forEach(function(o){if(o.player)prevIds[o.id]=1});
@@ -3164,7 +3478,11 @@ function pollMarket(force){
     var ai=S.offers.filter(function(o){return o.ai});
     S.offers=live.concat(ai);
     if(fresh>0){S.newOffers+=fresh;if(panelTab!=="trade")toast("🌐 새 글로벌 거래 "+fresh+"건");updateTabBadge()}
-    if(panelTab==="trade")drawPanel();
+    /* [V7 수정 12] 목록이 실제로 달라졌을 때만 다시 그린다 — 몇 초마다 화면이
+       통째로 새로 그려지면 스크롤 위치와 입력 중이던 값이 흔들린다. */
+    var sig=S.offers.map(function(o){return o.id}).join("|");
+    if(panelTab==="trade"&&sig!==pollSig){pollSig=sig;drawPanel()}
+    else pollSig=sig;
   });
   /* 내가 올린 물건이 팔렸는지 확인 → 대금 수령 */
   Market.myTaken(S.name,room,function(err,sold){
@@ -3249,6 +3567,13 @@ function drawHUD(){
     }else{
       t.innerHTML=B.n+(B.drop?" → "+iE(B.drop)+" "+iN(B.drop):" (캘 수 없음)");
     }
+    /* [V7] 이 블록에 자동으로 쓰이는 도구를 알려준다 */
+    if(B.drop!==null){
+      var tl=bestToolFor(target.b);
+      if(tl)t.innerHTML+="<span style='opacity:.75'> · "+iE(tl.key)+" "+iN(tl.key)+
+        " <span class='mono'>"+syncToolDur(tl.key)+"</span></span>";
+      else if(BL[target.b].hard>=1)t.innerHTML+="<span style='opacity:.6'> · 맨손(느림)</span>";
+    }
   }else t.classList.add("hide");
   var ring=$("minering"),mr=$("mr");
   if(mining){ring.classList.remove("hide");mr.style.strokeDashoffset=138*(1-mining.t/mining.need)}
@@ -3299,9 +3624,10 @@ function openPanel(tab){
   if(tab==="edu")S._cmp=null;
   drawPanel();
 }
-function closePanel(){panelTab=null;S.paused=false;$("panel").classList.add("hide")}
+function closePanel(){panelTab=null;if(S)S.paused=false;$("panel").classList.add("hide")}
 function drawPanel(){
   if(!panelTab)return;
+  captureTradeForm();          // [V7 수정 12] 다시 그리기 전에 입력값을 지켜둔다
   var h="";
   if(panelTab==="bag")h=uiBag();
   else if(panelTab==="trade")h=uiTrade();
@@ -3309,6 +3635,16 @@ function drawPanel(){
   else if(panelTab==="edu")h=uiEdu();
   else h=uiHelp();
   $("pbody").innerHTML=h;
+}
+/* [V7 수정 12] 거래소가 몇 초마다 목록을 새로 받아 패널을 다시 그리는데,
+   그때마다 '새 거래 만들기'에서 학생이 고르던 물건·개수가 초기화됐다.
+   다시 그리기 직전에 화면의 입력값을 S.form 으로 옮겨 담아 그대로 되살린다. */
+function captureTradeForm(){
+  if(panelTab!=="trade")return;
+  var gi=$("f_gi"),gn=$("f_gn"),wi=$("f_wi"),wn=$("f_wn");
+  if(!gi||!wi)return;
+  S.form={gi:gi.value,gn:Math.max(1,parseInt(gn&&gn.value||"1",10)||1),
+          wi:wi.value,wn:Math.max(1,parseInt(wn&&wn.value||"1",10)||1)};
 }
 function invChips(){
   var ks=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
@@ -3319,10 +3655,29 @@ function invChips(){
     return "<button class='chip t"+iT(k)+(f?" act":"")+"'"+(f?" onclick=\"eat('"+k+"')\"":"")+">"+
       iE(k)+" "+iN(k)+" <b>"+S.inv[k]+"</b>"+(f?" · 먹기":"")+"</button>"}).join("")+"</div>";
 }
+/* [V7 추가] 내 도구 선반 — 무엇을 갖고 있고 얼마나 닳았는지 한눈에 */
+function toolShelf(){
+  var ks=myTools();
+  if(!ks.length)return "<div class='card'><p class='eff'>아직 도구가 없습니다. 아래 <b>도구 제작</b>에서 "+
+    "🪓 도끼·⛏️ 곡괭이·🥄 삽을 만들어 보세요. 맨손보다 <b>2~6배</b> 빠르고 기력도 훨씬 덜 듭니다.</p></div>";
+  var h="";
+  ks.forEach(function(k){
+    var t=TOOLS[k],mx=toolMax(k),cur=syncToolDur(k),pct=Math.round(cur/mx*100);
+    var col=pct>50?"var(--good)":(pct>20?"var(--warn)":"var(--bad)");
+    h+="<div class='card'><div class='rw'><span style='font-size:19px'>"+iE(k)+"</span>"+
+      "<b>"+iN(k)+"</b>"+(qty(S,k)>1?"<span class='tier'>×"+qty(S,k)+"</span>":"")+
+      "<span style='flex:1'></span><span class='mono' style='font-size:11px;color:"+col+"'>"+cur+" / "+mx+"</span></div>"+
+      "<div class='bar' style='margin:8px 0 6px'><i style='width:"+pct+"%;background:"+col+"'></i></div>"+
+      "<div class='eff'>"+TOOL_KIND[t.kind].for+"에 <b>"+t.speed+"배</b> · 기력 <b>1/"+t.save.toFixed(1)+"</b></div></div>";
+  });
+  return h;
+}
 function uiBag(){
   var h="<div class='sec'><h3>가방 <span class='sm'>식량은 눌러서 바로 먹을 수 있어요</span></h3>"+invChips()+"</div>";
-  h+="<div class='sec'><h3>제작</h3>";
-  RECIPES.forEach(function(r){
+  /* 도구 선반 */
+  h+="<div class='sec'><h3>내 도구 <span class='sm'>조준한 블록에 맞는 것이 자동으로 쓰입니다</span></h3>"+toolShelf()+"</div>";
+
+  function recipeCard(r){
     var ok=canPay(S,r.need),cost="",miss="";
     for(var k in r.need){
       var have=qty(S,k),o=have>=r.need[k];
@@ -3330,26 +3685,38 @@ function uiBag(){
       if(!o&&!miss)miss=iN(k)+" 부족 · "+whereFrom(k);
     }
     var out=Object.keys(r.out)[0];
-    h+="<div class='card'><div class='rw'><span style='font-size:19px'>"+iE(out)+"</span>"+
+    return "<div class='card'><div class='rw'><span style='font-size:19px'>"+iE(out)+"</span>"+
       "<b>"+iN(out)+" ×"+r.out[out]+"</b><span class='tier'>TIER "+iT(out)+"</span>"+
       "<span style='flex:1'></span><button class='mini "+(ok?"acc":"")+"' onclick=\"craft('"+r.id+"')\""+(ok?"":" disabled")+">만들기</button></div>"+
       "<div class='chips' style='margin-top:8px'>"+cost+"</div><div class='eff'>"+r.eff+"</div>"+
       (miss?"<div class='why'>⚠ "+miss+"</div>":"")+"</div>";
-  });
+  }
+  /* 도구 제작을 먼저 보여준다 — 처음 들어온 학생이 가장 먼저 만들어야 할 것이기 때문 */
+  h+="<div class='sec'><h3>도구 제작 <span class='sm'>맨손보다 훨씬 빠릅니다</span></h3>";
+  h+="<div class='card'><p class='eff'>나무 → 돌 → <b>철</b> 순으로 좋아집니다. "+
+     "철은 <b>고산 대륙</b>에서만 나는 광물이라, 다른 기후에서는 <b>무역</b>으로 구해야 합니다.</p></div>";
+  RECIPES.forEach(function(r){if(r.cat==="tool")h+=recipeCard(r)});
+  h+="</div>";
+  h+="<div class='sec'><h3>제작</h3>";
+  RECIPES.forEach(function(r){if(r.cat!=="tool")h+=recipeCard(r)});
   h+="</div>";
   return h;
 }
 function uiTrade(){
   var h="";
   var online=Market&&Market.online;
-  /* 거래소 상태 배너 */
-  h+="<div class='sec'><div class='card' style='border-color:"+(online?"var(--good)":"var(--line2)")+"'>"+
-    "<div class='rw'><span style='font-size:19px'>"+(online?"🌐":"📶")+"</span>"+
+  /* 거래소 상태 배너 — [V7 수정 4] 설정값이 아니라 '실제로 통했는지'를 보여준다 */
+  var lastErr=online?marketRecentErr():"";
+  var bad=online&&(MarketNet.ok===false||!!lastErr);
+  h+="<div class='sec'><div class='card' style='border-color:"+(bad?"var(--bad)":(online?"var(--good)":"var(--line2)"))+"'>"+
+    "<div class='rw'><span style='font-size:19px'>"+(bad?"⚠️":(online?"🌐":"📶"))+"</span>"+
     "<b>"+marketLabel()+"</b><span class='tier'>방 "+esc(marketRoom())+"</span><span style='flex:1'></span>"+
-    "<button class='mini' onclick='pollMarket()'>새로고침</button></div>"+
-    "<div class='eff' style='margin-top:6px'>"+(online?
+    "<button class='mini' onclick='pollMarket(true)'>새로고침</button></div>"+
+    "<div class='eff' style='margin-top:6px'>"+(bad?
+      "<b style='color:var(--bad)'>서버 요청이 막혔습니다.</b><br>"+esc(lastErr||MarketNet.err)
+      :(online?
       "여섯 대륙의 실제 친구들과 같은 거래소를 공유합니다. 올린 물건은 DB에 저장되어 다른 대륙 친구에게 실시간으로 보입니다."
-      :"백엔드가 연결되지 않아 오프라인 거래소로 동작합니다(같은 기기의 다른 탭끼리는 실시간 동기화). 아래에서 글로벌 거래소를 켤 수 있습니다.")+
+      :"백엔드가 연결되지 않아 오프라인 거래소로 동작합니다(같은 기기의 다른 탭끼리는 실시간 동기화). 아래에서 글로벌 거래소를 켤 수 있습니다."))+
     "</div></div></div>";
 
   /* 들어온 제안 (AI + 실 플레이어) */
@@ -3362,7 +3729,7 @@ function uiTrade(){
       tag+" · "+bN(o.from)+" 대륙</div><div class='rw' style='margin-top:7px;flex-wrap:wrap'>"+
       "<span class='chip t"+iT(gk)+"'>"+bagLine(o.give)+"</span><span style='color:var(--ink3)'>받고 →</span>"+
       "<span class='chip "+(ok?"ok":"no")+"'>"+bagLine(o.want)+"</span><span style='flex:1'></span>"+
-      "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+o.id+"')\""+(ok?"":" disabled")+">거래</button></div></div>";
+      "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+esc(String(o.id))+"')\""+(ok?"":" disabled")+">거래</button></div></div>";
   });
   h+="</div><div class='sec'><h3>내가 내놓은 물건 <span class='sm'>거래소 등록</span></h3>";
   if(!S.pending.length)h+="<div class='card'><p class='eff'>아래에서 등록하면 다른 대륙 사람들이 살펴봅니다. 등록하는 순간 물건은 창고에서 잠깁니다.</p></div>";
@@ -3466,6 +3833,7 @@ function uiRecord(){
   h+="<div class='sec'><div class='card'><p class='eff'><b>"+esc(S.name)+"</b> · "+bN(S.biome)+" 대륙 · "+
     (cloudOn?"클라우드(방 "+esc(S.room||"")+")에 자동 저장됩니다.":"이 기기에 자동 저장됩니다.")+"</p>"+
     (cloudOn?"<button class='mini' style='margin-top:8px' onclick='cloudSaveWorld(true,function(){toast(\"클라우드에 저장했습니다\",\"good\")})'>지금 클라우드에 저장</button> ":"")+
+    "<button class='mini' style='margin-top:8px' onclick='askExit()'>🚪 저장하고 나가기</button> "+
     "<button class='mini' style='margin-top:8px' onclick='askReset()'>처음부터 다시</button></div></div>";
   return h;
 }
@@ -3721,14 +4089,23 @@ function uiHelp(){
   var B=BIOMES[S.biome];
   return "<div class='sec'><h3>조작</h3><div class='card'>"+
     (isTouch?
-     "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다."
+     "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다.<br>오른쪽 <b>🚪 나가기</b>를 누르면 저장하고 시작 화면으로 돌아갑니다."
      :"<p class='eff'><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>Shift</kbd> 달리기 · 마우스로 둘러보기<br>"+
       "<b>왼쪽 버튼 꾹</b> 캐기 · <b>오른쪽 버튼</b> 놓기 · <kbd>1</kbd>~<kbd>9</kbd> 블록 고르기<br>"+
-      "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>G</kbd> 학습 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기</p>")+
+      "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>G</kbd> 학습 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기<br>"+
+      "오른쪽 <b>🚪 나가기</b>를 누르면 저장하고 시작 화면으로 돌아갑니다.</p>")+
     "</div></div>"+
     "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>도구 <span class='sm'>맨손보다 2~6배 빠릅니다</span></h3><div class='card'><p class='eff'>"+
+    "가방(<kbd>E</kbd>)의 <b>도구 제작</b>에서 ⛏️ 곡괭이·🪓 도끼·🥄 삽을 만듭니다.<br>"+
+    "조준한 블록에 <b>가장 잘 듣는 도구가 저절로 쓰입니다</b> — 따로 바꿔 들 필요가 없어요. "+
+    "⛏️ 곡괭이는 돌·광물, 🪓 도끼는 나무·덤불, 🥄 삽은 흙·모래·눈에 듣습니다.<br>"+
+    "<b>나무(2배) → 돌(3.4배) → 철(6배)</b> 순으로 좋아지고, 기력도 그만큼 덜 듭니다. "+
+    "다만 <b>내구도</b>가 있어 쓸수록 닳고 결국 부러집니다(나무 60 · 돌 170 · 철 480회).<br>"+
+    "🔩 <b>철은 고산 대륙에서만</b> 나는 광물입니다. 다른 기후 학생이 철 도구를 쓰려면 "+
+    "<b>무역으로 철괴를 구해야</b> 합니다 — 이것이 나라들이 서로 사고파는 까닭이에요.</p></div></div>"+
     "<div class='sec'><h3>이 기후에서 살아남는 법 <span class='sm'>자연이 정한 규칙</span></h3><div class='card'><p class='eff'>"+
     (BIOME_SURVIVE[S.biome]||"내 대륙의 자원을 캐고, 없는 것은 무역으로 구하세요.")+"</p></div></div>"+
     "<div class='sec'><h3>이 게임의 규칙</h3><div class='card'><p class='eff'>"+
@@ -3796,11 +4173,100 @@ function winScreen(){
 /* ==========================================================================
    Part 7. 조작 입력 · 저장 · 시작 · 메인 루프
    ========================================================================== */
+/* ==========================================================================
+   [V7 추가] 게임 나가기 — 확인 → 저장 → 시작 화면
+   --------------------------------------------------------------------------
+   예전에는 한번 들어가면 브라우저를 새로고침하는 것 말고는 나갈 방법이 없었다.
+   수업 중에 "이제 그만하고 발표하자"가 안 되는 것이다. 그래서
+     · 화면 오른쪽에 늘 보이는 🚪 버튼을 두고
+     · 실수로 눌러도 되돌릴 수 있게 한 번 더 묻고("정말로 나가시겠습니까?")
+     · 나가기 전에 반드시 저장(기기 + 온라인이면 클라우드)을 끝낸 뒤
+     · 새로고침 없이 시작 화면으로 돌아온다.
+   ========================================================================== */
+var exiting=false;
+function askExit(){
+  if(exiting)return;
+  if(!S){exitToTitle();return}
+  var box=$("confirm"),msg=$("cMsg"),who=$("cWho"),yes=$("cYes");
+  var cloudOn=CloudSvc&&CloudSvc.online;
+  msg.innerHTML="지금까지 지은 것과 모은 자원은 <b>모두 저장됩니다</b>. "+
+    (cloudOn?"클라우드에 저장되니 다른 기기에서도 이어서 할 수 있어요."
+            :"이 기기에 저장되며, 시작 화면의 <b>이어서 하기</b>로 돌아올 수 있어요.")+
+    (S.isVisiting?"<br><b style='color:var(--warn)'>지금은 친구 월드를 구경 중입니다.</b> 나가면 내 월드 상태로 저장됩니다.":"");
+  var cur=(S.isVisiting&&myState)?myState:S;
+  who.innerHTML="<span class='chip'>"+esc(cur.name)+"</span>"+
+    "<span class='chip' style='color:"+BIOMES[cur.biome].c+"'>"+bN(cur.biome)+" 대륙</span>"+
+    "<span class='chip'>"+cur.day+"일차</span>"+
+    "<span class='chip'>거래 "+(cur.stat?cur.stat.trades:0)+"회</span>";
+  yes.disabled=false;yes.textContent="네, 나가기";
+  box.classList.remove("hide");
+  if(S)S.paused=true;                       // 확인하는 동안 시간이 흐르지 않게
+  try{if(document.pointerLockElement)document.exitPointerLock()}catch(e){}
+  setTimeout(function(){try{$("cNo").focus()}catch(e){}},30);   // 기본 초점은 '계속하기'
+}
+function cancelExit(){
+  $("confirm").classList.add("hide");
+  if(S&&!panelTab)S.paused=false;           // 패널이 열려 있었다면 계속 멈춰 있어야 한다
+}
+/* 저장이 끝난 뒤에 나간다. 클라우드가 느리거나 막혀도 4초 뒤에는 반드시 나간다. */
+function confirmExit(){
+  if(exiting)return;
+  exiting=true;
+  var yes=$("cYes");yes.disabled=true;yes.textContent="저장하는 중…";
+  /* 구경 중이면 내 진짜 상태로 되돌려 놓고 저장한다(임시 관전 상태가 저장되면 안 된다) */
+  if(S&&S.isVisiting&&myState){S=myState;myState=null;S.isVisiting=false}
+  save();
+  var done=false;
+  function finish(){if(done)return;done=true;exiting=false;exitToTitle()}
+  if(cloudActive()){cloudSaveWorld(true,function(){finish()});setTimeout(finish,4000)}
+  else finish();
+}
+/* 실제 정리: 루프·네트워크·화면 상태를 모두 원위치시킨다 */
+function exitToTitle(){
+  stopLoop();
+  netStop();
+  try{if(document.pointerLockElement)document.exitPointerLock()}catch(e){}
+  closePanel();
+  $("confirm").classList.add("hide");
+  mineHold=false;mining=null;target=null;mineDownT=0;
+  keys={};moveVec.f=0;moveVec.s=0;wantJump=false;lookId=null;
+  S=null;myState=null;panelTab=null;
+  $("hud").classList.add("hide");
+  $("panel").classList.add("hide");
+  $("load").classList.add("hide");
+  var pl=$("peerLabels");if(pl)pl.innerHTML="";
+  var vb=$("visitBanner");if(vb)vb.classList.add("hide");
+  var ts=$("toasts");if(ts)ts.innerHTML="";
+  $("boot").classList.remove("hide");
+  $("boot").scrollTop=0;
+  setupContinue();                          // '이어서 하기'를 방금 저장한 것으로 갱신
+}
+/* '이어서 하기' 버튼을 지금 저장 상태에 맞춰 다시 만든다.
+   addEventListener 대신 onclick 을 쓴다 — 여러 번 불려도 핸들러가 겹치지 않는다. */
+function setupContinue(){
+  var c=$("cont");if(!c)return;
+  var sv=loadSave();
+  if(!sv){c.classList.add("hide");c.onclick=null;return}
+  c.classList.remove("hide");c.disabled=false;
+  c.textContent="이어서 하기 — "+sv.name+" · "+bN(sv.biome)+" "+sv.day+"일차";
+  if(sv.room){var rm=$("s_room");if(rm)rm.value=sv.room}
+  c.onclick=function(){
+    S=sv;document.body.dataset.b=S.biome;
+    /* 온라인이면 이어서 할 때도 방 참가를 먼저 등록한다(월드 저장 권한의 근거) */
+    if(CloudSvc&&CloudSvc.online&&S.room){
+      c.disabled=true;
+      CloudSvc.joinRoom(S.room,S.name,S.biome,function(jerr){
+        if(jerr==="name_taken")toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
+        beginWorld(true);
+      });
+    }else beginWorld(true);
+  };
+}
 function newState(name,biome,seed){
   return{ver:VER,name:name,biome:biome,seed:seed,
     pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
-    inv:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
+    inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
     carbon:0,quizA:{},regrow:{},
     stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
@@ -3813,6 +4279,11 @@ function startKit(s){
     tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
     alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4}}[s.biome];
   for(var k in kit)add(s,k,kit[k]);
+  /* [V7] 나무 도구 한 벌을 들려 보낸다. 맨손으로 시작하면 첫 10분이 노동이 된다. */
+  s.dur=s.dur||{};
+  ["pick_wood","axe_wood","shovel_wood"].forEach(function(t){
+    add(s,t,1); s.dur[t]=toolMax(t);
+  });
 }
 /* ---------- 클라우드 세이브 ---------- */
 var cloudDirtyFlag=false, cloudAcc=0, cloudBusy=false;
@@ -3828,7 +4299,10 @@ function cloudSaveWorld(force,cb){
   cloudBusy=true;
   /* 순서가 있다: 개인 저장(players)이 먼저다. 공유 월드(worlds)에 쓸 권한이
      "이 방·이 기후에 내 players 행이 있는가"로 판정되기 때문이다. */
-  CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:S.stat,
+  /* [V7] 도구 내구도는 새 열을 만들지 않고 stat 안에 실어 보낸다 */
+  var statOut={};for(var sk in S.stat)statOut[sk]=S.stat[sk];
+  statOut.dur=S.dur||{};
+  CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
     pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(perr){
     /* [V5 수정 4] 업로드 직전 edits 를 압축해 페이로드 용량을 최소화한다 */
     CloudSvc.saveWorld(S.room,{biome:S.biome,seed:S.seed,edits:packEdits(S.edits),day:S.day},function(werr){
@@ -3853,6 +4327,11 @@ function loadSave(){
     if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
     if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
     if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
+    if(!s.dur)s.dur={};                                  // [V7] 도구 내구도
+    /* [V7 수정 5] 저장에 남아 있던 '남의 거래' 카드는 버린다.
+       그 거래는 내가 껐다 켜는 사이에 이미 팔렸거나 만료됐을 가능성이 크고,
+       그걸 누르면 곧바로 '거래 실패'가 떴다. AI 상인 제안만 이어받는다. */
+    s.offers=s.offers.filter(function(o){return o&&o.ai});
     s.isVisiting=false;if(!s.room)s.room=marketRoom();
     /* 예전 코드 기반 거래 잔재 정리: 미완료 등록은 창고로 회수 */
     s.pending=s.pending.filter(function(p){
@@ -3872,8 +4351,24 @@ function catchUp(){
 /* ---------- 입력 ---------- */
 function bindInput(){
   var cv=$("c");
+  /* [V7] 나가기 버튼 + 확인 창 */
+  var bx=$("bExit");
+  if(bx){
+    bx.addEventListener("click",function(e){e.stopPropagation();askExit()});
+    bx.addEventListener("touchstart",function(e){e.stopPropagation();e.preventDefault();askExit()},{passive:false});
+  }
+  $("cNo").addEventListener("click",cancelExit);
+  $("cYes").addEventListener("click",confirmExit);
+  /* 바깥을 눌러도 '아니요'로 친다 — 위험한 쪽이 기본이 되면 안 된다 */
+  $("confirm").addEventListener("click",function(e){if(e.target===this)cancelExit()});
+
   document.addEventListener("keydown",function(e){
     if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+    /* 확인 창이 떠 있으면 ESC=취소, Enter=계속하기(안전한 쪽) */
+    if(!$("confirm").classList.contains("hide")){
+      if(e.code==="Escape"||e.code==="Enter"){e.preventDefault();cancelExit()}
+      return;
+    }
     keys[e.code]=true;
     if(e.code==="Escape"&&panelTab){closePanel();return}
     if(e.code==="KeyE"){e.preventDefault();panelTab==="bag"?closePanel():openPanel("bag")}
@@ -3882,7 +4377,8 @@ function bindInput(){
     if(e.code==="KeyG"){e.preventDefault();panelTab==="edu"?closePanel():openPanel("edu")}
     if(e.code==="KeyH"){e.preventDefault();panelTab==="help"?closePanel():openPanel("help")}
     if(e.code==="Space")e.preventDefault();
-    if(/^Digit[1-9]$/.test(e.code)){hotIdx=parseInt(e.code.slice(5),10)-1;refreshHotbar()}
+    /* [V7 수정 10] 패널(가방·무역 등)이 열려 있을 때 숫자키가 핫바를 바꿔 버리던 문제 */
+    if(!panelTab&&/^Digit[1-9]$/.test(e.code)){hotIdx=parseInt(e.code.slice(5),10)-1;refreshHotbar()}
   });
   document.addEventListener("keyup",function(e){keys[e.code]=false});
   /* ── [V4 수정 3·4] PC는 순수 PointerLock(FPS)로 롤백. 드래그-투-룩 완전 제거 ──
@@ -3991,9 +4487,12 @@ function bindInput(){
     uiTap($("bJump"),function(){wantJump=true});
     uiTap($("bUse"),function(){tryPlace()});
     var bm=$("bMine");
-    bm.addEventListener("touchstart",function(e){e.stopPropagation();e.preventDefault();mineHold=true},{passive:false});
-    bm.addEventListener("touchend",function(e){e.preventDefault();mineHold=false;mining=null},{passive:false});
-    bm.addEventListener("touchcancel",function(){mineHold=false;mining=null});
+    /* [V7 수정 11] 터치도 마우스와 같은 releaseMine() 을 거치게 해
+       '딸깍 탭' 했을 때의 조작 안내가 모바일에서도 뜨게 했다. */
+    bm.addEventListener("touchstart",function(e){e.stopPropagation();e.preventDefault();
+      mineHold=true;mineDownT=performance.now()},{passive:false});
+    bm.addEventListener("touchend",function(e){e.preventDefault();releaseMine()},{passive:false});
+    bm.addEventListener("touchcancel",function(){mineHold=false;mining=null;mineDownT=0});
     /* 핫바 슬롯을 탭으로도 선택 가능 (click 지연/씹힘 방지) */
     $("hotbar").addEventListener("touchstart",function(e){
       var b=e.target.closest(".slot");if(!b)return;
@@ -4012,7 +4511,7 @@ function releaseMine(){
   var wasMiningIncomplete = !!mining;
   mineHold=false;mining=null;mineDownT=0;
   if(quick && wasMiningIncomplete && S && !S.isVisiting){
-    toast("블록을 캘 때는 마우스를 길게 꾹 누르세요!","warn");
+    toast(isTouch?"블록을 캘 때는 ⛏ 버튼을 길게 꾹 누르세요!":"블록을 캘 때는 마우스를 길게 꾹 누르세요!","warn");
   }
 }
 function readKeys(){
@@ -4049,25 +4548,8 @@ function buildBoot(){
     refreshStartBtn();
   });
 
-  /* 기존 저장(로컬) 이어하기 */
-  var sv=loadSave();
-  if(sv){
-    var c=$("cont");c.classList.remove("hide");
-    c.textContent="이어서 하기 — "+sv.name+" · "+bN(sv.biome)+" "+sv.day+"일차";
-    c.addEventListener("click",function(){
-      S=sv;document.body.dataset.b=S.biome;
-      /* 온라인이면 이어서 할 때도 방 참가를 먼저 등록한다(월드 저장 권한의 근거) */
-      if(CloudSvc&&CloudSvc.online&&S.room){
-        c.disabled=true;
-        CloudSvc.joinRoom(S.room,S.name,S.biome,function(jerr){
-          if(jerr==="name_taken")toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
-          beginWorld(true);
-        });
-      }else beginWorld(true);
-    });
-    // 방 코드 기본값 복원
-    if(sv.room)$("s_room").value=sv.room;
-  }
+  /* 기존 저장(로컬) 이어하기 — [V7] 나가기 후에도 다시 부를 수 있게 함수로 뺐다 */
+  setupContinue();
   if(MarketCfg.room)$("s_room").value=$("s_room").value||MarketCfg.room;
 
   /* 모드 토글 */
@@ -4174,7 +4656,11 @@ function startAsStudentOnline(name,bio){
         if(haveShared){S.edits=unpackEdits(wrec.edits);S.day=wrec.day||1;}   // [V5 수정 4] 내려받은 직후 해제
         /* 개인 데이터 복원 or 신규 지급 */
         if(prec){
-          S.inv=prec.inv||{};if(prec.stat)S.stat=prec.stat;
+          S.inv=prec.inv||{};
+          if(prec.stat){S.stat=prec.stat;
+            if(S.stat.dur){S.dur=S.stat.dur;delete S.stat.dur}   // [V7] stat 안에 실어둔 내구도 꺼내기
+          }
+          if(!S.dur)S.dur={};
           if(prec.day)S.day=Math.max(S.day,prec.day);
           if(prec.pos&&typeof prec.pos.x==="number")S.pos=prec.pos;
           logAdd(S,"클라우드에서 데이터를 불러왔습니다.");
@@ -4436,7 +4922,7 @@ function beginWorld(isLoad){
       if(isTouch)setTimeout(function(){openPanel("help")},400);
       /* [V4] 같은 방·같은 기후 학생들과 실시간 채널 연결(온라인일 때만) */
       if(CloudSvc&&CloudSvc.online&&!S.isVisiting)netStart(S.room,S.biome);
-      loop();
+      startLoop();
     });
   },60);
 }
@@ -4486,7 +4972,7 @@ function startVisit(nameEnc,biome){
     var vis={ver:VER,name:name,biome:rec.biome||biome,seed:rec.seed,
       pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
       hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
-      inv:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
+      inv:{},dur:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
       paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
       carbon:0,quizA:{},regrow:{},
       stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
@@ -4543,8 +5029,19 @@ function updateVisitBanner(){
   }else if(el){el.classList.add("hide")}
 }
 /* ---------- 메인 루프 ---------- */
-var lastT=0,acc=0,saveAcc=0,hudAcc=0;
+/* [V7] 루프 켜짐/꺼짐 스위치.
+   예전에는 loop() 가 스스로 requestAnimationFrame 을 다시 걸기만 해서 한 번
+   시작하면 멈출 방법이 없었다. 나가기를 만들려면 멈출 수 있어야 하고, 또
+   다시 시작할 때 루프가 두 겹으로 도는 일(속도 2배·배터리 낭비)도 막아야 한다. */
+var lastT=0,acc=0,saveAcc=0,hudAcc=0,loopOn=false;
+function startLoop(){
+  if(loopOn)return;                 // 이미 돌고 있으면 하나만 유지
+  loopOn=true;lastT=performance.now();
+  requestAnimationFrame(loop);
+}
+function stopLoop(){loopOn=false}
 function loop(t){
+  if(!loopOn)return;                // 나가기 → 여기서 체인이 끊긴다
   requestAnimationFrame(loop);
   t=t||performance.now();
   var dt=Math.min(.1,(t-lastT)/1000||0);lastT=t;
