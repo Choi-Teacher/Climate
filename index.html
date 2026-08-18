@@ -1220,8 +1220,8 @@ var RECIPES=[
  {id:"bread",out:{bread:2},need:{wheat:3,water:1},eff:"썩지 않는 식량 · 허기 +36"},
  {id:"dried_fruit",out:{dried_fruit:2},need:{fruit:3,spice:1},eff:"향신료로 절인 보존식 · 썩지 않음 (열대에서 과일을 오래 두는 법)"},
  {id:"campfire",out:{campfire:1},need:{wood:3},eff:"놓으면 주변 체온을 지켜줍니다"},
- {id:"coat",out:{coat:1},need:{fur:2,fiber:2},eff:"추위를 막아줍니다 (냉대·한대 필수)"},
- {id:"shade",out:{shade:1},need:{plank:2,fiber:2},eff:"더위를 막아줍니다 (건조 기후 필수)"},
+ {id:"coat",out:{coat:1},need:{fur:2,fiber:2},eff:"🧥 가방에 넣어 두기만 하면 자동 작동 · 추운 곳에서 체온이 떨어지는 것을 막습니다 (냉대·한대 필수) · 1개면 충분"},
+ {id:"shade",out:{shade:1},need:{plank:2,fiber:2},eff:"⛱️ 가방에 넣어 두기만 하면 자동 작동 · 폭염 피해 40%↓, 한낮에도 체온이 오르지 않게 합니다 (건조 기후 필수) · 1개면 충분"},
  {id:"brick",out:{brick:1},need:{clay:2,coal:1},eff:"단단한 건축 블록"},
  {id:"glass",out:{glass:1},need:{sand:2,coal:1},eff:"투명 블록 · 창문"},
  {id:"iron",out:{iron:1},need:{iron_ore:2,coal:1},eff:"모든 기계의 재료"},
@@ -1950,9 +1950,20 @@ function shelteredNow(){
   }
   return false;
 }
+/* [수정 1] 지붕 아래는 바깥 기온이 그대로 몸에 닿지 않는다.
+   예전에는 ambient() 가 지붕을 전혀 보지 않아서, 집 안으로 대피해도 '몸이 향하는 목표 체온'이
+   바깥과 똑같았다. 그래서 사막 오후에는 실내에서도 체온이 37.6°C 위에 머물러 체력이 계속 닳고,
+   폭염에 한 번 데면 어디로 피해도 식지 않았다.
+   두꺼운 흙벽·지붕이 바깥의 극단 기온을 절반쯤만 전달한다고 보고 체감 기온을 쾌적선(22°C)
+   쪽으로 끌어당긴다. 실제 사막의 흙집·한대의 이글루가 하는 일이 바로 이것이다. */
+var SHELTER_DAMP=0.55;                              // 실내 체감기온 = 22 + (바깥-22) × 0.55
+function feltAmbient(sheltered){
+  var a=ambient(S);
+  return sheltered? 22+(a-22)*SHELTER_DAMP : a;
+}
 /* 현재 기후·시각·장비에 따른 위기 계산 → {type:'heat'|'cold'|null, sev:0~1, sheltered} */
-function envHazard(){
-  var h=clockOf(S).h, sheltered=shelteredNow();
+function envHazard(shelteredIn){
+  var h=clockOf(S).h, sheltered=(shelteredIn==null)?shelteredNow():shelteredIn;
   var res={type:null,sev:0,sheltered:sheltered};
   if(S.biome==="desert"){
     /* 09:00~17:00 폭염. 지붕 아래(실내/지하)면 완전 회피. */
@@ -2563,8 +2574,8 @@ function nearFire(){
   return false;
 }
 var fireCheck=0,fireOn=false;
-function tempTarget(){
-  var a=ambient(S),t=36.5+clamp((a-20)*.055,-3.4,2.6);
+function tempTarget(sheltered){
+  var a=feltAmbient(!!sheltered),t=36.5+clamp((a-20)*.055,-3.4,2.6);
   if(a<12&&qty(S,"coat")>0)t=Math.min(36.5,t+Math.min(2.8,(12-a)*.115));
   if(a>30&&qty(S,"shade")>0)t=Math.max(36.5,t-Math.min(2.2,(a-30)*.11));
   if(a<20&&fireOn)t=Math.min(36.9,t+1.1);
@@ -2623,6 +2634,7 @@ function applyDeathPenalty(){
 }
 function simulate(dt,quiet){
   var m=BIOMES[S.biome].mods,prev=S.day;
+  var shelt=shelteredNow();                             // 이번 틱의 '지붕 아래인가'를 한 번만 계산해 재사용
   S.sec+=dt;S.day=1+Math.floor(S.sec/DAYSEC);
   if(S.day>prev){logAdd(S,S.day+"일차 아침이 밝았습니다.");if(!quiet)toast("☀ "+S.day+"일차")}
   updateWeather(dt,quiet);                              // [날씨] 비/맑음 전환
@@ -2630,7 +2642,7 @@ function simulate(dt,quiet){
   regrowTick(dt,quiet);                                 // [자원] 캔 자리에 숲이 다시 자람
   S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
   /* [날씨] 비가 오면 야외에서 수분이 덜 마른다(습도↑) */
-  var hydraMod=m.hydra*(isRaining()&&!shelteredNow()?.6:1);
+  var hydraMod=m.hydra*(isRaining()&&!shelt?.6:1);
   S.hydra=clamp(S.hydra-.10*hydraMod*dt,0,100);
   S.stam=clamp(S.stam+1.25*m.regen*(mining?.25:1)*dt,0,100);
   if(!quiet){fireCheck-=dt;if(fireCheck<=0){fireCheck=1.5;fireOn=nearFire()}}
@@ -2639,19 +2651,22 @@ function simulate(dt,quiet){
   envMoveSlow=0;curHazard={type:null,sev:0,sheltered:false};
   if(S.hazGrace>0)S.hazGrace=Math.max(0,S.hazGrace-dt);   // 부활 직후 잠깐 위기 면제
   if(!quiet){
-    var hz=envHazard();curHazard=hz;
+    var hz=envHazard(shelt);curHazard=hz;
     if(S.hazGrace<=0&&hz.type==="heat"){
-      /* 폭염: 수분·기력이 초당 약 5씩 증발, 체온 급상승 → 밖에 있으면 1분 내 탈진 */
+      /* 폭염: 수분·기력이 초당 약 5씩 증발, 체온 상승 → 밖에 계속 있으면 1분 안팎에 탈진.
+         [수정 2] 상승률 0.9 → 0.55. 예전 값은 단 5초 만에 체온이 상한(41°C)에 닿아
+         '햇빛 4초 = 사망 확정'이 되어 있었다. 지금은 8초가 걸리고, 그 사이 화면이 빨개져
+         피할 시간이 생긴다. 위험도는 그대로지만 되돌릴 수 없는 벌은 아니게 된다. */
       S.hydra=clamp(S.hydra-5*hz.sev*dt,0,100);
       S.stam =clamp(S.stam -5*hz.sev*dt,0,100);
-      S.temp =Math.min(41,S.temp+0.9*hz.sev*dt);
+      S.temp =Math.min(41,S.temp+0.55*hz.sev*dt);
       teachOnce("heat","☀ <b>사막의 한낮</b>은 사람이 버틸 수 없을 만큼 뜨겁습니다. 그래서 사막 사람들은 낮엔 <b>두꺼운 흙집 안</b>에서 쉬고 서늘한 <b>밤</b>에 움직입니다. 지붕 있는 실내로 피하거나 굴을 파세요!");
       var now=performance.now();
       if(now-lastEnvToast>4000){lastEnvToast=now;toast("🔥 폭염! 그늘·실내로 피하세요","bad");}
     }else if(S.hazGrace<=0&&hz.type==="cold"){
       /* 혹한: 기력 소모·체온 급강하·몸이 얼어 이동이 느려짐 → 밖을 돌아다닐 수 없음 */
       S.stam=clamp(S.stam-4*hz.sev*dt,0,100);
-      S.temp=Math.max(30,S.temp-0.8*hz.sev*dt);
+      S.temp=Math.max(30,S.temp-0.45*hz.sev*dt);      // [수정 2] 0.8 → 0.45 (폭염과 같은 이유)
       envMoveSlow=Math.min(0.7,hz.sev*0.75);
       teachOnce("cold","❄ <b>극지방의 밤</b>은 얼어붙을 만큼 춥고 낮이 짧습니다. 그래서 이곳 사람들은 <b>밝을 때 서둘러</b> 먹을 것을 구하고, 밤엔 <b>모닥불·방한복·지붕 있는 대피소</b>로 버팁니다.");
       var now2=performance.now();
@@ -2680,19 +2695,37 @@ function simulate(dt,quiet){
     }
   }
 
-  S.temp+=(tempTarget()-S.temp)*Math.min(1,.02*dt);
+  /* [수정 3] 체온 회복.
+     예전: (목표-체온) × 0.02 → 초당 격차의 2%. 폭염이 초당 0.9°C씩 올리는데 회복은 초당
+     0.07°C가 최대라, 오르는 속도와 내려가는 속도가 45배나 벌어져 있었다. 게다가 지수 감쇠라
+     목표에 가까워질수록 한없이 느려져 '거의 다 나았는데 안 낫는' 구간이 길었다.
+     지금: ① 정상 체온(36.5) 쪽으로 돌아가는 방향이면 5배 빠르게, ② 최소 회복 속도를 보장. */
+  var tt=tempTarget(shelt);
+  var backToNormal=Math.abs(tt-36.5)<Math.abs(S.temp-36.5);   // 목표가 지금보다 정상에 가까운가
+  var step=(tt-S.temp)*Math.min(1,(backToNormal?.10:.03)*dt);
+  var gapT=tt-S.temp, minStep=.06*dt;                          // 초당 최소 0.06°C는 반드시 움직인다
+  if(Math.abs(gapT)>.02&&Math.abs(step)<minStep)
+    step=(gapT>0?1:-1)*Math.min(minStep,Math.abs(gapT));
+  S.temp+=step;
+
   var d=0;
   if(S.hunger<=0)d+=.32;
   if(S.hydra<=0)d+=.45;
-  if(S.temp<35.4)d+=(35.4-S.temp)*.9;
-  if(S.temp>37.6)d+=(S.temp-37.6)*.9;
-  if(d===0&&S.hunger>35&&S.hydra>35)d=-.3;
+  /* [수정 4] 체온 피해에 상한(초당 1.2)을 둔다. 예전에는 상한이 없어 체온 41°C에서 초당 3.06,
+     즉 33초 만에 체력이 0이 되었다. 한 번의 실수가 곧바로 죽음이 되지 않도록 한다. */
+  if(S.temp<35.4)d+=Math.min(1.2,(35.4-S.temp)*.9);
+  if(S.temp>37.6)d+=Math.min(1.2,(S.temp-37.6)*.9);
+  /* [수정 5] 자연 회복을 피해와 분리한다.
+     예전 조건은 d===0, 즉 체온이 정상 범위를 0.001이라도 벗어나면 회복이 통째로 막혔다.
+     이제는 잘 먹고 잘 마시는 동안 회복분이 항상 들어가고, 피해와 상쇄된다. */
+  if(S.hunger>35&&S.hydra>35)d-=.3;
   S.hp=clamp(S.hp-d*dt,0,100);
   if(quiet)S.hp=Math.max(S.hp,25);
   updateRot(dt,m.rot,quiet);
   if(S.hp<=0&&!quiet){
     S.hp=55;S.hunger=Math.max(S.hunger,45);S.hydra=Math.max(S.hydra,55);S.stam=Math.max(S.stam,55);S.temp=36.5;S.faint++;
-    S.hazGrace=7;                                  // 깨어난 직후 잠깐은 폭염/혹한 면제 → 대피할 시간
+    S.hazGrace=12;                                 // [수정 6] 7 → 12초. 부활 지점은 실외라, 예전엔
+                                                   // 집이 조금만 멀어도 깨어나자마자 다시 죽는 고리에 빠졌다
     S.pos.x=S.spawn.x;S.pos.z=S.spawn.z;S.pos.y=findGround(S.spawn.x,S.spawn.z);S.vel.y=0;
     var dropped=applyDeathPenalty();
     logAdd(S,"탈진해서 쓰러졌습니다. 처음 도착한 곳에서 깨어났습니다."+
@@ -3587,7 +3620,12 @@ function drawHUD(){
   var wIcon=isRaining()?((S.biome==="tundra"||S.biome==="alpine")?"🌨️":"🌧️"):(day?"☀":"🌙");
   $("isun").textContent=wIcon;
   $("iday").textContent=S.day+"일차";
-  $("itemp").textContent=Math.round(amb)+"°C"+(fireOn?" 🔥":"");
+  /* [수정 7] 지금 무엇이 나를 지켜주고 있는지 보이게 한다.
+     햇빛막이·방한복은 '가방에 들고만 있으면' 자동으로 작동하는데 표시가 전혀 없어서,
+     만들고도 무슨 소용인지 알 수 없었다. */
+  $("itemp").textContent=Math.round(amb)+"°C"+
+    ((curHazard&&curHazard.sheltered)?" 🏠":"")+(fireOn?" 🔥":"")+
+    (qty(S,"shade")>0?" ⛱️":"")+(qty(S,"coat")>0?" 🧥":"");
   function row(k,v,txt,col,al){
     return "<div class='st"+(al?" alarm":"")+"'><span class='k'>"+k+"</span>"+
       "<span class='track'>"+bars(v,col)+"</span><span class='v' style='color:"+col+"'>"+txt+"</span></div>";
@@ -3639,8 +3677,16 @@ function drawHUD(){
     warn.className="cold";warn.innerHTML="❄️ 혹한 — 모닥불·방한복·지붕 있는 집으로 몸을 녹이세요";
   }else{
     fxH.style.opacity=0;fxC.style.opacity=0;
+    /* [수정 8] 폭염·혹한 '구역'이 아니어도 체온이 정상을 벗어나면 체력이 닳는다.
+       냉대의 밤이나 폭염을 피한 직후가 그런 경우인데, 예전엔 아무 표시가 없어서
+       "왜 아무 일도 없는데 체력이 줄지?"가 되었다. 이제는 반드시 이유를 보여준다. */
+    if(S&&!S.isVisiting&&S.temp>37.6){
+      warn.className="heat";warn.innerHTML="🌡️ 체온이 높습니다 ("+S.temp.toFixed(1)+"°) — 그늘·실내에서 식히세요";
+    }else if(S&&!S.isVisiting&&S.temp<35.4){
+      warn.className="cold";warn.innerHTML="🌡️ 체온이 낮습니다 ("+S.temp.toFixed(1)+"°) — 모닥불·방한복·지붕이 필요합니다";
+    }
     /* 위기는 없지만 대피에 성공한 상태면 안심 배너를 잠깐 */
-    if(hz&&hz.sheltered&&(S.biome==="desert"||S.biome==="tundra")){
+    else if(hz&&hz.sheltered&&(S.biome==="desert"||S.biome==="tundra")){
       warn.className="safe";warn.innerHTML=(S.biome==="desert"?"🏠 실내 — 폭염을 피했습니다":"🏠 실내 — 혹한을 피했습니다");
     }else warn.className="hide";
   }
@@ -4216,7 +4262,7 @@ function uiHelp(){
     "<b>탈진하면</b> 처음 도착한 곳에서 깨어나지만, 급히 나오느라 <b>티어1 생존 자원의 일부를 잃습니다</b>.<br>"+
     "신선 식품(밀·과일·생선)은 시간이 지나면 <b>종류별로 하나씩 상합니다</b>(열대는 3배 빠름). 빵·<b>말린 과일</b>·초콜릿·커피 같은 <b>가공식품은 썩지 않습니다</b>.<br>"+
     "추운 곳: 모피+섬유로 <b>방한복</b>, 또는 <b>모닥불</b>을 놓으세요.<br>"+
-    "더운 곳: 판자+섬유로 <b>햇빛막이</b>를 만드세요(그늘도 폭염은 완전히 막지 못하니 실내가 최고).<br>"+
+    "더운 곳: 판자+섬유로 <b>햇빛막이 ⛱️</b>를 만들어 <b>가방에 넣어만 두세요</b>(자동 작동 · 폭염 피해가 40% 줄고 더위에 체온이 오르지 않습니다). 다만 그늘도 폭염을 완전히 막지는 못하니 <b>지붕 아래가 최고</b>입니다. 지금 무엇이 나를 지켜 주는지는 화면 오른쪽 위 기온 옆의 🏠🔥⛱️🧥 표시로 알 수 있어요.<br>"+
     "💧 <b>물</b>: 호수·연못·오아시스 같은 <b>물웅덩이</b>를 캐면 물이 나옵니다. 물웅덩이가 없는 <b>사막·높은 곳</b>에서는 <b>우물</b>(돌4+판자2)을 만들어 놓으면 마르지 않는 물을 얻어요. 열린 물에서는 가끔 <b>물고기</b>도 잡힙니다.</p></div></div>"+
     "<div class='sec'><h3>🌾 농사짓기 <span class='sm'>온대가 가장 알맞은 땅</span></h3><div class='card'><p class='eff'>"+
     "가방에서 <b>씨앗</b>을 골라 <b>흙·풀·모래</b> 위에 놓으면 심어집니다.<br>"+
