@@ -1896,7 +1896,32 @@ function updatePeerLabels(){
    Part 4. 플레이어 · 조작 · 물리 · 채집/설치
    ========================================================================== */
 var keys={},PW=.62,PH=1.78,EYE=1.62,GRAV=26,JUMP=8.3;
-var mining=null, target=null, isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+var mining=null, target=null;
+/* ── [V8 수정 1] 터치 감지 방식 교체 ──────────────────────────────────────────
+   예전: 터치를 '지원'하기만 하면 무조건 모바일로 단정했다.
+         → 터치 모니터·전자칠판·2 in 1 노트북처럼 '터치가 되는 PC'가 모바일로 오인되고,
+           그 순간 마우스 핸들러와 WASD 이동이 통째로 차단되어 아무것도 안 움직였다.
+   지금: (가) 주 입력장치가 손가락(coarse)일 때만 터치로 출발하고,
+         (나) 실제로 들어온 입력을 보고 실시간으로 모드를 갈아탄다(setInputMode).
+         마우스·키보드·손가락이 한 기기에서 모두 살아 있다. */
+var isTouch = (("ontouchstart" in window) || navigator.maxTouchPoints > 0) &&
+              !(window.matchMedia && matchMedia("(pointer:fine)").matches);
+var lastTouchT = 0, stickActive = false, touchEverUsed = false;
+/* 터치 직후 브라우저가 흉내 내서 쏘는 가짜 마우스 이벤트를 걸러 낸다 */
+function recentTouch(){ return performance.now() - lastTouchT < 700 }
+function setInputMode(touch){
+  if(touch) touchEverUsed = true;
+  if(isTouch === touch) return;
+  isTouch = touch;
+  var tp = $("touch"); if(tp) tp.classList.toggle("hide", !(touch || touchEverUsed));
+  moveVec.f = moveVec.s = 0; stickActive = false;
+  var kn = document.querySelector("#stick i"); if(kn) kn.style.transform = "";
+  var hd = $("hud"), hn = $("hint");
+  if(hn && hd && !hd.classList.contains("hide") && !document.pointerLockElement && !panelTab){
+    hn.innerHTML = touch ? "" : "화면을 <b>클릭</b>하면 시작합니다<br>WASD 이동 · 마우스 둘러보기 · 왼쪽 버튼 꾹 눌러 캐기";
+    hn.classList.toggle("hide", touch);
+  }
+}
 var look={yaw:0,pitch:0}, moveVec={f:0,s:0}, wantJump=false, sprint=false;
 var DAYSEC=600, SUNRISE=6;
 /* ===== [날씨 시스템] 비/맑음이 하루 주기로 바뀐다 =====
@@ -4554,6 +4579,15 @@ function catchUp(){
 /* ---------- 입력 ---------- */
 function bindInput(){
   var cv=$("c");
+  /* [V8 수정 1] 입력 모드 자동 전환 — 기기 스펙보다 '실제로 들어온 입력'이 진실이다. */
+  window.addEventListener("touchstart",function(){lastTouchT=performance.now();setInputMode(true)},{capture:true,passive:true});
+  window.addEventListener("touchend",function(){lastTouchT=performance.now()},{capture:true,passive:true});
+  window.addEventListener("mousedown",function(){if(!recentTouch())setInputMode(false)},true);
+  window.addEventListener("mousemove",function(e){if(!recentTouch()&&(e.movementX||e.movementY))setInputMode(false)},true);
+  window.addEventListener("keydown",function(e){
+    if(e.target&&(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"))return;
+    if(/^(Key[WASD]|Arrow(Up|Down|Left|Right)|Space)$/.test(e.code))setInputMode(false);
+  },true);
   /* [V7] 나가기 버튼 + 확인 창 */
   var bx=$("bExit");
   if(bx){
@@ -4588,7 +4622,7 @@ function bindInput(){
      · 포인터락이 안 걸린 상태의 '최초 클릭'은 락 요청만 하고 tryMine/tryPlace를 발동하지 않는다(오발 방지).
      · 락이 걸린 뒤의 좌클릭=캐기, 우클릭=설치. 모바일 터치 조작은 별도 경로라 영향 없음. */
   cv.addEventListener("mousedown",function(e){
-    if(isTouch)return;                          // 모바일은 터치 핸들러가 담당
+    if(recentTouch())return;                    // 방금 터치했으면 가짜 마우스 이벤트 → 무시
     if(panelTab)return;
     /* [V5 수정 1] 최초 클릭으로 락을 요청하되, 좌클릭이면 그와 동시에 채집을 시작한다.
        (기존엔 return 으로 씹혀 첫 클릭 꾹 눌러도 파밍이 안 되는 UX 버그가 있었음)
@@ -4603,12 +4637,12 @@ function bindInput(){
     else if(e.button===2){e.preventDefault();tryPlace()}   // 우클릭: 설치
   });
   window.addEventListener("mouseup",function(e){
-    if(isTouch)return;
+    if(recentTouch())return;
     if(e.button===0)releaseMine();
   });
   cv.addEventListener("contextmenu",function(e){e.preventDefault()});
   document.addEventListener("mousemove",function(e){
-    if(isTouch||panelTab)return;
+    if(recentTouch()||panelTab)return;
     if(document.pointerLockElement===cv){
       /* 포인터락 모드에서만 시점 회전(순수 FPS) */
       look.yaw-=e.movementX*.0022;
@@ -4635,12 +4669,13 @@ function bindInput(){
     if(e.target.id==="pclose")closePanel();
   });
   $("panel").addEventListener("click",function(e){if(e.target===this)closePanel()});
-  /* 터치 */
-  if(isTouch){
-    $("touch").classList.remove("hide");
+  /* 터치 — [V8 수정 3] 기기 판정과 무관하게 '항상' 붙여 둔다.
+     화면에 보이느냐만 모드에 따라 켜고 끈다. 터치 되는 PC에서 마우스와 손가락을 번갈아 써도 둘 다 동작한다. */
+  {
+    $("touch").classList.toggle("hide",!isTouch);
     var st=$("stick"),knob=st.querySelector("i"),sid=null,sc={x:0,y:0};
     st.addEventListener("touchstart",function(e){
-      var t=e.changedTouches[0];sid=t.identifier;
+      var t=e.changedTouches[0];sid=t.identifier;stickActive=true;
       var r=st.getBoundingClientRect();sc.x=r.left+r.width/2;sc.y=r.top+r.height/2;
       e.stopPropagation();e.preventDefault();
     },{passive:false});
@@ -4661,7 +4696,7 @@ function bindInput(){
     function endTouch(e){
       for(var i=0;i<e.changedTouches.length;i++){
         var t=e.changedTouches[i];
-        if(t.identifier===sid){sid=null;moveVec.f=moveVec.s=0;knob.style.transform=""}
+        if(t.identifier===sid){sid=null;stickActive=false;moveVec.f=moveVec.s=0;knob.style.transform=""}
         if(t.identifier===lookId)lookId=null;
       }
     }
@@ -4724,7 +4759,9 @@ function readKeys(){
   if(keys.KeyS||keys.ArrowDown)f-=1;
   if(keys.KeyD||keys.ArrowRight)s+=1;
   if(keys.KeyA||keys.ArrowLeft)s-=1;
-  if(!isTouch){moveVec.f=f;moveVec.s=s}
+  /* [V8 수정 2] 조이스틱을 '실제로 잡고 있는 동안'에만 키보드에게 자리를 양보한다.
+     예전엔 터치 기기로 판정되기만 하면 키보드 이동값을 통째로 버려서 WASD·화살표가 먹통이었다. */
+  if(!stickActive){moveVec.f=f;moveVec.s=s}
   if(keys.Space)wantJump=true;
   sprint=!!(keys.ShiftLeft||keys.ShiftRight);
 }
