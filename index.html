@@ -240,6 +240,7 @@ summary:hover{color:var(--ink2)}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}}
 /* [V4] 다른 플레이어 이름표 오버레이 */
 #peerLabels{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.peerLabel.drop{color:#ffdf9a;border-color:#e8a33d66;background:#241c0dee;font-size:11px}
 .peerLabel{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;
   font-size:12px;font-weight:700;color:#fff;background:#0d1319cc;border:1px solid var(--line2);
   border-radius:999px;padding:2px 9px;letter-spacing:.01em;text-shadow:0 1px 2px #000;
@@ -732,6 +733,10 @@ var Auth=(function(){
    · publishable key 는 apikey 헤더로만 보낸다(JWT 가 아니라 Authorization 에 넣으면 안 됨)
    · Authorization 에는 로그인한 사용자의 access token 을 실어 RLS 가 auth.uid() 를 본다
    · 토큰이 만료돼 401 이 오면 한 번 갱신하고 재시도한다 */
+/* [V8 수정 4] 창을 닫는 순간(beforeunload)에도 요청이 살아남게 하는 스위치.
+   예전엔 탭을 그냥 닫으면 마지막 저장 fetch 가 브라우저에 의해 취소되어
+   "마지막 10분이 통째로 사라지는" 일이 생겼다. keepalive 를 켜면 살아남는다. */
+var sbKeepalive=false;
 function sbFetch(url,opts){
   opts=opts||{};
   function go(retried){
@@ -739,6 +744,7 @@ function sbFetch(url,opts){
     var t=Auth.token(); if(t)h["Authorization"]="Bearer "+t;
     if(opts.headers)for(var k in opts.headers)h[k]=opts.headers[k];
     var o={method:opts.method||"GET",headers:h};
+    if(sbKeepalive)o.keepalive=true;                    // [V8 수정 4]
     if(opts.body!==undefined&&opts.body!==null)o.body=opts.body;
     return fetch(url,o).then(function(r){
       if(r.status===401&&!retried)return Auth.renew().then(function(){return go(true)});
@@ -1816,9 +1822,18 @@ function pushBox(P,C,cx,cy,cz,hx,hy,hz,col,yaw,shadeBase){
 }
 function drawPeers(){
   var ids=Object.keys(peers);
-  if(!ids.length)return;
+  var dids=(typeof drops==="object"&&drops)?Object.keys(drops):[];
+  if(!ids.length&&!dids.length)return;
   var P=[],C=[];
   var parts=avatarParts();
+  /* [V8 추가 2] 바닥에 놓인 나눔 물건 — 천천히 도는 작은 금빛 상자 */
+  var spin=(performance.now()/700)%(Math.PI*2);
+  for(var di=0;di<dids.length;di++){
+    var dd=drops[dids[di]];
+    var bob=Math.sin(performance.now()/450+di)*0.09;
+    pushBox(P,C,dd.x,dd.y+bob,dd.z,0.19,0.19,0.19,[236,190,86],spin,.3+.7*lightF);
+    pushBox(P,C,dd.x,dd.y+bob,dd.z,0.21,0.07,0.21,[150,108,40],spin,.3+.7*lightF);
+  }
   for(var n=0;n<ids.length;n++){
     var q=peers[ids[n]];
     /* 이름 색을 몸통에 살짝 반영해 서로 구분되게(이름 해시) */
@@ -1883,6 +1898,22 @@ function updatePeerLabels(){
     el.style.display="block";
     el.style.left=sx+"px";el.style.top=sy+"px";
     el.style.opacity=dist>50?"0.4":"1";
+  }
+  /* [V8 추가 2] 나눔 물건 이름표 */
+  for(var dkid in drops){
+    var dv=drops[dkid],eld=document.getElementById("plbl_"+dkid);
+    if(!eld){eld=document.createElement("div");eld.id="plbl_"+dkid;eld.className="peerLabel drop";peerLabelWrap.appendChild(eld)}
+    eld.textContent=(dv.by===myNetId?"📦 내 나눔 · ":"🤝 "+(dv.name||"친구")+" · ")+iE(dv.item)+" "+iN(dv.item)+" "+dv.n;
+    used[dkid]=1;
+    var dwx=dv.x,dwy=dv.y+0.75,dwz=dv.z;
+    var dcx=VP[0]*dwx+VP[4]*dwy+VP[8]*dwz+VP[12];
+    var dcy=VP[1]*dwx+VP[5]*dwy+VP[9]*dwz+VP[13];
+    var dcw=VP[3]*dwx+VP[7]*dwy+VP[11]*dwz+VP[15];
+    var ddx=dv.x-S.pos.x,ddz=dv.z-S.pos.z,ddist=Math.hypot(ddx,ddz);
+    if(dcw<=0.01||ddist>40){eld.style.display="none";continue}
+    eld.style.display="block";
+    eld.style.left=((dcx/dcw*.5+.5)*Wp)+"px";eld.style.top=((-dcy/dcw*.5+.5)*Hp)+"px";
+    eld.style.opacity=ddist>25?"0.55":"1";
   }
   /* 사라진 피어의 라벨 제거 */
   var labels=peerLabelWrap.children;
@@ -2061,8 +2092,11 @@ function uuid(){
 /* AI 상인처럼 서버에 올리지 않는 임시 id 용(짧아도 되는 것) */
 function localId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
 function qty(s,k){return s.inv[k]||0}
-function add(s,k,n){if(n>0)s.inv[k]=(s.inv[k]||0)+n}
-function take(s,k,n){var h=qty(s,k);if(h<n)return false;s.inv[k]=h-n;if(s.inv[k]<=0)delete s.inv[k];return true}
+/* [V8 수정 8] 예전엔 cloudDirty() 가 '블록을 캐거나 놓았을 때'만 불렸다.
+   그래서 제작·거래·식사처럼 가방만 바뀌는 활동은 10초 주기 업로드에 잡히지 않았고,
+   탭을 닫으면 그 사이 모은 물건이 통째로 사라졌다. 이제 가방이 바뀌면 무조건 표시한다. */
+function add(s,k,n){if(n>0){s.inv[k]=(s.inv[k]||0)+n;if(s===S)invDirty()}}
+function take(s,k,n){var h=qty(s,k);if(h<n)return false;s.inv[k]=h-n;if(s.inv[k]<=0)delete s.inv[k];if(s===S)invDirty();return true}
 function canPay(s,nd){for(var k in nd)if(qty(s,k)<nd[k])return false;return true}
 function payFor(s,nd){if(!canPay(s,nd))return false;for(var k in nd)take(s,k,nd[k]);return true}
 function logAdd(s,t){s.log.unshift({t:Date.now(),x:t});if(s.log.length>90)s.log.pop()}
@@ -3272,17 +3306,148 @@ function netStart(room,biome){
   peers={};
   Net=new Realtime();
   Net.onEvent=onNetEvent;
-  Net.onJoin=function(){ /* join 직후 첫 좌표를 즉시 한 번 알림 */ broadcastPos(true); };
+  Net.onJoin=function(){
+    broadcastPos(true);                               // join 직후 첫 좌표를 즉시 한 번 알림
+    /* [V8 추가 2] 이미 바닥에 놓여 있는 나눔 물건을 알려 달라고 요청 */
+    try{Net.broadcast("dask",{by:myNetId})}catch(e){}
+  };
   Net.connect(room,biome);
 }
 function netStop(){
+  /* [V8 추가 2] 아무도 줍지 않은 내 나눔은 가방으로 돌려받는다 — 물건이 사라지지 않게 */
+  try{dropReclaimMine()}catch(e){}
   if(Net){ try{flushEditQueue()}catch(e){}; try{Net.broadcast("bye",{id:myNetId})}catch(e){}; Net.close(); Net=null; }
   editQueue.length=0; editAcc=0;
-  peers={};
+  peers={}; drops={}; dropTry={};
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 2] 나눠주기 — 땅에 내려놓으면 같은 기후 친구가 주워 간다
+   --------------------------------------------------------------------------
+   거래소는 "무엇을 주고 무엇을 받을지"를 정해야 해서, 같은 팀끼리 그냥 도와주기에는
+   번거롭다. 그래서 바닥에 내려놓고 주워 가는 길을 따로 열었다.
+     · 같은 방·같은 기후 채널(sixcont:{room}:{biome})로만 오간다 → 다른 대륙엔 안 보인다
+     · 가까이 가면 자동으로 주워진다(반경 1.7칸)
+     · 물건이 사라지지 않는다: 아무도 안 주운 것은 내가 나갈 때 가방으로 되돌아온다
+   물건의 주인이 심판을 본다(두 명이 동시에 밟아도 한 명만 가져간다).
+   주인이 이미 나갔으면 0.8초 뒤 먼저 밟은 사람이 가져간다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var drops={};                          // { id: {id,x,y,z,item,n,by,name,t,awarded} }
+var DROP_R=1.7;                        // 이 거리 안에 들어오면 줍는다
+var DROP_LIFE=900;                     // 15분 뒤 소멸(주인이 있으면 주인에게 돌아간다)
+var dropTry={};                        // 내가 집으려고 손 든 것 { id: 시각 }
+
+function dropId(){return "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+/* 가방에서 n개를 꺼내 내 앞에 내려놓는다 */
+function dropItem(k,nn){
+  if(!S||S.isVisiting)return;
+  nn=Math.max(1,Math.min(999,nn|0));
+  if(qty(S,k)<nn){toast(iN(k)+"이(가) 부족합니다","bad");return}
+  if(!take(S,k,nn))return;
+  /* 시선 방향 1.2칸 앞, 발밑 높이 */
+  var fx=S.pos.x-Math.sin(look.yaw)*1.2, fz=S.pos.z-Math.cos(look.yaw)*1.2;
+  if(!inW(Math.floor(fx),Math.floor(S.pos.y),Math.floor(fz))){fx=S.pos.x;fz=S.pos.z}
+  var d={id:dropId(),x:fx,y:S.pos.y+0.35,z:fz,item:k,n:nn,by:myNetId,name:S.name,t:performance.now()};
+  drops[d.id]=d;
+  if(Net&&Net.joined)try{Net.broadcast("drop",{d:d,by:myNetId})}catch(e){}
+  refreshHotbar();if(panelTab)drawPanel();
+  toast("📦 "+iE(k)+" "+iN(k)+" "+nn+"개를 내려놓았습니다"+((Net&&Net.joined)?" · 같은 기후 친구가 주울 수 있어요":" (아직 혼자예요)"),"good");
+  teachOnce("dropped","📦 바닥에 내려놓은 물건은 <b>같은 기후 친구</b>만 주울 수 있습니다. "+
+    "아무도 줍지 않으면 <b>내가 나갈 때 가방으로 돌아옵니다</b> — 없어지지 않으니 마음 놓고 나눠 주세요.");
+}
+/* 실제로 내 가방에 넣는다 */
+function dropAward(d,mine){
+  add(S,d.item,d.n);
+  if(!mine){
+    S.stat.helps=(S.stat.helps||0)+0;                 // 받은 쪽은 세지 않는다(준 쪽만 센다)
+    logAdd(S,(d.name||"친구")+"이(가) 나눠 준 "+iN(d.item)+" "+d.n+"개를 주웠습니다.");
+    toast("🤝 "+esc(d.name||"친구")+"의 "+iE(d.item)+" "+iN(d.item)+" "+d.n+"개를 주웠습니다","good");
+    teachOnce("picked","🤝 같은 기후 친구가 나눠 준 물건을 주웠습니다. 같은 환경에 사는 사람들끼리는 "+
+      "<b>서로 부족한 때를 메워 주는 협력</b>으로 살아갑니다.");
+  }else{
+    toast("📦 내려놓았던 "+iN(d.item)+" "+d.n+"개를 다시 챙겼습니다");
+  }
+  refreshHotbar();if(panelTab)drawPanel();
+}
+/* 가까운 드롭을 집으려 시도 */
+function dropScan(){
+  if(!S||S.isVisiting)return;
+  var now=performance.now();
+  for(var id in drops){
+    var d=drops[id];
+    /* 수명 다함 */
+    if(now-d.t>DROP_LIFE*1000){
+      if(d.by===myNetId){dropAward(d,true)}
+      delete drops[id];delete dropTry[id];
+      if(d.by===myNetId&&Net&&Net.joined)try{Net.broadcast("grabok",{id:id,to:d.by,by:myNetId})}catch(e){}
+      continue;
+    }
+    var dx=d.x-S.pos.x,dy=d.y-(S.pos.y+0.9),dz=d.z-S.pos.z;
+    if(dx*dx+dy*dy+dz*dz>DROP_R*DROP_R)continue;
+    if(d.by===myNetId){                               // 내 것 → 바로 회수
+      dropAward(d,true);delete drops[id];delete dropTry[id];
+      if(Net&&Net.joined)try{Net.broadcast("grabok",{id:id,to:myNetId,by:myNetId})}catch(e){}
+      continue;
+    }
+    if(dropTry[id]){                                  // 이미 손을 들었다 → 주인 응답 대기
+      if(now-dropTry[id]>800){                        // 주인이 나간 듯 → 먼저 밟은 내가 가져간다
+        dropAward(d,false);
+        if(Net&&Net.joined)try{Net.broadcast("grabok",{id:id,to:myNetId,by:myNetId})}catch(e){}
+        delete drops[id];delete dropTry[id];
+      }
+      continue;
+    }
+    dropTry[id]=now;
+    if(Net&&Net.joined)try{Net.broadcast("grabq",{id:id,by:myNetId,name:S.name})}catch(e){}
+  }
+}
+/* 내가 내려놓고 아직 아무도 안 주운 것을 가방으로 되돌린다(퇴장·새로고침 시) */
+function dropReclaimMine(){
+  if(!S)return;
+  for(var id in drops){
+    var d=drops[id];
+    if(d.by!==myNetId)continue;
+    add(S,d.item,d.n);
+    if(Net&&Net.joined)try{Net.broadcast("grabok",{id:id,to:myNetId,by:myNetId})}catch(e){}
+    delete drops[id];
+  }
 }
 /* 수신 라우팅 */
 function onNetEvent(event,p){
   if(!p)return;
+  /* ---- 나눠주기 이벤트 ---- */
+  if(event==="drop"){
+    if(p.by===myNetId||!p.d)return;
+    drops[p.d.id]=p.d; p.d.t=performance.now();       // 시계는 각자 기준으로
+    return;
+  }
+  if(event==="grabq"){                                // 누가 내 물건을 집으려 한다 → 주인이 판정
+    var dq=drops[p.id];
+    if(!dq||dq.by!==myNetId||dq.awarded)return;
+    dq.awarded=true;delete drops[p.id];
+    try{Net.broadcast("grabok",{id:p.id,to:p.by,by:myNetId})}catch(e){}
+    logAdd(S,(p.name||"친구")+"이(가) 내가 나눈 "+iN(dq.item)+" "+dq.n+"개를 가져갔습니다.");
+    S.stat.helps=(S.stat.helps||0)+1;
+    toast("🤝 "+esc(p.name||"친구")+"에게 "+iN(dq.item)+" "+dq.n+"개를 나눠 주었습니다","good");
+    return;
+  }
+  if(event==="grabok"){
+    var dk=drops[p.id];
+    if(dk&&p.to===myNetId)dropAward(dk,dk.by===myNetId);
+    delete drops[p.id];delete dropTry[p.id];
+    return;
+  }
+  if(event==="dask"){                                 // 늦게 들어온 친구에게 내 드롭을 알려 준다
+    if(p.by===myNetId)return;
+    var mineList=[];
+    for(var mk in drops)if(drops[mk].by===myNetId)mineList.push(drops[mk]);
+    if(mineList.length)try{Net.broadcast("dsync",{list:mineList,by:myNetId})}catch(e){}
+    return;
+  }
+  if(event==="dsync"){
+    if(p.by===myNetId||!p.list)return;
+    for(var i=0;i<p.list.length;i++){var dd=p.list[i];if(!drops[dd.id]){dd.t=performance.now();drops[dd.id]=dd}}
+    return;
+  }
   if(event==="edit"){
     /* 다른 학생의 블록 변경을 내 월드에 반영 */
     if(p.by===myNetId)return;                      // 내가 쏜 것은 무시
@@ -3359,6 +3524,7 @@ function netTick(dt){
     var dy=q.tyaw-q.yaw; while(dy>Math.PI)dy-=Math.PI*2; while(dy<-Math.PI)dy+=Math.PI*2;
     q.yaw+=dy*k;
   }
+  dropScan();                          // [V8 추가 2] 발밑의 나눔 물건 줍기
 }
 
 var AI_NAMES={temperate:["초원 상단","밀밭 마을","강가 농장"],tropical:["정글 시장","우림 상단","향신료 배"],
@@ -3485,13 +3651,22 @@ function settleBuy(o,confirmed){
   }else{
     payFor(S,o.want);
   }
-  for(var k in o.give){add(S,k,o.give[k]);S.stat.imp[k]=(S.stat.imp[k]||0)+o.give[k]}
+  /* [V8 추가 1] 같은 기후끼리 주고받은 것은 '무역'이 아니라 '나눔'으로 센다.
+     교과 개념(무역 = 자연환경이 달라 나는 것이 다른 곳끼리)이 흐려지면 안 되기 때문이다. */
+  var team=!o.ai&&o.from===S.biome;
+  for(var k in o.give){add(S,k,o.give[k]);if(!team)S.stat.imp[k]=(S.stat.imp[k]||0)+o.give[k]}
   for(var w in o.want)if(ITEMS[w]&&ITEMS[w].food)S.stat.foodOut+=o.want[w];
-  S.stat.trades++;
-  teachOnce("traded","⚖️ 내 대륙에 <b>없는 것</b>을 다른 기후에서 얻었습니다. 나라마다 자연환경이 달라 나는 것이 다르기 때문에 <b>무역</b>이 생깁니다.");
+  if(team){
+    S.stat.helps=(S.stat.helps||0)+1;
+    teachOnce("teamshare","🤝 같은 기후 친구와 주고받았습니다. 이건 <b>무역</b>이 아니라 <b>나눔·협력</b>이에요 — "+
+      "자연환경이 <b>같은</b> 곳끼리는 나는 것도 비슷해서, 서로 <b>부족한 때</b>를 메워 주는 관계가 됩니다.");
+  }else{
+    S.stat.trades++;
+    teachOnce("traded","⚖️ 내 대륙에 <b>없는 것</b>을 다른 기후에서 얻었습니다. 나라마다 자연환경이 달라 나는 것이 다르기 때문에 <b>무역</b>이 생깁니다.");
+  }
   S.offers=S.offers.filter(function(x){return x.id!==o.id});
-  logAdd(S,(o.name||bN(o.from))+"와(과) 거래했습니다.");
-  toast("🤝 거래 성사!","good");refreshHotbar();drawPanel();updateTabBadge();
+  logAdd(S,(o.name||bN(o.from))+"와(과) "+(team?"나눴습니다.":"거래했습니다."));
+  toast(team?"🤝 우리 팀과 주고받았습니다!":"🤝 거래 성사!","good");refreshHotbar();drawPanel();updateTabBadge();
 }
 /* ---- 내 물건을 글로벌 거래소에 등록 ---- */
 function postOffer(gi,gn,wi,wn){
@@ -3564,7 +3739,11 @@ function pollMarket(force){
     var live=list.filter(function(o){
       if(mine.indexOf(o.id)>=0){dg.mineCnt++;return false}         // 내가 올린 것
       if(o.name===S.name){dg.sameName++;return false}              // 이름이 나와 같음
-      if(o.from===S.biome){dg.sameBiome++;return false}            // 같은 기후끼리는 무역이 아니다
+      /* ── [V8 추가 1] 같은 기후(우리 팀)끼리의 거래도 보여 준다 ──────────────
+         예전엔 여기서 잘라 냈다. "같은 기후끼리는 무역이 아니다"는 개념 자체는 맞지만,
+         그 결과 한 팀이 서로 도울 방법이 하나도 없었다. 이제 감추는 대신 '나눔'으로
+         따로 분류해, 무역(다른 기후)과 나눔(같은 팀)을 눈으로 구분하게 한다. */
+      if(o.from===S.biome){dg.sameBiome++;o.team=true}
       if(myUid&&o.owner&&o.owner===myUid)dg.sameAcct++;            // 숨기지는 않고 표시만 해 둔다
       dg.shown++;return true;
     }).slice(0,20).map(function(o){o.player=true;return o});
@@ -3783,8 +3962,43 @@ function toolShelf(){
   });
   return h;
 }
+/* [V8 추가 2] 우리 팀에게 나눠주기 창구 — 가방과 무역 화면 양쪽에 붙는다 */
+function teamShareCard(){
+  var ks=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
+  ks.sort(function(a,b){return iT(a)-iT(b)});
+  var mates=Object.keys(peers).length;
+  var live=!!(Net&&Net.joined);
+  var f=S.share||(S.share={k:ks[0]||"",n:1});
+  if(ks.indexOf(f.k)<0)f.k=ks[0]||"";
+  var h="<div class='sec'><h3>🤝 우리 팀에게 나눠주기 <span class='sm'>"+bN(S.biome)+" 친구들</span></h3><div class='card'>"+
+    "<p class='eff' style='margin-bottom:9px'>물건을 <b>바닥에 내려놓으면</b> 같은 기후 친구가 걸어와 주울 수 있습니다. "+
+    "값을 정할 필요가 없어요.<br><b>아무도 줍지 않으면 내가 나갈 때 가방으로 돌아옵니다</b> — 없어지지 않습니다.</p>"+
+    "<div class='rw' style='margin-bottom:9px'><span class='chip "+(live?"ok":"")+"'>"+
+      (live?"🛰 실시간 연결됨":"📴 연결 대기 중")+"</span>"+
+      "<span class='chip'>지금 같은 대륙에 <b>"+mates+"</b>명</span></div>";
+  if(!ks.length){
+    h+="<p class='eff'>나눠 줄 물건이 없습니다.</p>";
+  }else{
+    h+="<div class='grid2' style='margin-bottom:10px'>"+
+      "<select class='sel' id='sh_k'>"+ks.map(function(k){
+        return "<option value='"+k+"'"+(k===f.k?" selected":"")+">"+iE(k)+" "+iN(k)+" ("+S.inv[k]+")</option>"}).join("")+"</select>"+
+      "<input class='sel' id='sh_n' type='number' min='1' value='"+f.n+"'></div>"+
+      "<button class='mini acc' style='width:100%' onclick='submitShare()'>📦 내 앞에 내려놓기</button>"+
+      "<p class='eff' style='margin-top:8px'>게임 화면에서 <kbd>Q</kbd> 를 누르면 지금 고른 핫바 물건을 1개씩 바로 내려놓습니다.</p>";
+  }
+  var mine=0;for(var dk in drops)if(drops[dk].by===myNetId)mine++;
+  if(mine)h+="<div class='why' style='margin-top:9px'>📦 지금 바닥에 내놓은 것 <b>"+mine+"</b>개 — 아직 아무도 줍지 않았습니다.</div>";
+  return h+"</div></div>";
+}
+function submitShare(){
+  var k=$("sh_k").value, nn=parseInt($("sh_n").value||"1",10);
+  S.share={k:k,n:nn};
+  dropItem(k,nn);
+  drawPanel();
+}
 function uiBag(){
   var h="<div class='sec'><h3>가방 <span class='sm'>식량은 눌러서 바로 먹을 수 있어요</span></h3>"+invChips()+"</div>";
+  h+=teamShareCard();
   /* 도구 선반 */
   h+="<div class='sec'><h3>내 도구 <span class='sm'>조준한 블록에 맞는 것이 자동으로 쓰입니다</span></h3>"+toolShelf()+"</div>";
 
@@ -3837,7 +4051,7 @@ function diagCard(){
   h+=line("서버가 준 열린 거래",d.total+"건");
   h+=line("→ 내가 올린 것",d.mineCnt+"건");
   h+=line("→ 이름이 나와 같아 제외",d.sameName+"건",d.sameName>0);
-  h+=line("→ 나와 같은 기후라 제외",d.sameBiome+"건");
+  h+=line("→ 우리 팀(같은 기후) 나눔",d.sameBiome+"건");
   h+=line("→ 화면에 보이는 것",d.shown+"건",d.shown===0&&d.total>0);
   if(d.sameAcct>0){
     h+="<div class='why' style='margin-top:9px'>⚠ 그중 "+d.sameAcct+"건은 <b>나와 같은 계정</b>으로 올라온 것입니다."+
@@ -3848,7 +4062,7 @@ function diagCard(){
   if(d.total>0&&d.shown===0){
     h+="<div class='why' style='margin-top:9px'>⚠ 서버에는 거래가 있는데 하나도 보이지 않습니다. "+
        "위 항목에서 몇 건이 어디로 빠졌는지 확인하세요. "+
-       (d.sameBiome>0?"<b>같은 기후끼리는 무역 상대가 아닙니다</b> — 서로 다른 대륙을 골랐는지 보세요.":"")+"</div>";
+       ""+"</div>";
   }
   if(d.total===0){
     h+="<div class='why' style='margin-top:9px'>⚠ 이 방(<b>"+esc(d.room)+"</b>)에 올라온 거래가 하나도 없습니다. "+
@@ -3876,24 +4090,40 @@ function uiTrade(){
     (diagOpen?diagCard():"")+
     "</div></div>";
 
-  /* 들어온 제안 (AI + 실 플레이어) */
-  h+="<div class='sec'><h3>들어온 거래 제안 <span class='sm'>다른 대륙</span></h3>";
-  if(!S.offers.length)h+="<div class='card'><p class='eff'>아직 제안이 없습니다. 잠시 기다리면 상인과 친구들의 제안이 올라옵니다.</p></div>";
-  S.offers.forEach(function(o){
+  /* ── [V8 추가 1] 우리 팀 나눔 창구 ─────────────────────────────────────── */
+  h+=teamShareCard();
+
+  /* 들어온 제안 (AI + 실 플레이어) — 무역(다른 기후) / 나눔(우리 팀) 으로 나눠 보여 준다 */
+  function offerCard(o){
     var ok=canPay(S,o.want),gk=Object.keys(o.give)[0];
-    var tag=o.ai?"🤖 상인":"🧑 "+esc(o.name||"친구");
+    var team=!o.ai&&o.from===S.biome;
+    var tag=o.ai?"🤖 상인":((team?"🤝 우리 팀 · ":"🧑 ")+esc(o.name||"친구"));
     /* [V7.1] 같은 브라우저(같은 익명 계정)에서 올라온 것은 미리 표시해 둔다.
        눌러 보고 실패하는 것보다, 누르기 전에 아는 편이 낫다. */
     var myUid=null;try{myUid=Auth.uid()}catch(e){}
     var self=!o.ai&&myUid&&o.owner&&o.owner===myUid;
-    h+="<div class='card'><div style='font-family:var(--m);font-size:10px;color:"+(BIOMES[o.from]?BIOMES[o.from].c:"var(--ink3)")+"'>"+
+    return "<div class='card'"+(team?" style='border-color:"+BIOMES[S.biome].c+"55'":"")+">"+
+      "<div style='font-family:var(--m);font-size:10px;color:"+(BIOMES[o.from]?BIOMES[o.from].c:"var(--ink3)")+"'>"+
       tag+" · "+bN(o.from)+" 대륙"+
       (self?" <span style='color:var(--warn)'>· ⚠ 같은 계정(같은 브라우저)</span>":"")+
       "</div><div class='rw' style='margin-top:7px;flex-wrap:wrap'>"+
       "<span class='chip t"+iT(gk)+"'>"+bagLine(o.give)+"</span><span style='color:var(--ink3)'>받고 →</span>"+
       "<span class='chip "+(ok?"ok":"no")+"'>"+bagLine(o.want)+"</span><span style='flex:1'></span>"+
-      "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+esc(String(o.id))+"')\""+(ok?"":" disabled")+">거래</button></div></div>";
-  });
+      "<button class='mini "+(ok?"acc":"")+"' onclick=\"acceptOffer('"+esc(String(o.id))+"')\""+(ok?"":" disabled")+">"+
+      (team?"주고받기":"거래")+"</button></div></div>";
+  }
+  var teamOffers=S.offers.filter(function(o){return !o.ai&&o.from===S.biome});
+  var farOffers =S.offers.filter(function(o){return o.ai||o.from!==S.biome});
+
+  h+="<div class='sec'><h3>🤝 우리 팀 주고받기 <span class='sm'>"+bN(S.biome)+" 친구들</span></h3>";
+  if(!teamOffers.length)h+="<div class='card'><p class='eff'>같은 기후 친구가 올린 것이 아직 없습니다. "+
+    "같은 팀끼리는 <b>무역</b>이 아니라 <b>나눔·품앗이</b>예요 — 남는 것을 서로 채워 주면 훨씬 빨리 자리를 잡습니다.</p></div>";
+  teamOffers.forEach(function(o){h+=offerCard(o)});
+
+  h+="</div><div class='sec'><h3>🌍 들어온 거래 제안 <span class='sm'>다른 대륙</span></h3>";
+  if(!farOffers.length)h+="<div class='card'><p class='eff'>아직 제안이 없습니다. 잠시 기다리면 상인과 친구들의 제안이 올라옵니다.</p></div>";
+  farOffers.forEach(function(o){h+=offerCard(o)});
+
   h+="</div><div class='sec'><h3>내가 내놓은 물건 <span class='sm'>거래소 등록</span></h3>";
   if(!S.pending.length)h+="<div class='card'><p class='eff'>아래에서 등록하면 다른 대륙 사람들이 살펴봅니다. 등록하는 순간 물건은 창고에서 잠깁니다.</p></div>";
   S.pending.forEach(function(p){
@@ -3973,7 +4203,8 @@ function uiRecord(){
     "<div class='chips'>"+rows+"</div></div></div>";
   var st=S.stat,imp=Object.keys(st.imp).length;
   h+="<div class='sec'><h3>기록</h3><div class='card'><div class='chips'>"+
-    "<span class='chip'>거래 <b>"+st.trades+"</b>회</span><span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
+    "<span class='chip'>무역 <b>"+st.trades+"</b>회</span><span class='chip'>우리 팀 나눔 <b>"+(st.helps||0)+"</b>회</span>"+
+    "<span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
     "<span class='chip'>식량 수출 <b>"+st.foodOut+"</b></span><span class='chip'>설치한 블록 <b>"+st.placed+"</b></span>"+
     "<span class='chip'>생존 <b>"+S.day+"</b>일차</span><span class='chip'>탈진 <b>"+S.faint+"</b>회</span>"+
     "<span class='chip' style='color:"+carbonStep().c+"'>내가 낸 탄소 <b>"+carbonAmt()+"</b> · "+carbonStep().n+"</span></div>";
@@ -4252,9 +4483,10 @@ function uiHelp(){
   var B=BIOMES[S.biome];
   return "<div class='sec'><h3>조작</h3><div class='card'>"+
     (isTouch?
-     "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다.<br>오른쪽 <b>🚪 나가기</b>를 누르면 저장하고 시작 화면으로 돌아갑니다."
+     "<p class='eff'>왼쪽 동그라미로 이동 · 화면 오른쪽을 문질러 둘러보기 · <b>⛏️ 캐기</b> 길게 눌러 블록 캐기 · <b>🧱</b> 블록 놓기 · <b>⤴</b> 점프<br>아래 칸(핫바)을 눌러 놓을 블록을 고릅니다.<br>우리 팀에게 나눠주려면 <b>가방</b> 화면의 <b>🤝 우리 팀에게 나눠주기</b>를 쓰세요.<br>오른쪽 <b>🚪 나가기</b>를 누르면 저장하고 시작 화면으로 돌아갑니다."
      :"<p class='eff'><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>Shift</kbd> 달리기 · 마우스로 둘러보기<br>"+
       "<b>왼쪽 버튼 꾹</b> 캐기 · <b>오른쪽 버튼</b> 놓기 · <kbd>1</kbd>~<kbd>9</kbd> 블록 고르기<br>"+
+      "<kbd>Q</kbd> 우리 팀에게 나눠주기(바닥에 내려놓기)<br>"+
       "<kbd>E</kbd> 가방 · <kbd>T</kbd> 무역 · <kbd>R</kbd> 기록 · <kbd>G</kbd> 학습 · <kbd>H</kbd> 도움말 · <kbd>ESC</kbd> 닫기<br>"+
       "오른쪽 <b>🚪 나가기</b>를 누르면 저장하고 시작 화면으로 돌아갑니다.</p>")+
     "</div></div>"+
@@ -4384,6 +4616,7 @@ function confirmExit(){
   var yes=$("cYes");yes.disabled=true;yes.textContent="저장하는 중…";
   /* 구경 중이면 내 진짜 상태로 되돌려 놓고 저장한다(임시 관전 상태가 저장되면 안 된다) */
   if(S&&S.isVisiting&&myState){S=myState;myState=null;S.isVisiting=false}
+  try{dropReclaimMine()}catch(e){}      // [V8 추가 2] 아무도 안 주운 내 나눔을 가방으로
   save();
   var done=false;
   function finish(){if(done)return;done=true;exiting=false;exitToTitle()}
@@ -4443,12 +4676,57 @@ function resumeSave(sv,btn){
   S=sv;document.body.dataset.b=S.biome;
   /* 온라인이면 이어서 할 때도 방 참가를 먼저 등록한다(월드 저장 권한의 근거) */
   if(CloudSvc&&CloudSvc.online&&S.room){
-    if(btn)btn.disabled=true;
-    CloudSvc.joinRoom(S.room,S.name,S.biome,function(jerr){
-      if(jerr==="name_taken")toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
-      beginWorld(true);
+    if(btn){btn.disabled=true;btn.textContent="불러오는 중…"}
+    joinWithRetry(S.room,S.name,S.biome,function(jerr){
+      if(jerr==="name_taken"){
+        cloudBlocked=true;
+        toast("다른 기기가 이 이름을 쓰고 있어 이번엔 이 기기에만 저장됩니다","bad");
+        beginWorld(true);return;
+      }
+      /* ── [V8 수정 11] '이어서 하기'도 공유 월드를 먼저 내려받는다 ────────────
+         예전엔 이 기기에 저장돼 있던 낡은 지형·건축을 그대로 들고 들어갔고,
+         첫 자동 저장에서 그것이 반 전체 월드를 덮어써 친구들 건물이 사라졌다.
+         이제 서버본을 기준으로 삼고, 아직 못 올린 내 건축만 위에 얹는다. */
+      CloudSvc.loadWorld(S.room,S.biome,function(werr,wrec){
+        if(!werr&&wrec){
+          S.seed=wrec.seed||S.seed;
+          var srv=unpackEdits(wrec.edits)||{};
+          for(var k in S.edits)if(!srv.hasOwnProperty(k))srv[k]=S.edits[k];
+          S.edits=srv;
+          if(wrec.day)S.day=Math.max(S.day||1,wrec.day);
+        }
+        beginWorld(true);
+      });
     });
   }else beginWorld(true);
+}
+/* ── [V8 수정 5] 같은 반·같은 기후는 '항상 똑같은 지형' ───────────────────────
+   예전엔 월드를 못 불러오면 Math.random() 으로 새 seed 를 만들었다. 그런데 그 seed 가
+   그대로 공유 월드(worlds)에 저장되면서, 먼저 들어와 있던 같은 기후 친구들의 지형이
+   통째로 갈려 버렸다 — 학생들이 "블록이 사라진다"고 한 일의 큰 원인이다.
+   이제 seed 는 (방 코드 + 기후) 로부터 계산한다. 누가 먼저 들어오든, 통신이 실패하든
+   같은 반 같은 기후는 언제나 똑같은 대륙이 만들어진다. */
+function seedFor(room,biome){
+  var t=String(room||"")+"|"+String(biome||""),h=2166136261;
+  for(var i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}
+  return Math.abs(h)%99999;
+}
+/* 이 기기에 저장된 (방,이름) 슬롯 하나를 찾아 준다 — 클라우드가 비었을 때의 안전망 */
+function findLocalSlot(room,name){
+  try{
+    var raw=localStorage.getItem(slotKey(name,room));
+    if(!raw)return null;
+    var v=JSON.parse(raw);
+    return (v&&v.ver===VER&&BIOMES[v.biome])?v:null;
+  }catch(e){return null}
+}
+function invCount(inv){var c=0;for(var k in inv)c+=inv[k]||0;return c}
+/* 서버 오류를 교실에서 알아들을 수 있는 말로 */
+function cloudErrText(e){
+  var st=e&&e.status;
+  if(st===429)return "접속 한도(429)에 걸렸습니다. Supabase 대시보드에서 익명 로그인 한도를 올려 주세요.";
+  if(st===403)return "서버 권한(403)에 막혔습니다. 이름이 다른 기기에 묶여 있을 수 있습니다.";
+  return marketErrText(e);
 }
 function newState(name,biome,seed){
   return{ver:VER,name:name,biome:biome,seed:seed,
@@ -4457,7 +4735,7 @@ function newState(name,biome,seed){
     inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
     carbon:0,quizA:{},regrow:{},
-    stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
+    stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
 }
 function startKit(s){
   var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
@@ -4475,8 +4753,13 @@ function startKit(s){
 }
 /* ---------- 클라우드 세이브 ---------- */
 var cloudDirtyFlag=false, cloudAcc=0, cloudBusy=false;
-function cloudDirty(){cloudDirtyFlag=true}          // 건축/채집 후 호출 → 다음 주기에 업로드
-function cloudActive(){return CloudSvc&&CloudSvc.online&&S&&!S.isVisiting}
+/* [V8 수정 6] 이름이 다른 기기에 묶여 서버에 쓸 수 없는 상태로 들어온 경우.
+   이때 클라우드에 쓰려 들면 남의 데이터를 건드리거나 403 만 반복하므로 아예 끈다. */
+var cloudBlocked=false;
+var worldDirtyFlag=false;
+function cloudDirty(){cloudDirtyFlag=true;worldDirtyFlag=true}   // 블록이 바뀜 → 개인+월드 둘 다 올린다
+function invDirty(){cloudDirtyFlag=true}                          // 가방만 바뀜 → 개인 데이터만 올린다
+function cloudActive(){return !cloudBlocked&&CloudSvc&&CloudSvc.online&&S&&!S.isVisiting}
 /* [V4] 저장이 두 갈래로 나뉘었다:
      · worlds(room,biome)  … 공유 월드(seed+edits). 같은 기후 학생 모두가 함께 씀
      · players(room,name)  … 개인 인벤토리·스탯·위치
@@ -4492,14 +4775,50 @@ function cloudSaveWorld(force,cb){
   statOut.dur=S.dur||{};
   CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
     pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(perr){
-    /* [V5 수정 4] 업로드 직전 edits 를 압축해 페이로드 용량을 최소화한다 */
-    CloudSvc.saveWorld(S.room,{biome:S.biome,seed:S.seed,edits:packEdits(S.edits),day:S.day},function(werr){
-      cloudBusy=false;cloudDirtyFlag=false;
-      var err0=perr||werr;
-      if(err0)console.warn("cloud save fail",err0);
-      cb&&cb(err0);
+    if(!S){cloudBusy=false;cb&&cb(perr);return}
+    /* ── [V8 수정 7] 공유 월드는 '덮어쓰기'가 아니라 '합치기' ────────────────
+       예전엔 내 S.edits 를 통째로 worlds 행에 덮어썼다. 그래서 내가 잠깐 끊겼거나
+       늦게 들어온 사이 친구가 지은 건물이, 내가 저장하는 순간 전부 지워졌다.
+       이제 올리기 직전에 서버본을 한 번 읽어 (서버 ∪ 내 것) 으로 합친다.
+       같은 칸이 겹치면 내 최신 값이 이긴다. 서버에만 있던 칸은 내 화면에도 즉시 반영. */
+    /* 블록이 하나도 안 바뀌었으면 공유 월드는 건드릴 필요가 없다(서버 왕복 절약) */
+    if(!worldDirtyFlag&&!force){cloudBusy=false;cloudDirtyFlag=false;cb&&cb(perr);return}
+    CloudSvc.loadWorld(S.room,S.biome,function(lerr,cur){
+      if(!S){cloudBusy=false;cb&&cb(perr);return}
+      if(!lerr&&cur){
+        var srv=unpackEdits(cur.edits);
+        for(var k in srv){
+          if(S.edits.hasOwnProperty(k))continue;        // 내 값이 더 최신 → 유지
+          S.edits[k]=srv[k];
+          var a=k.split(","),ax=+a[0],ay=+a[1],az=+a[2];
+          if(typeof inW==="function"&&inW(ax,ay,az)){setB(ax,ay,az,srv[k]);markDirty(ax,az)}
+        }
+      }
+      /* seed 는 서버에 이미 있는 값을 절대 바꾸지 않는다(바꾸면 반 전체 지형이 뒤집힌다).
+         내 S.seed 는 이번 세션의 지형을 만든 값이므로 그대로 두고, 쓰기만 서버 값으로 한다. */
+      var useSeed=(cur&&cur.seed)||S.seed;
+      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits),day:S.day},function(werr){
+        cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
+        var err0=perr||werr;
+        if(err0)console.warn("cloud save fail",err0);
+        cb&&cb(err0);
+      });
     });
   });
+}
+/* [V8 수정 4] 탭을 닫을 때 쓰는 마지막 한 방 — 개인 데이터만 keepalive 로 밀어 넣는다.
+   월드(edits)는 용량이 커서 keepalive 한도(64KB)를 넘을 수 있고, 실시간 동기화와
+   10초 주기 저장으로 이미 올라가 있으므로 여기서는 건드리지 않는다. */
+function cloudFlushPlayer(){
+  if(!cloudActive())return;
+  var statOut={};for(var sk in S.stat)statOut[sk]=S.stat[sk];
+  statOut.dur=S.dur||{};
+  sbKeepalive=true;
+  try{
+    CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
+      pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(){});
+  }catch(e){}
+  setTimeout(function(){sbKeepalive=false},0);
 }
 /* ==========================================================================
    [V7.1] 저장 슬롯 — 창을 두 개 띄워도 서로 덮어쓰지 않게
@@ -4549,6 +4868,7 @@ function normalizeSave(s){
   if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
   if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
   if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
+  if(s.stat&&typeof s.stat.helps!=="number")s.stat.helps=0;      // [V8 추가 1] 우리 팀 나눔 횟수
   if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
   if(!s.dur)s.dur={};                                  // [V7] 도구 내구도
   /* [V7 수정 5] 저장에 남아 있던 '남의 거래' 카드는 버린다.
@@ -4613,6 +4933,8 @@ function bindInput(){
     if(e.code==="KeyR"){e.preventDefault();panelTab==="record"?closePanel():openPanel("record")}
     if(e.code==="KeyG"){e.preventDefault();panelTab==="edu"?closePanel():openPanel("edu")}
     if(e.code==="KeyH"){e.preventDefault();panelTab==="help"?closePanel():openPanel("help")}
+    /* [V8 추가 2] Q — 지금 고른 핫바 물건 1개를 바닥에 내려놓는다(우리 팀 나눔) */
+    if(e.code==="KeyQ"&&!panelTab){e.preventDefault();var qk=hotbar[hotIdx];if(qk)dropItem(qk,1);else toast("내려놓을 물건이 없습니다")}
     if(e.code==="Space")e.preventDefault();
     /* [V7 수정 10] 패널(가방·무역 등)이 열려 있을 때 숫자키가 핫바를 바꿔 버리던 문제 */
     if(!panelTab&&/^Digit[1-9]$/.test(e.code)){hotIdx=parseInt(e.code.slice(5),10)-1;refreshHotbar()}
@@ -4869,50 +5191,121 @@ function startAsStudent(){
     $("start").disabled=true;$("start").textContent="불러오는 중…";
     /* ⓪ 먼저 내 players 행을 만들어 "이 방 사람"으로 등록한다.
        월드·거래소 읽기 권한이 이 행을 근거로 판정되므로 순서가 중요하다. */
-    CloudSvc.joinRoom(MarketCfg.room,name,bio,function(jerr){
-      if(jerr==="name_taken"){
-        $("start").disabled=false;$("start").textContent="대륙에 도착하기";
-        toast("이 방에 같은 이름이 이미 있습니다. 다른 이름을 쓰거나 선생님께 말하세요","bad");
-        return;
-      }
+    joinWithRetry(MarketCfg.room,name,bio,function(jerr){
+      if(jerr==="name_taken"){ bootNameLocked(name,bio); return; }
       startAsStudentOnline(name,bio);
     });
   }else{
     newStudentWorld(name,bio);   // 오프라인: 기존과 동일(로컬 단독 월드)
   }
 }
+/* [V8 수정 6] 403(이름 잠김)은 토큰이 갱신되는 찰나에도 잠깐 뜰 수 있다. 한 번은 다시 해 본다. */
+function joinWithRetry(room,name,bio,cb){
+  CloudSvc.joinRoom(room,name,bio,function(err){
+    if(err!=="name_taken"){cb(err);return}
+    setTimeout(function(){ CloudSvc.joinRoom(room,name,bio,cb) },1200);
+  });
+}
+/* 학생 화면 안내창(시작 화면의 배정 안내 자리를 쓴다) */
+function bootNotice(html,tone){
+  var info=$("assignInfo");if(!info)return;
+  info.className=tone||"";
+  info.innerHTML=html;
+  var b=$("start");if(b){b.disabled=false;b.textContent=(assignedBiome||picked)?(bN(assignedBiome||picked)+" 대륙에 도착하기"):"대륙에 도착하기"}
+}
+/* ── 이름이 다른 기기에 묶여 있을 때 ──────────────────────────────────────────
+   예전엔 "같은 이름이 이미 있습니다" 한 줄만 띄우고 끝이라, 컴퓨터실 자리를 바꿨거나
+   PC가 초기화된 학생은 아예 들어올 방법이 없었다. 이제 원인과 해결책을 같이 알려 준다. */
+function bootNameLocked(name,bio){
+  var hasLocal=!!findLocalSlot(MarketCfg.room,name);
+  bootNotice(
+    "<b style='color:var(--warn)'>⚠ 이 이름은 다른 기기에서 먼저 접속한 기록이 있습니다.</b>"+
+    "<div style='margin-top:6px;line-height:1.55'>컴퓨터를 바꿨거나 PC가 초기화되면 이렇게 됩니다."+
+    "<br>선생님 화면 → <b>명단</b>에서 <b>"+esc(name)+"</b> 옆의 <b>↻ 기기 바꿈</b>을 눌러 달라고 하세요."+
+    "<br>선생님이 눌러 주신 뒤 아래 <b>다시 시도</b>를 누르면 그대로 이어집니다.</div>"+
+    "<div style='margin-top:9px;display:flex;gap:6px;flex-wrap:wrap'>"+
+    "<button class='mini acc' onclick='startAsStudent()'>다시 시도</button>"+
+    (hasLocal?"<button class='mini' onclick=\"startLocalOnly()\">이 기기에 저장된 것으로 계속하기</button>":"")+
+    "</div>","");
+  toast("선생님께 '기기 바꿈'을 요청하세요","bad");
+}
+/* 서버에 못 쓰는 상태로라도 수업은 이어가게 한다(이 기기에만 저장) */
+function startLocalOnly(){
+  var name=$("nm").value.trim()||"개척자";
+  var sv=findLocalSlot(MarketCfg.room,name);
+  if(!sv){toast("이 기기에 저장된 기록이 없습니다","bad");return}
+  cloudBlocked=true;
+  S=normalizeSave(sv);
+  if(!S){toast("저장을 읽지 못했습니다","bad");return}
+  document.body.dataset.b=S.biome;
+  toast("이 기기에만 저장됩니다. 수업 뒤 선생님께 알려 주세요","warn");
+  beginWorld(true);
+}
 function startAsStudentOnline(name,bio){
-  {
-    /* ① 같은 기후의 공유 월드(seed+edits)를 먼저 불러온다 */
-    CloudSvc.loadWorld(MarketCfg.room,bio,function(werr,wrec){
-      /* ② 내 개인 데이터(인벤토리·스탯·위치)를 불러온다 */
-      CloudSvc.loadPlayer(MarketCfg.room,name,function(perr,prec){
-        var haveShared=wrec&&wrec.edits;
-        var seed=haveShared?(wrec.seed||Math.floor(Math.random()*99999)):Math.floor(Math.random()*99999);
-        S=newState(name,bio,seed);
-        S.room=MarketCfg.room;
-        document.body.dataset.b=S.biome;
-        /* 공유 월드가 이미 있으면 그 건축(edits)을 그대로 이어받는다 */
-        if(haveShared){S.edits=unpackEdits(wrec.edits);S.day=wrec.day||1;}   // [V5 수정 4] 내려받은 직후 해제
-        /* 개인 데이터 복원 or 신규 지급 */
-        if(prec){
-          S.inv=prec.inv||{};
-          if(prec.stat){S.stat=prec.stat;
-            if(S.stat.dur){S.dur=S.stat.dur;delete S.stat.dur}   // [V7] stat 안에 실어둔 내구도 꺼내기
-          }
-          if(!S.dur)S.dur={};
-          if(prec.day)S.day=Math.max(S.day,prec.day);
-          if(prec.pos&&typeof prec.pos.x==="number")S.pos=prec.pos;
-          logAdd(S,"클라우드에서 데이터를 불러왔습니다.");
-        }else{
-          startKit(S);
-          logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
+  /* ① 같은 기후의 공유 월드(seed+edits)를 먼저 불러온다 */
+  CloudSvc.loadWorld(MarketCfg.room,bio,function(werr,wrec){
+    /* ── [V8 수정 9] 불러오기에 '실패'했을 때 새 월드를 만들지 않는다 ──────────
+       예전엔 통신이 한 번만 끊겨도 곧바로 빈 월드 + 시작 키트로 새 판을 열었고,
+       그 상태가 10초 뒤 클라우드에 그대로 덮어써져 학생의 며칠치가 지워졌다.
+       실패는 실패라고 말하고 멈추는 것이 맞다. */
+    if(werr){ loadAborted("대륙 정보",werr,name); return }
+    /* ② 내 개인 데이터(인벤토리·스탯·위치)를 불러온다 */
+    CloudSvc.loadPlayer(MarketCfg.room,name,function(perr,prec){
+      if(perr){ loadAborted("내 가방",perr,name); return }
+      var localSv=findLocalSlot(MarketCfg.room,name);
+      var haveShared=!!wrec;                                   // 행이 있으면 공유 월드가 있는 것
+      var seed=(wrec&&wrec.seed)||seedFor(MarketCfg.room,bio); // 실패해도 랜덤을 쓰지 않는다
+      S=newState(name,bio,seed);
+      S.room=MarketCfg.room;
+      document.body.dataset.b=S.biome;
+      if(haveShared){S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;}
+      /* 개인 데이터 복원 or 신규 지급 */
+      if(prec){
+        S.inv=prec.inv||{};
+        if(prec.stat){S.stat=prec.stat;
+          if(S.stat.dur){S.dur=S.stat.dur;delete S.stat.dur}   // [V7] stat 안에 실어둔 내구도 꺼내기
         }
-        /* 공유 월드가 아예 없던 첫 학생이면 새 월드로 취급(스폰 정리 등) */
-        beginWorld(haveShared||!!prec);
-      });
+        if(!S.dur)S.dur={};
+        if(prec.day)S.day=Math.max(S.day,prec.day);
+        if(prec.pos&&typeof prec.pos.x==="number")S.pos=prec.pos;
+        /* [V8 수정 10] 클라우드 가방은 비었는데 이 기기에는 물건이 남아 있는 경우 —
+           예전 버전에서 업로드를 놓친 흔적이다. 빈 쪽을 믿지 말고 남아 있는 쪽을 살린다. */
+        if(invCount(S.inv)===0&&localSv&&invCount(localSv.inv)>0){
+          S.inv=localSv.inv;
+          if(localSv.dur)S.dur=localSv.dur;
+          if(localSv.stat)S.stat=localSv.stat;
+          if(localSv.day)S.day=Math.max(S.day,localSv.day);
+          logAdd(S,"클라우드 가방이 비어 있어 이 기기에 남아 있던 물건을 되살렸습니다.");
+          setTimeout(function(){toast("🧰 이 기기에 남아 있던 물건을 되살렸습니다","good")},900);
+        }else{
+          logAdd(S,"클라우드에서 데이터를 불러왔습니다.");
+        }
+      }else if(localSv&&invCount(localSv.inv)>0){
+        /* 서버에 내 행이 없는데 이 기기엔 기록이 있다 → 새로 주지 말고 그대로 이어받는다 */
+        S.inv=localSv.inv;S.dur=localSv.dur||{};
+        if(localSv.stat)S.stat=localSv.stat;
+        S.day=Math.max(S.day,localSv.day||1);
+        if(localSv.pos&&typeof localSv.pos.x==="number")S.pos=localSv.pos;
+        logAdd(S,"이 기기에 저장된 기록을 이어받았습니다.");
+      }else{
+        startKit(S);
+        logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
+      }
+      beginWorld(haveShared||!!prec||!!localSv);
     });
-  }
+  });
+}
+/* 불러오기 실패: 아무것도 새로 만들지 않고 멈춘 뒤, 선택지를 준다 */
+function loadAborted(what,err,name){
+  var hasLocal=!!findLocalSlot(MarketCfg.room,name);
+  bootNotice(
+    "<b style='color:var(--bad)'>⚠ "+esc(what)+"를 불러오지 못했습니다.</b>"+
+    "<div style='margin-top:6px;line-height:1.55'>"+esc(cloudErrText(err))+
+    "<br>기존 기록이 지워지지 않도록 <b>새 월드를 만들지 않고 멈췄습니다.</b> 잠시 뒤 다시 시도해 주세요.</div>"+
+    "<div style='margin-top:9px;display:flex;gap:6px;flex-wrap:wrap'>"+
+    "<button class='mini acc' onclick='startAsStudent()'>다시 시도</button>"+
+    (hasLocal?"<button class='mini' onclick=\"startLocalOnly()\">이 기기에 저장된 것으로 계속하기</button>":"")+
+    "</div>","");
 }
 function newStudentWorld(name,bio){
   S=newState(name,bio,Math.floor(Math.random()*99999));
@@ -5215,7 +5608,7 @@ function startVisit(nameEnc,biome){
       inv:{},dur:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
       paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
       carbon:0,quizA:{},regrow:{},
-      stat:{got:{},made:{},trades:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
+      stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
     S=vis;document.body.dataset.b=S.biome;
     /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
     if(CloudSvc&&CloudSvc.online)netStart(S.room,S.biome);
@@ -5308,10 +5701,16 @@ function loop(t){
 }
 document.addEventListener("visibilitychange",function(){
   if(!S)return;
-  if(document.hidden){save();if(cloudActive())cloudSaveWorld(true)}
+  if(document.hidden){save();if(cloudActive())cloudSaveWorld(true);cloudFlushPlayer()}
   else{lastT=performance.now();if(!S.isVisiting&&catchUp()>60)toast("돌아왔습니다")}
 });
-window.addEventListener("beforeunload",function(){save();if(cloudActive())cloudSaveWorld(true);netStop()});
+/* [V8 수정 4] 순서가 중요하다: 먼저 정리(netStop 이 미수령 나눔을 가방으로 돌려준다) →
+   로컬 저장 → keepalive 로 클라우드에 마지막 개인 데이터 전송. */
+window.addEventListener("beforeunload",function(){
+  try{netStop()}catch(e){}
+  save();
+  cloudFlushPlayer();
+});
 /* ---------- 앱 설치 (파일 없이 아이콘·매니페스트 생성) ---------- */
 function mkIcon(sz){
   var c=document.createElement("canvas");c.width=c.height=sz;var x=c.getContext("2d"),u=sz/512;
