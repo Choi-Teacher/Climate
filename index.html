@@ -838,11 +838,29 @@ var BL={
  34:{n:"철 블록",c:0xd6dbe0,hard:2.2,drop:"iron",solid:true},
  35:{n:"무역소",c:0xe0b84a,hard:2.5,drop:"tradepost",solid:true,special:"trade"},
  36:{n:"기념비",c:0xf2e2a8,hard:3,drop:null,solid:true,special:"monument"},
- 37:{n:"모닥불",c:0xf07830,hard:.5,drop:"wood",solid:true,special:"fire",light:true}
+ 37:{n:"모닥불",c:0xf07830,hard:.5,drop:"wood",solid:true,special:"fire",light:true},
+ /* ── [V8 추가 3] 전기 · 기계 ──────────────────────────────────────────────
+    발전기가 석탄을 태워 ⚡전력을 만들고, 기계들이 그 전력을 쓴다.
+    "수렵채집 → 농경 → 목축 → 공업 → 전기"로 이어지는 단계를 몸으로 겪게 하려는 것. */
+ 45:{n:"화력 발전기",  c:0x5a6470,hard:2.4,drop:"generator", solid:true,special:"gen"},
+ 46:{n:"태양광 패널",  c:0x2b4a8c,hard:1.4,drop:"solar",     solid:true,special:"sun"},
+ 47:{n:"온실",        c:0xa8e0c8,hard:1.0,drop:"greenhouse",solid:true,special:"green",alpha:.5},
+ 48:{n:"전기 난로",    c:0xd4553c,hard:1.6,drop:"heater",    solid:true,special:"heat",light:true},
+ 49:{n:"전기 용광로",  c:0x8f9aa6,hard:2.4,drop:"efurnace",  solid:true,special:"efur"},
+ /* ── [V8 추가 4] 목축 — 기후마다 기르는 가축이 다르다 ─────────────────── */
+ 50:{n:"소 목장",     c:0xcbbfa8,hard:.8,drop:"an_cow",  solid:true,special:"ranch"},
+ 51:{n:"닭장",        c:0xd8bd86,hard:.8,drop:"an_hen",  solid:true,special:"ranch"},
+ 52:{n:"은여우 사육장",c:0xb0783f,hard:.8,drop:"an_fox",  solid:true,special:"ranch"},
+ 53:{n:"낙타 우리",    c:0xd2ac72,hard:.8,drop:"an_camel",solid:true,special:"ranch"},
+ 54:{n:"순록 우리",    c:0x9c8f7e,hard:.8,drop:"an_deer", solid:true,special:"ranch"},
+ 55:{n:"야마 우리",    c:0xc9b79a,hard:.8,drop:"an_llama",solid:true,special:"ranch"}
 };
 /* 아이템 → 놓을 수 있는 블록 */
 var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:34,
-  clay:10,coal:11,snow:8,tradepost:35,monument:36,campfire:37,well:44};
+  clay:10,coal:11,snow:8,tradepost:35,monument:36,campfire:37,well:44,
+  /* [V8 추가 3·4] 기계와 가축도 '놓아서' 쓴다 */
+  generator:45,solar:46,greenhouse:47,heater:48,efurnace:49,
+  an_cow:50,an_hen:51,an_fox:52,an_camel:53,an_deer:54,an_llama:55};
 /* 씨앗 아이템 → 심으면 자라나는 '어린 작물' 블록.
    밀은 '심는 작물'이 아니라 온대 들판에 야생으로 나는 재료(빵·섬유용)라 여기 없다. */
 var SEED={seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42};
@@ -861,6 +879,35 @@ var BIOME_CROPS={
   taiga:["seed_potato"],
   tundra:[]
 };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 4] 목축 — 기후마다 기르는 가축이 다르다
+   --------------------------------------------------------------------------
+   실제 지리를 그대로 옮겼다. 온대의 낙농(소), 열대의 닭, 냉대의 모피동물,
+   건조의 낙타 유목, 한대의 순록 유목(사미·네네츠), 고산 안데스의 야마.
+   자기 기후의 가축은 잘 자라고, 남의 기후 가축은 거의 자라지 않는다 —
+   "왜 사막에 순록이 없고 툰드라에 낙타가 없는가"를 손으로 겪게 하려는 규칙이다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var LIVESTOCK={
+  cow  :{b:"temperate",n:"소",    em:"🐄",id:50,give:"milk",gn:2,meat:4,
+         feed:["wheat","rice","potato","bread"],d:"온대의 넓은 초지에서 기르는 젖소 — 우유"},
+  hen  :{b:"tropical", n:"닭",    em:"🐔",id:51,give:"egg", gn:2,meat:2,
+         feed:["rice","cassava","fruit","wheat"],d:"열대 마을의 마당닭 — 달걀"},
+  fox  :{b:"taiga",    n:"은여우", em:"🦊",id:52,give:"fur", gn:1,meat:2,
+         feed:["fish","meat","potato"],d:"냉대의 모피 사육 — 모피"},
+  camel:{b:"desert",   n:"낙타",   em:"🐪",id:53,give:"milk",gn:2,meat:4,
+         feed:["date","wheat","fruit"],d:"사막 유목민의 낙타 — 젖과 짐"},
+  deer :{b:"tundra",   n:"순록",   em:"🦌",id:54,give:"fur", gn:1,meat:5,
+         feed:["ice","fish","potato"],d:"툰드라 유목의 순록 — 눈 밑 이끼를 먹습니다"},
+  llama:{b:"alpine",   n:"야마",   em:"🦙",id:55,give:"wool",gn:2,meat:3,
+         feed:["potato","wheat","rice"],d:"안데스 고산의 야마 — 양털과 짐"}
+};
+var RANCH_ITEM={},RANCH_BY_ID={};
+(function(){for(var k in LIVESTOCK){RANCH_ITEM["an_"+k]=k;RANCH_BY_ID[LIVESTOCK[k].id]=k}})();
+var GROW_TIME=110;        // 새끼 → 성체(초). 자기 기후 기준
+var PROD_TIME=70;         // 성체가 산물을 한 번 내는 데 걸리는 시간(초)
+var FEED_EVERY=55;        // 이 주기마다 먹이 한 번
+var BREED_TIME=150;       // 성체 2마리 이상이면 이 주기마다 새끼 1마리
 
 var ITEMS={
  wheat:{n:"밀",em:"🌾",tier:1,val:1,rot:1,food:{h:18}},
@@ -907,6 +954,23 @@ var ITEMS={
  chocolate:{n:"초콜릿",em:"🍫",tier:3,val:8,food:{h:10}},
  brew:{n:"커피",em:"🧋",tier:3,val:7.2,food:{h:4,s:35}},
  power:{n:"전력",em:"⚡",tier:3,val:12},
+ /* [V8 추가 3] 기계 */
+ generator:{n:"화력 발전기",em:"🏭",tier:3,val:16},
+ greenhouse:{n:"온실",em:"🏡",tier:3,val:15},
+ heater:{n:"전기 난로",em:"🔌",tier:3,val:13},
+ efurnace:{n:"전기 용광로",em:"⚙️",tier:3,val:18},
+ /* [V8 추가 4] 축산물 */
+ milk:{n:"우유",em:"🥛",tier:2,val:3,rot:1,food:{h:12,w:16}},
+ egg:{n:"달걀",em:"🥚",tier:2,val:3,rot:1,food:{h:16}},
+ wool:{n:"양털",em:"🧶",tier:2,val:3.2},
+ meat:{n:"고기",em:"🍖",tier:2,val:4.5,rot:1,food:{h:34}},
+ /* [V8 추가 4] 가축(놓으면 목장이 됩니다) */
+ an_cow:{n:"소",em:"🐄",tier:2,val:10},
+ an_hen:{n:"닭",em:"🐔",tier:2,val:7},
+ an_fox:{n:"은여우",em:"🦊",tier:2,val:11},
+ an_camel:{n:"낙타",em:"🐪",tier:2,val:11},
+ an_deer:{n:"순록",em:"🦌",tier:2,val:11},
+ an_llama:{n:"야마",em:"🦙",tier:2,val:10},
  tradepost:{n:"무역소",em:"⚖️",tier:2,val:8},
  well:{n:"우물",em:"🪣",tier:2,val:5},
  monument:{n:"기념비",em:"🗽",tier:3,val:99},
@@ -936,8 +1000,10 @@ var ITEMS={
    도구는 자동으로 가장 좋은 것이 골라진다. 초등학생이 장비 교체에 헤매지 않도록.
    ========================================================================== */
 var TOOL_KIND={
-  pick  :{n:"곡괭이",em:"⛏️",for:"돌·광물",  blocks:{3:1,10:1,11:1,12:1,13:1,14:1,15:1,9:1,31:1,33:1,34:1,32:1,44:1,35:1,36:1}},
-  axe   :{n:"도끼",  em:"🪓",for:"나무·덤불",blocks:{6:1,7:1,16:1,17:1,18:1,19:1,20:1,21:1,22:1,30:1,37:1}},
+  pick  :{n:"곡괭이",em:"⛏️",for:"돌·광물",  blocks:{3:1,10:1,11:1,12:1,13:1,14:1,15:1,9:1,31:1,33:1,34:1,32:1,44:1,35:1,36:1,
+                                                    45:1,46:1,48:1,49:1}},
+  axe   :{n:"도끼",  em:"🪓",for:"나무·덤불",blocks:{6:1,7:1,16:1,17:1,18:1,19:1,20:1,21:1,22:1,30:1,37:1,47:1,
+                                                    50:1,51:1,52:1,53:1,54:1,55:1}},
   shovel:{n:"삽",    em:"🥄",for:"흙·모래·눈",blocks:{1:1,2:1,4:1,8:1,24:1}}
 };
 var TOOL_MAT={
@@ -1009,6 +1075,7 @@ var LAT_INFO={
    쌓인 탄소는 실제로 내 대륙의 기온을 올린다(ambient).
    ========================================================================== */
 var CARBON_OF={brick:1,glass:1,iron:2,fuel:4,power:6};   // 만들 때 나오는 탄소(석탄·석유를 태우는 제작)
+CARBON_OF.power_coal=3;                                  // [V8] 석탄 화력(레시피 id 로도 찾는다)
 var CARBON_STEP=[
  {at:0,  d:0, n:"안정",  c:"#5fd3a3", m:"아직은 지구가 견디고 있습니다."},
  {at:25, d:1, n:"주의",  c:"#e8d24a", m:"평균 기온이 <b>1°C</b> 올랐습니다. 더워진 만큼 폭염과 가뭄이 잦아집니다."},
@@ -1022,9 +1089,11 @@ function carbonStep(){
   return r;
 }
 function warmDeg(){return carbonStep().d}     // ambient() 에 더해지는 온난화 보정(°C)
-var SPECIAL={temperate:["wheat","wood","clay","bread"],tropical:["rubber","cacao","coffee","spice","hardwood","fruit"],
- taiga:["wood","fur","coal"],desert:["sand","oil","gold","glass"],tundra:["ice","fish"],
- alpine:["iron_ore","copper","stone","iron"]};
+var SPECIAL={temperate:["wheat","wood","clay","bread","milk","an_cow"],
+ tropical:["rubber","cacao","coffee","spice","hardwood","fruit","egg","an_hen"],
+ taiga:["wood","fur","coal","an_fox"],desert:["sand","oil","gold","glass","an_camel"],
+ tundra:["ice","fish","meat","an_deer"],
+ alpine:["iron_ore","copper","stone","iron","wool","an_llama"]};
 var SOURCE={};
 for(var _b in SPECIAL)SPECIAL[_b].forEach(function(k){(SOURCE[k]=SOURCE[k]||[]).push(_b)});
 function whereFrom(k){
@@ -1034,12 +1103,12 @@ function whereFrom(k){
 }
 /* 기후별 '살아남는 법' 안내(도움말) — 게임에서 몸으로 겪는 규칙을 말로 정리 */
 var BIOME_SURVIVE={
- temperate:"기후가 온화해 살기 좋습니다. 호수·연못이 많아 물 걱정이 적고, <b>벼농사</b>가 잘 되어 식량이 넘칩니다(들판엔 야생 밀도 있어 빵·옷감을 만들 수 있어요). 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
- tropical:"습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>비가 잦아(우기) <b>벼·카사바 농사</b>가 잘 됩니다. 무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
- taiga:"여름이 짧고 서늘합니다. 벼·밀 같은 곡식은 어렵지만 추위에 강한 <b>감자</b>는 기를 수 있어요. 주로 <b>낚시·사냥(모피)·벌목</b>으로 살고, 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
- desert:"낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>💧 물이 아주 귀합니다. <b>오아시스</b>를 찾거나 <b>우물</b>(돌+판자)을 파서 물을 확보하세요. 물가에선 <b>대추야자</b>를 기를 수 있습니다. 채집은 서늘한 <b>밤</b>에 하세요.",
- tundra:"낮이 <b>아주 짧습니다(08~16시)</b>. 밝을 때 <b>낚시</b>로 먹을 것을 모으고, 밤엔 <b>모닥불·방한복·지붕 있는 집</b> 안에서 버티세요. 밤에 밖을 돌면 몸이 얼어 느려지고 쓰러집니다. 이 땅에선 <b>농사가 안 되니</b> 낚시·모피가 생명줄입니다.",
- alpine:"공기가 희박해 회복이 느립니다(기력·체력 주의). 빙하 녹은 물웅덩이가 드물게 있고, 서늘해도 <b>감자</b>는 기를 수 있습니다. 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
+ temperate:"🐄 <b>소</b>를 길러 우유를 얻을 수 있습니다(밀·쌀+물을 주세요). 물가에는 <b>점토</b>가 있어 벽돌의 재료가 됩니다.<br>기후가 온화해 살기 좋습니다. 호수·연못이 많아 물 걱정이 적고, <b>벼농사</b>가 잘 되어 식량이 넘칩니다(들판엔 야생 밀도 있어 빵·옷감을 만들 수 있어요). 남는 식량을 척박한 대륙(사막·한대)에 팔아 철·유리·얼음 같은 없는 자원을 구하세요.",
+ tropical:"🐔 <b>닭</b>을 길러 달걀을 얻습니다(쌀·카사바·과일+물).<br>습기와 벌레가 많아 <b>땅에 지은 집은 썩습니다</b>. <b>나무 기둥(고상 가옥)</b> 위에 지어야 남습니다.<br>비가 잦아(우기) <b>벼·카사바 농사</b>가 잘 됩니다. 무더위로 음식이 <b>3배 빨리 상하니</b>, 향신료로 절여 <b>말린 과일</b>로 보존하거나 상하기 전에 <b>바로 팔아야</b> 합니다.",
+ taiga:"🦊 <b>은여우</b>를 길러 모피를 계속 얻을 수 있습니다. ⚫ 석탄이 있어 <b>화력 발전</b>에 유리하지만, 그만큼 탄소도 쌓입니다.<br>여름이 짧고 서늘합니다. 벼·밀 같은 곡식은 어렵지만 추위에 강한 <b>감자</b>는 기를 수 있어요. 주로 <b>낚시·사냥(모피)·벌목</b>으로 살고, 날이 차서 음식이 잘 안 상하니 보존·가공에 유리합니다.",
+ desert:"🐪 <b>낙타</b>를 기를 수 있습니다(대추야자+물). 🔆 햇빛이 강해 <b>태양광 패널</b>이 가장 잘 도는 땅입니다.<br>낮 <b>09~17시는 폭염</b>이라 밖에 서 있으면 곧 탈진합니다. <b>지붕을 덮은 실내</b>나 <b>파 놓은 굴</b>(하늘이 막힌 곳)에 있어야 안전합니다.<br>💧 물이 아주 귀합니다. <b>오아시스</b>를 찾거나 <b>우물</b>(돌+판자)을 파서 물을 확보하세요. 물가에선 <b>대추야자</b>를 기를 수 있습니다. 채집은 서늘한 <b>밤</b>에 하세요.",
+ tundra:"🦌 <b>순록</b>을 기를 수 있습니다 — 얼음을 캐서(눈 밑 이끼) 물과 함께 주면 모피와 고기를 계속 냅니다. 얼음에 뚫린 <b>낚시 구멍</b>에서 물고기를 잡으세요.<br>낮이 <b>아주 짧습니다(08~16시)</b>. 밝을 때 <b>낚시</b>로 먹을 것을 모으고, 밤엔 <b>모닥불·방한복·지붕 있는 집</b> 안에서 버티세요. 밤에 밖을 돌면 몸이 얼어 느려지고 쓰러집니다. 이 땅에선 <b>농사가 안 되니</b> 낚시·모피가 생명줄입니다.",
+ alpine:"🦙 <b>야마</b>를 길러 <b>양털</b>을 얻습니다 — 밀이 없는 기후들도 양털로 실을 뽑아 옷을 지으니, 고산의 양털은 좋은 수출품입니다. 철·구리가 있어 <b>발전기</b>도 가장 먼저 만들 수 있습니다.<br>공기가 희박해 회복이 느립니다(기력·체력 주의). 빙하 녹은 물웅덩이가 드물게 있고, 서늘해도 <b>감자</b>는 기를 수 있습니다. 철·구리·석재가 풍부하니 <b>중화학·광물</b>을 캐서 다른 대륙과 바꾸세요."
 };
 /* ==========================================================================
    [학습 콘텐츠] 6학년 사회 '기후와 생활' 교과 내용
@@ -1233,6 +1302,22 @@ var RECIPES=[
  {id:"iron",out:{iron:1},need:{iron_ore:2,coal:1},eff:"모든 기계의 재료"},
  {id:"fuel",out:{fuel:1},need:{oil:2},eff:"원유를 태워 쓰는 화석연료 · 🏭 탄소 4"},
  {id:"power",out:{power:2},need:{fuel:1,copper:2,iron:1},eff:"화력 발전 · 값싸지만 🏭 탄소 6"},
+ /* [V8 추가 3] 석탄 화력 — 냉대·고산의 석탄이 곧 전기가 된다 */
+ {id:"power_coal",out:{power:1},need:{coal:2,copper:1},eff:"⚫ 석탄을 태워 만든 전기 · 🏭 탄소 3"},
+ {id:"generator",out:{generator:1},need:{iron:3,stone:6,copper:2},
+  eff:"🏭 땅에 놓으면 가방의 석탄을 스스로 태워 ⚡전력을 만듭니다 (석탄 1 → 전력 1 · 탄소 2)"},
+ {id:"greenhouse",out:{greenhouse:1},need:{glass:4,plank:4,iron:1},
+  eff:"🏡 전기로 온도를 맞춰 줍니다 · 둘레 5칸 안에서는 <b>어떤 기후에서도</b> 씨앗이 자라고 2.5배 빨라집니다"},
+ {id:"heater",out:{heater:1},need:{iron:2,copper:2,stone:2},
+  eff:"🔌 전기 난로 · 둘레 4칸을 따뜻하게 (모닥불과 달리 나무를 태우지 않아 탄소 0)"},
+ {id:"efurnace",out:{efurnace:1},need:{iron:4,stone:8,copper:1},
+  eff:"⚙️ 놓아 두면 석탄 대신 전기로 제련할 수 있게 됩니다 (철·유리·벽돌)"},
+ /* 전기 제련 — 전기 용광로를 놓아야 목록에 나타난다 */
+ {id:"iron_e", cat:"elec",out:{iron:3}, need:{iron_ore:3,power:1},eff:"⚙️ 전기 제련 · 석탄 없이, 탄소 없이 철괴 3개"},
+ {id:"glass_e",cat:"elec",out:{glass:3},need:{sand:4,power:1},   eff:"⚙️ 전기 제련 · 석탄 없이 유리 3개"},
+ {id:"brick_e",cat:"elec",out:{brick:3},need:{clay:4,power:1},   eff:"⚙️ 전기 가마 · 석탄 없이 벽돌 3개"},
+ /* [V8 추가 4] 축산물 가공 */
+ {id:"fiber_wool",out:{fiber:2},need:{wool:2},eff:"🧶 양털로 실 뽑기 — 밀이 없는 기후도 옷을 지을 수 있습니다"},
  {id:"solar",out:{solar:1},need:{glass:3,copper:2,iron:1},eff:"햇빛으로 전기를 만드는 판 (건조의 유리 + 고산의 금속)"},
  {id:"power_sun",out:{power:2},need:{solar:1,copper:1},eff:"태양광 발전 · 재료는 더 들지만 🌱 탄소 0"},
  {id:"chocolate",out:{chocolate:1},need:{cacao:2,ice:1},eff:"사치재 · 기념비에 필요"},
@@ -1269,6 +1354,9 @@ var TITLES=[
  {id:"oasis",n:"사막의 기적",d:"유리 10개 제작",b:"desert",f:function(s){return (s.stat.made.glass||0)>=10}},
  {id:"polar",n:"극지방의 생존자",d:"3일 생존 + 얼음 30개",b:"tundra",f:function(s){return s.day>=3&&(s.stat.got.ice||0)>=30}},
  {id:"roof",n:"세계의 지붕",d:"철괴 12개 제작",b:"alpine",f:function(s){return (s.stat.made.iron||0)>=12}},
+ {id:"rancher",n:"목축가",d:"가축 4마리 기르기",f:function(s){return (s.stat.animals||0)>=4}},
+ {id:"engineer",n:"기술자",d:"전기 10 생산",f:function(s){return (s.stat.powerMade||0)>=10}},
+ {id:"green",n:"푸른 전기",d:"태양광으로 전기 8",f:function(s){return (s.stat.powerClean||0)>=8}},
  {id:"civil",n:"문명의 완성자",d:"기념비 건설",f:function(s){return s.stat.monument}}
 ];
 
@@ -1358,10 +1446,15 @@ function genWorld(biome,seed,onProg){
         if(ore>.68&&r()<.16)setB(x2,top,z2,14);
         if(ore<.3&&r()<.10){for(var d=0;d<2;d++)setB(x2,top-d,z2,15)}
       }
-      if(biome==="temperate"&&h2<=SEA+1&&r()<.30)setB(x2,top,z2,10);
+      /* [V8 수정 12] 예전 점토 규칙은 h2<=SEA+1(=9) 인 칸에만 점토를 놓았다.
+         그런데 지형 높이 계산식의 최솟값이 10이라 이 조건은 단 한 번도 참이 되지 않았다.
+         → 온대에 점토가 0칸. 벽돌도, 기념비도 아무도 만들 수 없었다.
+         점토는 아래 lineClay() 에서 '물가 진흙'으로 제대로 깔아 준다. */
       /* 바다·호수 */
       for(var wy=h2+1;wy<=SEA;wy++)setB(x2,wy,z2,biome==="tundra"?(wy===SEA?9:5):5);
-      if(biome==="tundra"&&h2<SEA&&r()<.06)setB(x2,SEA,z2,23);   // 낚시 구멍(상향: .012→.06)
+      /* [V8 수정 13] 낚시 구멍도 같은 이유(h2<SEA 가 절대 성립하지 않음)로 0개였다.
+         한대의 유일한 식량인 물고기를 얻을 방법이 아예 없었다는 뜻이다.
+         아래 ensureFishing() 에서 실제 물웅덩이 위에 구멍을 뚫어 준다. */
     }
     if(onProg&&x2%12===0)onProg(x2/W*.7);
   }
@@ -1457,7 +1550,8 @@ function genWorld(biome,seed,onProg){
     }
     return true;
   }
-  var pondSpec={temperate:14,tropical:20,taiga:9,alpine:5,desert:0,tundra:4}[biome]||0;
+  /* [V8 수정 13] 한대 4 → 18. 한대의 물웅덩이는 곧 '얼음 구멍을 뚫을 자리'다. */
+  var pondSpec={temperate:16,tropical:20,taiga:9,alpine:5,desert:0,tundra:18}[biome]||0;
   var placed=0,guard=0;
   while(placed<pondSpec&&guard++<pondSpec*40){
     var px=4+Math.floor(r()*(W-8)),pz=4+Math.floor(r()*(W-8)),ph=hmap[pz*W+px];
@@ -1484,6 +1578,98 @@ function genWorld(biome,seed,onProg){
       }
     }
   }
+  /* ══════════════════════════════════════════════════════════════════════
+     [V8 수정 12] 온대의 점토 — 물가 진흙
+     점토는 강·호수 바닥에 고운 흙이 가라앉아 생긴다. 그래서 물가에 깔고,
+     학생이 반드시 하나는 찾도록 눈에 띄는 '점토 둑'도 몇 군데 만들어 둔다.
+     ══════════════════════════════════════════════════════════════════════ */
+  function waterNearXZ(x,z,rad){
+    for(var ox=-rad;ox<=rad;ox++)for(var oz=-rad;oz<=rad;oz++){
+      var xx=x+ox,zz=z+oz;if(xx<1||zz<1||xx>=W-1||zz>=W-1)continue;
+      var hh=hmap[zz*W+xx];
+      for(var yy=hh;yy<=hh+2;yy++)if(getB(xx,yy,zz)===5)return true;
+    }
+    return false;
+  }
+  function lineClay(){
+    var made=0;
+    /* ① 물가 두 칸 안의 지표를 점토로 (자연스러운 진흙 띠) */
+    for(var x=2;x<W-2;x++)for(var z=2;z<W-2;z++){
+      var h=hmap[z*W+x];if(h<=SEA)continue;
+      var t=getB(x,h,z);
+      if(t!==1&&t!==2)continue;                    // 풀·흙 위에만
+      if(!waterNearXZ(x,z,2))continue;
+      if(r()<.55){setB(x,h,z,10);made++}
+    }
+    /* ② 그래도 부족하면(웅덩이가 적은 시드) 들판 한가운데에 점토 둑을 만든다 */
+    var guard=0;
+    while(made<260&&guard++<900){
+      var cx=6+Math.floor(r()*(W-12)),cz=6+Math.floor(r()*(W-12)),ch=hmap[cz*W+cx];
+      if(ch<=SEA)continue;
+      var t0=getB(cx,ch,cz);if(t0!==1&&t0!==2)continue;
+      var rad=2+Math.floor(r()*2);
+      for(var ox=-rad;ox<=rad;ox++)for(var oz=-rad;oz<=rad;oz++){
+        if(ox*ox+oz*oz>rad*rad)continue;
+        var xx=cx+ox,zz=cz+oz;if(xx<2||zz<2||xx>=W-2||zz>=W-2)continue;
+        var hh=hmap[zz*W+xx];if(hh<=SEA)continue;
+        var tb=getB(xx,hh,zz);if(tb!==1&&tb!==2)continue;
+        setB(xx,hh,zz,10);made++;
+        if(r()<.5)setB(xx,hh-1,zz,10);             // 한 층 더 깊게
+      }
+    }
+    /* ③ 스폰(월드 중앙) 가까이에도 반드시 한 덩이 — 처음 나온 학생이 헤매지 않게 */
+    var sx=Math.floor(W/2),sz=Math.floor(W/2),done=false,g2=0;
+    while(!done&&g2++<600){
+      var ang=r()*Math.PI*2,dist=8+r()*14;
+      var px2=sx+Math.round(Math.cos(ang)*dist),pz2=sz+Math.round(Math.sin(ang)*dist);
+      if(px2<4||pz2<4||px2>=W-4||pz2>=W-4)continue;
+      var ph2=hmap[pz2*W+px2];if(ph2<=SEA)continue;
+      var pb=getB(px2,ph2,pz2);if(pb!==1&&pb!==2&&pb!==10)continue;
+      for(var ax=-2;ax<=2;ax++)for(var az=-2;az<=2;az++){
+        var qx=px2+ax,qz=pz2+az;if(qx<2||qz<2||qx>=W-2||qz>=W-2)continue;
+        var qh=hmap[qz*W+qx];if(qh<=SEA)continue;
+        var qb=getB(qx,qh,qz);if(qb===1||qb===2||qb===10)setB(qx,qh,qz,10);
+      }
+      done=true;
+    }
+  }
+  if(biome==="temperate")lineClay();
+
+  /* ══════════════════════════════════════════════════════════════════════
+     [V8 수정 13] 한대의 낚시 구멍 — 얼음을 뚫어야 물고기를 잡는다
+     물웅덩이 표면(물 또는 얼음)을 골라 구멍을 낸다. 스폰 근처에도 반드시 몇 개.
+     ══════════════════════════════════════════════════════════════════════ */
+  function ensureFishing(){
+    var surf=[];
+    for(var x=2;x<W-2;x++)for(var z=2;z<W-2;z++){
+      for(var y=H-2;y>1;y--){
+        var b=getB(x,y,z);
+        if(b===0)continue;
+        if(b===5||b===9){ if(getB(x,y+1,z)===0)surf.push([x,y,z]); }
+        break;                                     // 각 칸의 '맨 위 블록'만 본다
+      }
+    }
+    if(!surf.length)return;
+    var cx=Math.floor(W/2),cz=Math.floor(W/2);
+    /* 중앙에서 가까운 순서로 정렬해 스폰 근처가 먼저 뚫리게 한다 */
+    surf.sort(function(a,b){
+      var da=(a[0]-cx)*(a[0]-cx)+(a[2]-cz)*(a[2]-cz);
+      var db=(b[0]-cx)*(b[0]-cx)+(b[2]-cz)*(b[2]-cz);return da-db;});
+    var want=Math.min(surf.length,34), step=Math.max(1,Math.floor(surf.length/want));
+    var near=0;
+    for(var i=0;i<surf.length&&want>0;i+=step){
+      var c=surf[i];setB(c[0],c[1],c[2],23);want--;
+      if((c[0]-cx)*(c[0]-cx)+(c[2]-cz)*(c[2]-cz)<=400)near++;
+    }
+    /* 스폰 반경 20칸 안에 3개는 보장 */
+    for(var j=0;j<surf.length&&near<3;j++){
+      var d=surf[j];
+      if((d[0]-cx)*(d[0]-cx)+(d[2]-cz)*(d[2]-cz)>400)break;
+      if(getB(d[0],d[1],d[2])!==23){setB(d[0],d[1],d[2],23);near++}
+    }
+  }
+  if(biome==="tundra")ensureFishing();
+
   /* 고산: 빙하 녹은 물웅덩이 가장자리를 얼음으로 (차가운 물) */
   if(onProg)onProg(.8);
   return hmap;
@@ -2314,6 +2500,7 @@ function tryMine(dt){
 }
 function breakBlock(x,y,z){
   var b=getB(x,y,z),B=BL[b];if(!B||B.drop===null)return;
+  machineUnregister(x,y,z,b);                   // [V8 추가 3·4] 기계·목장 해제(가축은 회수)
   yieldBlock(x,y,z,b,B);                        // 대상 블록 파괴 + 드롭
   S.hunger=clamp(S.hunger-.25,0,100);
   if(B.special==="trade")S.hasPost=false;
@@ -2418,6 +2605,7 @@ function tryPlace(){
   if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
   setB(bx,by,bz,id);S.edits[bx+","+by+","+bz]=id;markDirty(bx,bz);
   netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
+  machineRegister(bx,by,bz,id);     // [V8 추가 3·4] 기계·목장 등록
   S.stat.placed++;
   toast(iE(sel)+" "+iN(sel)+" 설치","good");
   if(id===44)teachOnce("wellDug","💧 비가 오지 않는 땅에서는 <b>땅을 파서</b> 물을 얻습니다. 사막 사람들이 <b>오아시스와 우물 곁</b>에 마을을 세운 까닭이에요.");
@@ -2455,17 +2643,19 @@ function waterNear(x,y,z){
 }
 /* [농사] 씨앗을 심는다 */
 function plantSeed(sel,bx,by,bz,tg){
+  /* [V8 추가 3] 온실 안에서는 기후의 제약을 넘는다 — 전기가 만든 예외 */
+  var inGreen=greenhouseAt(bx,by,bz);
   /* 한대(영구동토): 농사 완전 불가 */
-  if(S.biome==="tundra"){
+  if(S.biome==="tundra"&&!inGreen){
     teachOnce("nofarm","🌾 <b>한대(툰드라)</b>는 땅이 얼어 있어 곡식이 자라지 않습니다. 그래서 이곳 사람들은 농사 대신 <b>낚시</b>와 <b>사냥(순록·물고기)</b>으로 먹고삽니다.");
     toast("얼어붙은 땅이라 씨앗이 자라지 않습니다","bad");return;
   }
   /* 이 기후에서 자라는 작물인지 */
   var okList=BIOME_CROPS[S.biome]||[];
-  if(okList.length===0){
+  if(okList.length===0&&!inGreen){
     toast("이 기후에선 농사를 지을 수 없습니다","bad");return;
   }
-  if(okList.indexOf(sel)<0){
+  if(!inGreen&&okList.indexOf(sel)<0){
     var names=okList.map(function(k){return CROP_NAME[k]||iN(k)}).join("·");
     /* 냉대는 서늘해 감자만 되는 것을 짚어준다 */
     if(S.biome==="taiga")teachOnce("taigafarm","🥔 <b>냉대</b>는 여름이 짧고 서늘해 벼·밀 같은 곡식은 어렵지만, 추위에 강한 <b>감자</b>는 기를 수 있습니다.");
@@ -2476,8 +2666,8 @@ function plantSeed(sel,bx,by,bz,tg){
   if(!isFarmSoil(below)){toast("흙·풀·모래 위에만 씨앗을 심을 수 있어요","bad");return}
   var youngId=SEED[sel];
   var cropInfo=BL[youngId].crop;
-  /* 벼(논)는 물가에만 심을 수 있다 */
-  if(cropInfo.paddy&&!waterNear(bx,by,bz)){
+  /* 벼(논)는 물가에만 심을 수 있다 (온실은 관수 설비가 있는 셈으로 친다) */
+  if(cropInfo.paddy&&!waterNear(bx,by,bz)&&!inGreen){
     toast("🌾 벼는 물가(논)에만 심을 수 있어요. 물 옆에 심으세요","bad");
     teachOnce("paddy","🌾 <b>벼농사</b>는 물을 댄 <b>논</b>에서 짓습니다. 물웅덩이·강 바로 옆 흙에 볍씨를 심으세요.");
     return;
@@ -2489,7 +2679,9 @@ function plantSeed(sel,bx,by,bz,tg){
   if(!S.crops)S.crops={};
   S.crops[bx+","+by+","+bz]=0;
   S.stat.placed++;
-  toast("🌱 "+iN(sel)+" 심음 · 물을 주면 자랍니다","good");
+  toast("🌱 "+iN(sel)+" 심음"+(inGreen?" · 🏡 온실 안이라 빨리 자랍니다":" · 물을 주면 자랍니다"),"good");
+  if(inGreen)teachOnce("greenfarm","🏡 <b>온실</b> 덕분에 이 기후에서 원래 자라지 않는 작물이 자랍니다. "+
+    "사람은 <b>기술</b>로 환경의 제약을 넘어서기도 합니다 — 네덜란드의 유리온실, 한대 지방의 실내 농장이 그 예예요.");
   teachOnce("farm","🌾 씨앗을 심었습니다. <b>물이 가까이 있으면(비가 오거나 물웅덩이 옆)</b> 시간이 지나며 자라 <b>수확</b>할 수 있습니다. 온대·열대는 물이 넉넉해 <b>벼농사</b>에 알맞습니다.");
   refreshHotbar();cloudDirty();
 }
@@ -2503,7 +2695,10 @@ function overlapsPlayer(bx,by,bz){
 /* --- 핫바 --- */
 var hotbar=[],hotIdx=0;
 function refreshHotbar(){
-  var pri=["seed_rice","seed_potato","seed_date","seed_cassava","plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
+  var pri=["seed_rice","seed_potato","seed_date","seed_cassava",
+    "an_cow","an_hen","an_fox","an_camel","an_deer","an_llama",
+    "generator","solar","greenhouse","heater","efurnace",
+    "plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
   var arr=Object.keys(S.inv).filter(function(k){return (PLACE[k]||SEED[k])&&S.inv[k]>0});
   arr.sort(function(a,b){var ia=pri.indexOf(a),ib=pri.indexOf(b);
     return (ia<0?99:ia)-(ib<0?99:ib)});
@@ -2605,9 +2800,12 @@ function growCrops(dt,quiet){
     var a=key.split(","),x=+a[0],y=+a[1],z=+a[2];
     var b=getB(x,y,z),B=BL[b];
     if(!B||!B.crop||B.crop.ripe){delete S.crops[key];continue}  // 이미 다 자랐거나 사라짐
-    var watered=raining||waterNear(x,y,z);
+    /* [V8 추가 3] 온실 안이면 물·기후와 상관없이 잘 자란다 */
+    var inGreen=greenhouseAt(x,y,z);
+    var watered=raining||waterNear(x,y,z)||inGreen;
     /* 물 있으면 정상 속도, 없으면 1/4 속도(가뭄엔 거의 안 자람) */
     var rate=watered?1:0.25;
+    if(inGreen)rate*=2.5;
     /* 열대는 덥고 습해 조금 빨리, 고산·건조는 조금 느리게 */
     if(S.biome==="tropical")rate*=1.25;
     if(S.biome==="desert"||S.biome==="alpine")rate*=0.85;
@@ -2625,11 +2823,264 @@ function growCrops(dt,quiet){
     }
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 3] 전기 — 발전과 기계
+   --------------------------------------------------------------------------
+   교과의 흐름을 그대로 규칙으로 삼았다.
+     수렵·채집 → 농경 → 목축 → 공업(불로 제련) → 전기(기계) → 지속가능(태양광)
+   · 화력 발전기: 가방의 석탄을 스스로 태워 ⚡을 만든다. 대신 탄소가 쌓인다.
+   · 태양광 패널: 낮에만, 느리게, 탄소 0. 냉대·한대의 짧은 낮이 그대로 불리하게 작용한다.
+   · 온실: 전기로 온도를 맞춰 '기후의 제약'을 넘는다 — 한대에서도 농사가 된다.
+   · 전기 난로: 나무를 태우지 않고 몸을 데운다.
+   · 전기 용광로: 석탄 없이 제련한다.
+   기계는 월드에 '놓인 블록'이고, 연료와 전력은 각자의 가방에서 나간다.
+   그래서 같은 기후 친구들이 발전소를 함께 지어 쓰는 것이 이득이 된다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var MACHINE_IDS={45:"gen",46:"sun",47:"green",48:"heat",49:"efur"};
+function machineRegister(x,y,z,id){
+  if(!S)return;
+  var k=x+","+y+","+z;
+  if(MACHINE_IDS[id]){ if(!S.machines)S.machines={}; S.machines[k]=id; return }
+  var kind=RANCH_BY_ID[id];
+  if(kind){
+    if(!S.ranch)S.ranch={};
+    S.ranch[k]={k:kind,age:0,prod:0,hun:0,grown:false,hungry:false};
+    S.stat.animals=(S.stat.animals||0)+1;
+    var sp=LIVESTOCK[kind],own=(sp.b===S.biome);
+    toast(sp.em+" "+sp.n+"을(를) 풀어놓았습니다"+(own?"":" · 이 기후에는 맞지 않아 거의 자라지 않습니다"),own?"good":"warn");
+    teachOnce("ranch","🐄 <b>목축</b>을 시작했습니다. 먹이와 물을 주면 새끼가 자라 <b>산물</b>(우유·달걀·모피·양털)을 계속 내줍니다. "+
+      "가방 화면의 <b>목축</b>에서 상태를 보고 <b>도축</b>할 수도 있어요.<br>"+
+      "<b>자기 기후의 가축만</b> 잘 자랍니다 — 사막에 순록이, 툰드라에 낙타가 없는 까닭입니다.");
+  }
+}
+function machineUnregister(x,y,z,id){
+  if(!S)return;
+  var k=x+","+y+","+z;
+  if(S.machines&&S.machines[k])delete S.machines[k];
+  if(S.ranch&&S.ranch[k]){
+    var e=S.ranch[k];delete S.ranch[k];
+    toast((LIVESTOCK[e.k]?LIVESTOCK[e.k].em+" "+LIVESTOCK[e.k].n:"가축")+"을(를) 데리고 왔습니다");
+  }
+}
+/* 월드를 다시 불러왔을 때, 내 저장에 남은 좌표만 골라 실제 블록과 맞춘다 */
+function machineSync(){
+  if(!S)return;
+  if(!S.machines)S.machines={};
+  if(!S.ranch)S.ranch={};
+  var k,a;
+  for(k in S.machines){a=k.split(",");
+    if(getB(+a[0],+a[1],+a[2])!==S.machines[k])delete S.machines[k];}
+  for(k in S.ranch){a=k.split(",");
+    var want=LIVESTOCK[S.ranch[k].k]?LIVESTOCK[S.ranch[k].k].id:0;
+    if(getB(+a[0],+a[1],+a[2])!==want)delete S.ranch[k];}
+  /* 내가 놓았지만 저장 전에 창이 닫힌 기계는 edits 에서 되찾는다 */
+  for(k in S.edits){
+    var id=S.edits[k];
+    if(MACHINE_IDS[id]&&!S.machines[k]){a=k.split(",");
+      if(getB(+a[0],+a[1],+a[2])===id)S.machines[k]=id;}
+  }
+}
+function machineCount(kind){
+  var c=0;if(!S||!S.machines)return 0;
+  for(var k in S.machines)if(MACHINE_IDS[S.machines[k]]===kind)c++;
+  return c;
+}
+function hasEFurnace(){return machineCount("efur")>0}
+/* 하늘이 보이는 자리인가 — 태양광은 지붕 아래에선 못 쓴다 */
+function skyOpen(x,y,z){
+  for(var yy=y+1;yy<H;yy++)if(getB(x,yy,z))return false;
+  return true;
+}
+var heaterOn=false;
+/* 전력·기계 1틱 */
+function powerTick(dt,quiet){
+  if(!S||S.isVisiting)return;
+  if(!S.machines)S.machines={};
+  if(!S.gen)S.gen={};
+  var g=S.gen;
+  heaterOn=false;
+  var nGen=0,nSun=0,nGreen=0,nHeat=0;
+  for(var k in S.machines){
+    var t=MACHINE_IDS[S.machines[k]];
+    if(t==="gen")nGen++;else if(t==="sun"){
+      var a=k.split(",");
+      if(skyOpen(+a[0],+a[1],+a[2]))nSun++;
+    }
+    else if(t==="green")nGreen++;else if(t==="heat")nHeat++;
+  }
+  /* ── 화력 발전: 석탄 1 → 전력 1 (12초/대) ── */
+  if(nGen&&qty(S,"coal")>0){
+    g.gen=(g.gen||0)+dt*nGen;
+    while(g.gen>=12&&qty(S,"coal")>0){
+      g.gen-=12;
+      take(S,"coal",1);add(S,"power",1);
+      S.stat.powerMade=(S.stat.powerMade||0)+1;
+      emitRaw(2);
+      if(!quiet)teachOnce("gen1","🏭 <b>화력 발전기</b>가 석탄을 태워 전기를 만들었습니다. 값은 싸지만 <b>탄소</b>가 하늘에 쌓입니다. "+
+        "🔆 태양광 패널을 함께 쓰면 같은 전기를 탄소 없이 얻을 수 있어요.");
+    }
+  }else g.gen=0;
+  /* ── 태양광 발전: 낮에만, 20초/대, 탄소 0 ── */
+  var hh=clockOf(S).h, day=(hh>=7&&hh<18);
+  if(nSun&&day&&!isRaining()){
+    g.sun=(g.sun||0)+dt*nSun;
+    while(g.sun>=20){
+      g.sun-=20;add(S,"power",1);
+      S.stat.powerMade=(S.stat.powerMade||0)+1;
+      S.stat.powerClean=(S.stat.powerClean||0)+1;
+      if(!quiet)teachOnce("sun1","🔆 <b>태양광</b>으로 전기를 만들었습니다. 탄소가 하나도 나오지 않습니다. "+
+        "다만 <b>밤과 비 오는 날엔 멈춥니다</b> — 낮이 짧은 냉대·한대에서 특히 불리하지요.");
+    }
+  }else g.sun=0;
+  /* ── 온실: 30초마다 전력 1 ── */
+  g.green=(g.green||0);
+  if(nGreen){
+    g.green+=dt*nGreen;
+    while(g.green>=30){
+      g.green-=30;
+      if(qty(S,"power")>0){take(S,"power",1);g.greenOn=performance.now()}
+      else {g.greenOn=0;if(!quiet)teachOnce("nopow","⚡ 전기가 떨어져 기계가 멈췄습니다. 발전기에 <b>석탄</b>을 넣거나 <b>태양광 패널</b>을 더 놓아 보세요.")}
+    }
+  }else g.green=0;
+  /* ── 전기 난로: 40초마다 전력 1 ── */
+  if(nHeat){
+    g.heat=(g.heat||0)+dt*nHeat;
+    while(g.heat>=40){
+      g.heat-=40;
+      if(qty(S,"power")>0){take(S,"power",1);g.heatOn=performance.now()}
+      else g.heatOn=0;
+    }
+    if(g.heatOn===undefined)g.heatOn=performance.now();     // 놓은 직후 한 번은 켜 준다
+  }else {g.heat=0;g.heatOn=0}
+  /* 켜져 있는가(마지막 전력 소모로부터 45초 이내) */
+  g.greenLive=!!(g.greenOn&&performance.now()-g.greenOn<35000);
+  g.heatLive =!!(g.heatOn &&performance.now()-g.heatOn <45000);
+  heaterOn=g.heatLive;
+}
+/* 레시피가 아닌 곳에서 나오는 탄소(발전기 가동 등) */
+function emitRaw(amt){
+  if(!S||!amt)return;
+  if(typeof S.carbon!=="number")S.carbon=0;
+  var before=carbonStep().d;
+  S.carbon+=amt;S.stat.carbon=(S.stat.carbon||0)+amt;
+  var after=carbonStep();
+  if(after.d>before){
+    logAdd(S,"[기후변화] 누적 탄소 "+S.carbon+" · 평균 기온 +"+after.d+"°C ("+after.n+")");
+    lessonToast("🌍 <b>온난화 "+after.n+"</b> · "+after.m+"<br>🔆 <b>태양광 패널</b>로 바꾸면 더 오르지 않아요.");
+  }
+}
+/* 내 둘레 rad 칸 안에 켜져 있는 기계가 있는가 */
+function machineNear(kind,rad){
+  if(!S||!S.machines)return false;
+  var px=S.pos.x,py=S.pos.y,pz=S.pos.z;
+  for(var k in S.machines){
+    if(MACHINE_IDS[S.machines[k]]!==kind)continue;
+    var a=k.split(","),dx=+a[0]+.5-px,dy=+a[1]+.5-py,dz=+a[2]+.5-pz;
+    if(dx*dx+dz*dz<=rad*rad&&Math.abs(dy)<=rad)return true;
+  }
+  return false;
+}
+/* 어떤 칸이 켜져 있는 온실의 영향권인가 */
+function greenhouseAt(x,y,z){
+  if(!S||!S.machines||!S.gen||!S.gen.greenLive)return false;
+  for(var k in S.machines){
+    if(MACHINE_IDS[S.machines[k]]!=="green")continue;
+    var a=k.split(","),dx=+a[0]-x,dy=+a[1]-y,dz=+a[2]-z;
+    if(dx*dx+dz*dz<=25&&Math.abs(dy)<=3)return true;
+  }
+  return false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 4] 목축 1틱 — 먹이고, 키우고, 산물을 받는다
+   ══════════════════════════════════════════════════════════════════════════ */
+function ranchTick(dt,quiet){
+  if(!S||S.isVisiting||!S.ranch)return;
+  var grownByKind={},any=false;
+  for(var k in S.ranch){
+    var e=S.ranch[k],sp=LIVESTOCK[e.k];
+    if(!sp){delete S.ranch[k];continue}
+    var a=k.split(",");
+    if(getB(+a[0],+a[1],+a[2])!==sp.id){delete S.ranch[k];continue}   // 누가 치웠다
+    any=true;
+    var native=(sp.b===S.biome), rate=native?1:0.18;
+    /* 온실 안이면 남의 기후 가축도 어느 정도 자란다(기술이 환경을 보완한다) */
+    if(!native&&greenhouseAt(+a[0],+a[1],+a[2]))rate=0.7;
+    /* 먹이 주기 */
+    e.hun=(e.hun||0)+dt;
+    if(e.hun>=FEED_EVERY){
+      var fed=false;
+      if(qty(S,"water")>0){
+        for(var i=0;i<sp.feed.length;i++){
+          if(qty(S,sp.feed[i])>0){take(S,sp.feed[i],1);take(S,"water",1);fed=true;break}
+        }
+      }
+      if(fed){e.hun=0;e.hungry=false}
+      else{
+        e.hun=FEED_EVERY;e.hungry=true;
+        if(!quiet)teachOnce("feed","🌾 가축은 <b>먹이와 물</b>이 있어야 자랍니다. 가방에 "+
+          "물과 먹이를 넣어 두세요. 굶겨도 죽지는 않지만 자라지도, 산물을 내지도 않습니다.");
+      }
+    }
+    if(e.hungry)continue;                        // 굶는 동안엔 시간이 멈춘다
+    if(!e.grown){
+      e.age=(e.age||0)+dt*rate;
+      if(e.age>=GROW_TIME){
+        e.grown=true;
+        if(!quiet)toast(sp.em+" "+sp.n+"이(가) 다 자랐습니다 · 이제 "+iE(sp.give)+" "+iN(sp.give)+"를 냅니다","good");
+      }
+    }else{
+      grownByKind[e.k]=(grownByKind[e.k]||0)+1;
+      e.prod=(e.prod||0)+dt*rate;
+      if(e.prod>=PROD_TIME){
+        e.prod=0;add(S,sp.give,sp.gn);
+        S.stat.got[sp.give]=(S.stat.got[sp.give]||0)+sp.gn;
+        if(!quiet){toast(iE(sp.give)+" "+iN(sp.give)+" +"+sp.gn+" ("+sp.em+" "+sp.n+")","good");refreshHotbar()}
+        teachOnce("prod","🥛 가축이 <b>산물</b>을 냈습니다. 잡아먹으면 한 번이지만, 기르면 <b>계속</b> 얻습니다 — "+
+          "재생 가능한 자원을 다루는 법이에요.");
+      }
+    }
+  }
+  /* 번식: 같은 종 성체가 둘 이상이면 이따금 새끼가 태어난다 */
+  if(any){
+    var pair=false;for(var kk in grownByKind)if(grownByKind[kk]>=2)pair=true;
+    if(pair){
+      S.breed=(S.breed||0)+dt;
+      if(S.breed>=BREED_TIME){
+        S.breed=0;
+        for(var kn in grownByKind)if(grownByKind[kn]>=2){
+          add(S,"an_"+kn,1);
+          if(!quiet)toast(LIVESTOCK[kn].em+" 새끼가 태어났습니다! 땅에 놓아 목장을 늘리세요","good");
+          teachOnce("breed","🐣 가축이 <b>새끼</b>를 낳았습니다. 두 마리 이상 다 키우면 저절로 늘어납니다.");
+          break;
+        }
+      }
+    }else S.breed=0;
+  }
+}
+/* 도축 — 목장을 비우고 고기를 얻는다 */
+function slaughter(key){
+  if(!S||!S.ranch||!S.ranch[key])return;
+  var e=S.ranch[key],sp=LIVESTOCK[e.k];if(!sp)return;
+  var a=key.split(","),x=+a[0],y=+a[1],z=+a[2];
+  var got=e.grown?sp.meat:Math.max(1,Math.round(sp.meat/2));
+  add(S,"meat",got);
+  S.stat.got.meat=(S.stat.got.meat||0)+got;
+  delete S.ranch[key];
+  setB(x,y,z,0);S.edits[key]=0;markDirty(x,z);netBroadcastEdit(x,y,z,0);
+  toast("🍖 고기 +"+got+" ("+sp.em+" "+sp.n+")","good");
+  teachOnce("slaughter","🍖 가축을 잡았습니다. 고기는 많이 나오지만 <b>그 짐승은 사라집니다</b>. "+
+    "계속 산물을 받을지, 지금 고기를 얻을지 — 목축은 늘 이 선택입니다.");
+  refreshHotbar();cloudDirty();if(panelTab)drawPanel();
+}
+
 /* --- 스탯 시뮬레이션 --- */
 function nearFire(){
   var p=S.pos,px=Math.floor(p.x),py=Math.floor(p.y),pz=Math.floor(p.z);
   for(var dx=-3;dx<=3;dx++)for(var dy=-2;dy<=2;dy++)for(var dz=-3;dz<=3;dz++)
     if(getB(px+dx,py+dy,pz+dz)===37)return true;
+  /* [V8 추가 3] 켜져 있는 전기 난로도 불과 같은 구실을 한다(탄소 없이) */
+  if(heaterOn&&machineNear("heat",4))return true;
   return false;
 }
 var fireCheck=0,fireOn=false;
@@ -2699,6 +3150,8 @@ function simulate(dt,quiet){
   updateWeather(dt,quiet);                              // [날씨] 비/맑음 전환
   growCrops(dt,quiet);                                  // [농사] 심은 작물 성장
   regrowTick(dt,quiet);                                 // [자원] 캔 자리에 숲이 다시 자람
+  powerTick(dt,quiet);                                  // [V8] 발전기·기계
+  ranchTick(dt,quiet);                                  // [V8] 목축
   S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
   /* [날씨] 비가 오면 야외에서 수분이 덜 마른다(습도↑) */
   var hydraMod=m.hydra*(isRaining()&&!shelt?.6:1);
@@ -2818,7 +3271,9 @@ function emitCarbon(r){
   if(!S)return;
   if(typeof S.carbon!=="number")S.carbon=0;
   var before=carbonStep().d, amt=0;
-  if(r.id!=="power_sun")for(var k in r.out)if(CARBON_OF[k])amt+=CARBON_OF[k]*r.out[k];
+  if(r.id==="power_coal")amt=3;                          // [V8] 석탄 화력은 레시피 단위로 계산
+  else if(r.cat==="elec")amt=0;                          // [V8] 전기 제련은 발전 단계에서 이미 셈함
+  else if(r.id!=="power_sun")for(var k in r.out)if(CARBON_OF[k])amt+=CARBON_OF[k]*r.out[k];
   if(r.id==="power_sun"||r.id==="solar"){
     teachOnce("renew","🔆 <b>햇빛으로 만든 전기</b>는 탄소를 내뿜지 않습니다. 재생에너지가 기후위기의 답으로 꼽히는 까닭이에요.");
     if(r.id==="power_sun")toast("🌱 탄소 배출 없이 전력을 얻었습니다","good");
@@ -3530,18 +3985,22 @@ function netTick(dt){
 var AI_NAMES={temperate:["초원 상단","밀밭 마을","강가 농장"],tropical:["정글 시장","우림 상단","향신료 배"],
  taiga:["침엽수 캠프","모피 상인","숯가마"],desert:["오아시스 대상","모래 유리방","유전 캠프"],
  tundra:["빙하 기지","얼음 창고","심해 어선"],alpine:["산맥 광산","대장간 마을","돌산 캠프"]};
-var WANTS={temperate:["iron","glass","ice","rubber","spice","gold","coal"],
- tropical:["wheat","bread","ice","iron","coat","stone"],
- taiga:["wheat","bread","water","glass","iron","spice"],
- desert:["wheat","bread","water","wood","ice","fur"],
- tundra:["wheat","bread","wood","coal","fur","iron"],
- alpine:["wheat","bread","fruit","coal","water","spice"]};
+var WANTS={temperate:["iron","glass","ice","rubber","spice","gold","coal","wool","power"],
+ tropical:["wheat","bread","ice","iron","coat","stone","milk","wool"],
+ taiga:["wheat","bread","water","glass","iron","spice","wool","egg"],
+ desert:["wheat","bread","water","wood","ice","fur","meat","wool"],
+ tundra:["wheat","bread","wood","coal","fur","iron","wool","power"],
+ alpine:["wheat","bread","fruit","coal","water","spice","milk","egg"]};
 function valOf(bag){var v=0;for(var k in bag)v+=iV(k)*bag[k];return v}
 function bagLine(bag){var o=[];for(var k in bag)o.push(iE(k)+" "+iN(k)+" "+bag[k]);return o.join(", ")}
 function mkOffer(){
   var others=BKEYS.filter(function(b){return b!==S.biome});
   var from=others[Math.floor(Math.random()*others.length)];
-  var give=SPECIAL[from][Math.floor(Math.random()*SPECIAL[from].length)];
+  /* [V8] 살아 있는 가축은 값이 크고 귀하니 상인이 흔히 내놓지 않는다(15%만) */
+  var giveList=SPECIAL[from].filter(function(k){return !RANCH_ITEM[k]});
+  if(Math.random()<.15)giveList=SPECIAL[from];
+  if(!giveList.length)giveList=SPECIAL[from];
+  var give=giveList[Math.floor(Math.random()*giveList.length)];
   var pool=WANTS[from].filter(function(k){return SPECIAL[S.biome].indexOf(k)>=0||["wheat","bread","water","wood"].indexOf(k)>=0});
   if(!pool.length)pool=WANTS[from];
   var want=pool[Math.floor(Math.random()*pool.length)];
@@ -3962,6 +4421,112 @@ function toolShelf(){
   });
   return h;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 4] 목축 화면 — 내 가축의 상태를 보고 도축할 수 있다
+   ══════════════════════════════════════════════════════════════════════════ */
+function uiRanch(){
+  var keys=Object.keys(S.ranch||{});
+  var mine=LIVESTOCK[Object.keys(LIVESTOCK).filter(function(k){return LIVESTOCK[k].b===S.biome})[0]];
+  var h="<div class='sec'><h3>🐄 목축 <span class='sm'>"+bN(S.biome)+"의 가축</span></h3>";
+  if(!keys.length){
+    h+="<div class='card'><p class='eff'>아직 기르는 가축이 없습니다."+
+      (mine?"<br>가방의 <b>"+mine.em+" "+mine.n+"</b>을(를) 땅에 <b>놓으면</b> 목장이 됩니다. "+esc(mine.d)+".":"")+
+      "<br>먹이와 <b>물</b>을 가방에 넣어 두면 저절로 자랍니다.</p></div></div>";
+    return h;
+  }
+  keys.forEach(function(k){
+    var e=S.ranch[k],sp=LIVESTOCK[e.k];if(!sp)return;
+    var native=(sp.b===S.biome);
+    var pct=e.grown?100:Math.min(100,Math.round((e.age||0)/GROW_TIME*100));
+    var ppc=e.grown?Math.min(100,Math.round((e.prod||0)/PROD_TIME*100)):0;
+    var state=e.hungry?"<span style='color:var(--bad)'>배고픔 — 먹이·물이 없습니다</span>"
+              :(e.grown?"<span style='color:var(--good)'>다 자람 · 산물을 내는 중</span>":"자라는 중");
+    h+="<div class='card'"+(native?"":" style='border-color:var(--warn)'")+">"+
+      "<div class='rw'><span style='font-size:19px'>"+sp.em+"</span><b>"+sp.n+"</b>"+
+      "<span class='tier'>"+(native?"이 기후의 가축":"⚠ 남의 기후")+"</span>"+
+      "<span style='flex:1'></span>"+
+      "<button class='mini' onclick=\"slaughter('"+k+"')\">🍖 도축</button></div>"+
+      "<div class='eff' style='margin-top:6px'>"+state+" · 먹이 "+
+        sp.feed.map(function(f){return iE(f)+iN(f)}).join("·")+" + 💧물</div>"+
+      "<div class='eff' style='margin-top:6px'>성장</div>"+
+      "<div class='bar' style='margin:4px 0 6px'><i style='width:"+pct+"%'></i></div>"+
+      (e.grown?("<div class='eff'>"+iE(sp.give)+" "+iN(sp.give)+" 모으는 중</div>"+
+        "<div class='bar' style='margin:4px 0 0'><i style='width:"+ppc+"%;background:var(--good)'></i></div>"):"")+
+      (native?"":"<div class='why' style='margin-top:8px'>이 기후에 맞지 않아 거의 자라지 않습니다. "+
+        "🏡 온실 안에 두면 조금 나아집니다.</div>")+
+      "</div>";
+  });
+  h+="<div class='card'><p class='eff'>성체가 <b>2마리 이상</b>이면 이따금 새끼가 태어납니다. "+
+    "도축하면 고기를 많이 얻지만 그 짐승은 사라집니다 — 계속 받을지, 지금 먹을지 골라 보세요.</p></div>";
+  return h+"</div>";
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   [V8 추가 3] 발전 화면 — 지금 무엇이 돌고 있는지
+   ══════════════════════════════════════════════════════════════════════════ */
+function uiPower(){
+  var g=S.gen||{};
+  var nG=machineCount("gen"),nS=machineCount("sun"),nGr=machineCount("green"),
+      nH=machineCount("heat"),nE=machineCount("efur");
+  var total=nG+nS+nGr+nH+nE;
+  var h="<div class='sec'><h3>⚡ 발전과 기계 <span class='sm'>전력 "+qty(S,"power")+"</span></h3>";
+  if(!total){
+    h+="<div class='card'><p class='eff'>아직 기계가 하나도 없습니다.<br>"+
+      "아래 <b>제작</b>에서 🏭 <b>화력 발전기</b>를 만들어 땅에 놓아 보세요. "+
+      "가방에 <b>석탄</b>이 있으면 스스로 태워 ⚡전력을 만듭니다.<br>"+
+      "🔆 <b>태양광 패널</b>은 낮에만 돌지만 <b>탄소가 나오지 않습니다</b>.</p></div></div>";
+    return h;
+  }
+  function row(em,nm,cnt,st){
+    return "<div class='rw' style='padding:4px 0'><span style='font-size:17px'>"+em+"</span>"+
+      "<b>"+nm+"</b><span class='tier'>×"+cnt+"</span><span style='flex:1'></span>"+
+      "<span class='eff' style='margin:0'>"+st+"</span></div>";
+  }
+  var hh=clockOf(S).h,day=(hh>=7&&hh<18);
+  h+="<div class='card'>";
+  if(nG)h+=row("🏭","화력 발전기",nG,qty(S,"coal")>0?"<span style='color:var(--good)'>가동 중 · 석탄 "+qty(S,"coal")+"</span>":"<span style='color:var(--bad)'>석탄 없음</span>");
+  if(nS)h+=row("🔆","태양광 패널",nS,(day&&!isRaining())?"<span style='color:var(--good)'>발전 중 (낮)</span>":"<span style='color:var(--ink3)'>"+(isRaining()?"비 — 멈춤":"밤 — 멈춤")+"</span>");
+  if(nGr)h+=row("🏡","온실",nGr,g.greenLive?"<span style='color:var(--good)'>가동 중</span>":"<span style='color:var(--bad)'>전력 부족</span>");
+  if(nH)h+=row("🔌","전기 난로",nH,g.heatLive?"<span style='color:var(--good)'>가동 중</span>":"<span style='color:var(--bad)'>전력 부족</span>");
+  if(nE)h+=row("⚙️","전기 용광로",nE,"석탄 없이 제련 가능");
+  h+="</div>";
+  var made=S.stat.powerMade||0,clean=S.stat.powerClean||0;
+  var pc=made?Math.round(clean/made*100):0;
+  h+="<div class='card'><div class='eff'>지금까지 만든 전기 <b>"+made+"</b> · 그중 태양광 <b>"+clean+"</b></div>"+
+    "<div class='bar' style='margin:8px 0 6px'><i style='width:"+pc+"%;background:var(--good)'></i></div>"+
+    "<div class='eff'>재생에너지 비율 <b>"+pc+"%</b> — "+
+    (pc>=50?"훌륭합니다. 전기를 쓰면서도 탄소를 늘리지 않고 있어요."
+           :"석탄에 기대고 있습니다. 🔆 태양광 패널을 늘리면 탄소가 줄어듭니다.")+"</div></div></div>";
+  return h;
+}
+/* 발전 단계 — 수렵채집에서 어디까지 왔는가 */
+function techTier(){
+  var st=S.stat, steps=[
+    {n:"수렵·채집",em:"🍃",ok:true,d:"땅에서 나는 것을 거두어 삽니다"},
+    {n:"농경",em:"🌾",ok:Object.keys(S.crops||{}).length>0||(st.got.rice||0)+(st.got.potato||0)+(st.got.date||0)+(st.got.cassava||0)>0,
+     d:"씨앗을 심어 먹을 것을 스스로 기릅니다"},
+    {n:"목축",em:"🐄",ok:Object.keys(S.ranch||{}).length>0,d:"짐승을 길러 산물을 계속 얻습니다"},
+    {n:"공업",em:"🏗️",ok:(st.made.iron||0)+(st.made.brick||0)+(st.made.glass||0)>0,d:"불로 광물을 녹여 재료를 만듭니다"},
+    {n:"전기",em:"⚡",ok:(st.powerMade||0)>0,d:"기계를 돌려 힘을 만들어 씁니다"},
+    {n:"지속가능",em:"🔆",ok:(st.powerMade||0)>=6&&(st.powerClean||0)*2>=(st.powerMade||0),
+     d:"전기를 쓰면서도 탄소를 늘리지 않습니다"}
+  ];
+  var lvl=0;steps.forEach(function(x,i){if(x.ok)lvl=i});
+  return {steps:steps,lvl:lvl};
+}
+function uiTech(){
+  var t=techTier();
+  var h="<div class='sec'><h3>🚀 발전 단계 <span class='sm'>"+(t.lvl+1)+" / "+t.steps.length+"</span></h3><div class='card'>";
+  h+="<div class='bar' style='margin-bottom:10px'><i style='width:"+Math.round((t.lvl+1)/t.steps.length*100)+"%'></i></div>";
+  t.steps.forEach(function(x,i){
+    h+="<div class='rw' style='padding:4px 0;opacity:"+(x.ok?1:.45)+"'>"+
+      "<span style='font-size:17px'>"+(x.ok?x.em:"🔒")+"</span><b>"+x.n+"</b>"+
+      "<span style='flex:1'></span><span class='eff' style='margin:0'>"+x.d+"</span></div>";
+  });
+  var nxt=t.steps[t.lvl+1];
+  if(nxt)h+="<div class='why' style='margin-top:9px'>다음 단계 — <b>"+nxt.em+" "+nxt.n+"</b> · "+nxt.d+"</div>";
+  else h+="<div class='why' style='margin-top:9px'>🎉 마지막 단계까지 왔습니다. 이제 기념비를 세워 보세요.</div>";
+  return h+"</div></div>";
+}
 /* [V8 추가 2] 우리 팀에게 나눠주기 창구 — 가방과 무역 화면 양쪽에 붙는다 */
 function teamShareCard(){
   var ks=Object.keys(S.inv).filter(function(k){return S.inv[k]>0});
@@ -3998,6 +4563,8 @@ function submitShare(){
 }
 function uiBag(){
   var h="<div class='sec'><h3>가방 <span class='sm'>식량은 눌러서 바로 먹을 수 있어요</span></h3>"+invChips()+"</div>";
+  h+=uiRanch();          // [V8 추가 4] 목축
+  h+=uiPower();          // [V8 추가 3] 발전과 기계
   h+=teamShareCard();
   /* 도구 선반 */
   h+="<div class='sec'><h3>내 도구 <span class='sm'>조준한 블록에 맞는 것이 자동으로 쓰입니다</span></h3>"+toolShelf()+"</div>";
@@ -4023,8 +4590,20 @@ function uiBag(){
   RECIPES.forEach(function(r){if(r.cat==="tool")h+=recipeCard(r)});
   h+="</div>";
   h+="<div class='sec'><h3>제작</h3>";
-  RECIPES.forEach(function(r){if(r.cat!=="tool")h+=recipeCard(r)});
+  RECIPES.forEach(function(r){if(!r.cat)h+=recipeCard(r)});
   h+="</div>";
+  /* [V8 추가 3] 전기 제련 — 전기 용광로를 놓아야 열린다 */
+  if(hasEFurnace()){
+    h+="<div class='sec'><h3>⚙️ 전기 제련 <span class='sm'>석탄 없이 · 탄소 없이</span></h3>";
+    h+="<div class='card'><p class='eff'>전기 용광로가 있어 <b>석탄을 태우지 않고</b> 제련할 수 있습니다. "+
+       "같은 재료로 더 많이 나오고, 탄소도 나오지 않습니다.</p></div>";
+    RECIPES.forEach(function(r){if(r.cat==="elec")h+=recipeCard(r)});
+    h+="</div>";
+  }else{
+    h+="<div class='sec'><h3>⚙️ 전기 제련 <span class='sm'>잠김</span></h3><div class='card'>"+
+       "<p class='eff'>🔒 <b>전기 용광로</b>를 만들어 땅에 놓으면 열립니다. "+
+       "석탄 없이 철·유리·벽돌을 만들 수 있고, 탄소도 나오지 않아요.</p></div></div>";
+  }
   return h;
 }
 /* [V7.1] 거래소 진단 — "서버는 몇 건을 줬고, 그중 무엇을 왜 걸렀는지"를 그대로 보여준다.
@@ -4186,7 +4765,8 @@ function saveMarketFromUI(online){
   pollMarket();drawPanel();
 }
 function uiRecord(){
-  var h="<div class='sec'><h3>칭호 <span class='sm'>"+S.titles.length+"개</span></h3><div class='chips'>";
+  var h=uiTech();        // [V8 추가 3] 발전 단계를 맨 위에
+  h+="<div class='sec'><h3>칭호 <span class='sm'>"+S.titles.length+"개</span></h3><div class='chips'>";
   TITLES.forEach(function(t){
     if(t.b&&t.b!==S.biome)return;
     var g=S.titles.indexOf(t.id)>=0;
@@ -4206,6 +4786,8 @@ function uiRecord(){
     "<span class='chip'>무역 <b>"+st.trades+"</b>회</span><span class='chip'>우리 팀 나눔 <b>"+(st.helps||0)+"</b>회</span>"+
     "<span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
     "<span class='chip'>식량 수출 <b>"+st.foodOut+"</b></span><span class='chip'>설치한 블록 <b>"+st.placed+"</b></span>"+
+    "<span class='chip'>만든 전기 <b>"+(st.powerMade||0)+"</b>(태양광 "+(st.powerClean||0)+")</span>"+
+    "<span class='chip'>기른 가축 <b>"+(st.animals||0)+"</b></span>"+
     "<span class='chip'>생존 <b>"+S.day+"</b>일차</span><span class='chip'>탈진 <b>"+S.faint+"</b>회</span>"+
     "<span class='chip' style='color:"+carbonStep().c+"'>내가 낸 탄소 <b>"+carbonAmt()+"</b> · "+carbonStep().n+"</span></div>";
   if(imp)h+="<div class='chips' style='margin-top:8px'>"+Object.keys(st.imp).map(function(k){
@@ -4526,6 +5108,10 @@ function uiHelp(){
     "💦 <b>물이 가까이 있거나(웅덩이 옆) 비가 오면</b> 작물이 쑥쑥 자랍니다. 물이 없으면 아주 느리게 자라요(가뭄).<br>"+
     "🌱 다 자란 작물을 캐면 <b>먹거리 여러 개 + 씨앗 1개</b>가 나와 계속 농사지을 수 있습니다.<br>"+
     "기후마다 자라는 작물이 다릅니다 — <b>온대</b>: 벼 / <b>열대</b>: 벼·카사바 / <b>사막</b>: 대추야자 / <b>냉대·고산</b>: 감자 / <b>한대</b>: 농사 불가.<br>"+
+    "🐄 <b>기르는 가축</b>도 기후마다 다릅니다 — 온대 소 · 열대 닭 · 냉대 은여우 · 건조 낙타 · 한대 순록 · 고산 야마. "+
+    "가방의 가축을 땅에 놓고 <b>먹이와 물</b>을 지니고 있으면 자라서 우유·달걀·모피·양털을 계속 냅니다.<br>"+
+    "⚡ <b>화력 발전기</b>를 놓으면 석탄을 태워 전기를 만듭니다. 전기가 있으면 🏡 온실(어떤 기후에서도 농사)·"+
+    "🔌 전기 난로·⚙️ 전기 용광로를 돌릴 수 있어요. 🔆 <b>태양광 패널</b>은 느리지만 탄소가 나오지 않습니다.<br>"+
     "🌾 <b>벼</b>는 물을 댄 <b>논</b>에서만 자라니 물웅덩이 바로 옆에 심으세요. <b>냉대</b>는 서늘해 <b>감자</b>만 되고, <b>한대</b>는 땅이 얼어 농사가 전혀 안 됩니다(낚시·사냥으로 생활).</p></div></div>"+
     "<div class='sec'><h3>🌦️ 날씨 <span class='sm'>하늘도 생활을 바꿉니다</span></h3><div class='card'><p class='eff'>"+
     "날씨는 <b>맑음과 비</b>가 번갈아 바뀝니다. 화면 위 아이콘(☀🌧️🌨️)으로 지금 날씨를 알 수 있어요.<br>"+
@@ -4734,8 +5320,10 @@ function newState(name,biome,seed){
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
+    machines:{},ranch:{},gen:{},breed:0,
     carbon:0,quizA:{},regrow:{},
-    stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
+    stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false,
+          powerMade:0,powerClean:0,animals:0}};
 }
 function startKit(s){
   var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
@@ -4745,6 +5333,9 @@ function startKit(s){
     tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
     alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4}}[s.biome];
   for(var k in kit)add(s,k,kit[k]);
+  /* [V8 추가 4] 그 기후에서 기르는 가축 한 마리를 들려 보낸다.
+     "기후마다 기르는 짐승이 다르다"를 첫날부터 손에 쥐고 시작하게 하려는 것. */
+  for(var lk in LIVESTOCK)if(LIVESTOCK[lk].b===s.biome)add(s,"an_"+lk,1);
   /* [V7] 나무 도구 한 벌을 들려 보낸다. 맨손으로 시작하면 첫 10분이 노동이 된다. */
   s.dur=s.dur||{};
   ["pick_wood","axe_wood","shovel_wood"].forEach(function(t){
@@ -4773,6 +5364,7 @@ function cloudSaveWorld(force,cb){
   /* [V7] 도구 내구도는 새 열을 만들지 않고 stat 안에 실어 보낸다 */
   var statOut={};for(var sk in S.stat)statOut[sk]=S.stat[sk];
   statOut.dur=S.dur||{};
+  statOut.ranch=S.ranch||{};        // [V8 추가 4] 기르던 가축도 함께 저장(새 열 없이)
   CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
     pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(perr){
     if(!S){cloudBusy=false;cb&&cb(perr);return}
@@ -4813,6 +5405,7 @@ function cloudFlushPlayer(){
   if(!cloudActive())return;
   var statOut={};for(var sk in S.stat)statOut[sk]=S.stat[sk];
   statOut.dur=S.dur||{};
+  statOut.ranch=S.ranch||{};        // [V8 추가 4]
   sbKeepalive=true;
   try{
     CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
@@ -4869,6 +5462,16 @@ function normalizeSave(s){
   if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
   if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
   if(s.stat&&typeof s.stat.helps!=="number")s.stat.helps=0;      // [V8 추가 1] 우리 팀 나눔 횟수
+  /* [V8 추가 3·4] 기계·목장 — 예전 저장에도 빈 채로 만들어 준다 */
+  if(!s.machines)s.machines={};
+  if(!s.ranch)s.ranch={};
+  if(!s.gen)s.gen={};
+  if(typeof s.breed!=="number")s.breed=0;
+  if(s.stat){
+    if(typeof s.stat.powerMade!=="number")s.stat.powerMade=0;
+    if(typeof s.stat.powerClean!=="number")s.stat.powerClean=0;
+    if(typeof s.stat.animals!=="number")s.stat.animals=0;
+  }
   if(!s.offers)s.offers=[];if(!s.pending)s.pending=[];
   if(!s.dur)s.dur={};                                  // [V7] 도구 내구도
   /* [V7 수정 5] 저장에 남아 있던 '남의 거래' 카드는 버린다.
@@ -5264,6 +5867,7 @@ function startAsStudentOnline(name,bio){
         S.inv=prec.inv||{};
         if(prec.stat){S.stat=prec.stat;
           if(S.stat.dur){S.dur=S.stat.dur;delete S.stat.dur}   // [V7] stat 안에 실어둔 내구도 꺼내기
+          if(S.stat.ranch){S.ranch=S.stat.ranch;delete S.stat.ranch}  // [V8] 기르던 가축 되찾기
         }
         if(!S.dur)S.dur={};
         if(prec.day)S.day=Math.max(S.day,prec.day);
@@ -5547,6 +6151,7 @@ function beginWorld(isLoad){
         if(!S.spawn)S.spawn={x:S.pos.x,z:S.pos.z};
         if(catchUp&&!S.isVisiting&&catchUp()>60)toast("자리를 비운 사이 시간이 흘렀습니다");
       }
+      machineSync();                     // [V8] 놓아 둔 기계·목장을 실제 블록과 맞춘다
       $("load").classList.add("hide");
       $("hud").classList.remove("hide");
       refreshHotbar();updateTabBadge();updateVisitBanner();
