@@ -218,6 +218,16 @@ summary:hover{color:var(--ink2)}
 .cbox .crow button.yes{background:var(--bad);border-color:var(--bad);color:#fff}
 .cbox .crow button.yes:hover{filter:brightness(1.1)}
 .cbox .crow button:disabled{opacity:.55;cursor:progress}
+/* [V9 추가 3] 퀴즈 상자 창 — 확인 창과 같은 뼈대를 쓰되 보기 버튼을 크게 */
+#quizbox{position:fixed;inset:0;z-index:62;background:#060a0ed6;backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:16px}
+#quizbox .cbox{max-width:480px;border-color:#e0b84a66}
+#quizbox .cbox h3{color:#ffd977}
+.qopts{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.qopts button{text-align:left;background:#1b2733;border:1px solid var(--line2);border-radius:11px;
+  padding:13px 14px;font-size:13.5px;line-height:1.5;color:var(--ink);transition:border-color .15s,background .15s}
+.qopts button:hover{border-color:var(--accent);background:#22323f}
+.qopts button b{font-family:var(--m);color:var(--ink3);margin-right:7px}
 /* 모바일 조작 */
 #touch{position:absolute;inset:0;pointer-events:none}
 #stick{position:absolute;left:calc(16px + env(safe-area-inset-left));bottom:calc(76px + env(safe-area-inset-bottom));
@@ -545,13 +555,28 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
 
         <div class="tcard">
           <h4>➕ 학생 추가</h4>
-          <p class="thint">한 줄에 한 명씩, 또는 쉼표로 구분해 붙여넣으세요. 엑셀에서 이름 열을 그대로 복사해도 됩니다.</p>
+          <p class="thint">한 줄에 한 명씩, 또는 쉼표로 구분해 붙여넣으세요. 엑셀에서 이름 열을 그대로 복사해도 됩니다.<br><b>🎲 무작위 섞기</b>는 누를 때마다 다른 조합이 나옵니다(인원은 늘 고르게 맞춰집니다).</p>
           <textarea class="tpaste" id="r_bulk" placeholder="김민준&#10;이서연&#10;박지호" autocomplete="off" spellcheck="false"></textarea>
           <div class="trow">
             <button class="mini acc" id="r_add">명단에 넣기</button>
-            <button class="mini" id="t_autofill">6기후로 고르게 나누기</button>
+            <button class="mini" id="t_autofill">🎲 6기후로 무작위 섞기</button>
             <button class="mini" id="t_clear">전체 비우기</button>
           </div>
+        </div>
+
+        <div class="tcard" id="resetCard">
+          <h4>🗺 지도 초기화 <span class="cnt">수업 전에만</span></h4>
+          <p class="thint">지형과 건축은 학생 개인이 아니라 <b>방 코드 + 기후</b>에 함께 저장됩니다.
+          그래서 학생 계정만 지워서는 지도가 바뀌지 않습니다. 아래 버튼을 눌러야 그 기후의 대륙이
+          <b>완전히 새 지형</b>으로 다시 만들어집니다(친구들이 지은 건물도 모두 사라집니다).<br>
+          <b style="color:var(--warn)">학생들이 모두 나간 뒤에 누르세요.</b> 접속 중인 학생은 잠시 뒤
+          “새 지도가 깔렸다”는 안내를 받고 다시 들어오면 됩니다.</p>
+          <div class="tsum" id="resetPick"></div>
+          <div class="trow" style="margin-top:8px">
+            <button class="mini" id="t_resetAll">여섯 기후 전부 초기화</button>
+            <button class="mini" id="t_wipeLocal">이 기기에 남은 저장 지우기</button>
+          </div>
+          <p class="note" id="t_resetMsg"></p>
         </div>
       </div>
 
@@ -593,6 +618,10 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
     <button class="no" id="cNo">아니요, 계속하기</button>
     <button class="yes" id="cYes">네, 나가기</button>
   </div>
+</div></div>
+
+<div id="quizbox" class="hide"><div class="cbox" role="dialog" aria-modal="true">
+  <div id="qbody"></div>
 </div></div>
 
 <div id="load" class="hide"><div class="lt" id="ltx">대륙을 만드는 중…</div><div class="lbar"><i id="lbi"></i></div></div>
@@ -793,7 +822,22 @@ function withUid(build){
    Part 1. 데이터
    ========================================================================== */
 var VER="5.0", SAVE="sixcont5_"+ "v5";
-var W=96, H=44, SEA=8, CH=16;                 // 월드 크기 / 높이 / 해수면 / 청크
+/* ══════════════════════════════════════════════════════════════════════════
+   [V9 수정 5] 하늘과 지하를 넓혔다
+   --------------------------------------------------------------------------
+   예전 월드는 높이 44칸에 지면이 y=10~14 쯤이었다. 그래서
+     · 지하로 파고 내려갈 수 있는 깊이가 10칸 남짓뿐이었고(암반이 코앞)
+     · 하늘로 쌓아 올릴 수 있는 높이도 30칸 정도에서 천장에 부딪혔다.
+   이제 천장을 96칸으로 올리고(하늘 약 2.3배), 지면 전체를 LIFT(10칸)만큼
+   들어 올려 지하 깊이도 두 배로 늘렸다.
+   지형의 '모양'은 예전과 똑같다 — 통째로 10칸 위로 옮겼을 뿐이다. 그래서
+   예전에 지어 둔 건물도 좌표를 +10 해 주면 그대로 제자리에 앉는다.
+   (아래 liftEdits / unpackEdits / normalizeSave 가 그 이사를 맡는다)
+   ══════════════════════════════════════════════════════════════════════════ */
+var LIFT=10;                                  // 지면을 들어 올린 높이(지하가 이만큼 깊어짐)
+var HGEN=44;                                  // 예전 천장. 지형 모양을 그대로 유지하려는 기준값
+var WORLD_FMT=2;                              // 월드 좌표 규격 번호(1=예전, 2=지금)
+var W=96, H=96, SEA=8+LIFT, CH=16;            // 월드 크기 / 높이 / 해수면 / 청크
 
 /* 블록 정의: c=색, hard=캐는 시간(초), drop=나오는 아이템, solid, alpha */
 var BL={
@@ -853,8 +897,11 @@ var BL={
  52:{n:"은여우 사육장",c:0xb0783f,hard:.8,drop:"an_fox",  solid:true,special:"ranch"},
  53:{n:"낙타 우리",    c:0xd2ac72,hard:.8,drop:"an_camel",solid:true,special:"ranch"},
  54:{n:"순록 우리",    c:0x9c8f7e,hard:.8,drop:"an_deer", solid:true,special:"ranch"},
- 55:{n:"야마 우리",    c:0xc9b79a,hard:.8,drop:"an_llama",solid:true,special:"ranch"}
+ 55:{n:"야마 우리",    c:0xc9b79a,hard:.8,drop:"an_llama",solid:true,special:"ranch"},
+ /* ── [V9 추가 3] 퀴즈 상자 — 돌아다니다 우연히 만나는 '기후 문제' ─────── */
+ 56:{n:"퀴즈 상자",    c:0xf0c246,hard:.4,drop:null,  solid:true,special:"quiz",light:true}
 };
+var QBOX_ID=56;
 /* 아이템 → 놓을 수 있는 블록 */
 var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:34,
   clay:10,coal:11,snow:8,tradepost:35,monument:36,campfire:37,well:44,
@@ -1263,6 +1310,148 @@ var WARM_QUIZ=[
  {q:"기후변화의 피해가 가장 먼저 크게 나타나는 곳은?",a:["빙하가 녹는 극지방과 물이 마르는 건조 지역","우리 교실","도시의 지하철역"],c:0,
   why:"탄소를 가장 적게 내뿜은 곳이 가장 먼저 피해를 봅니다. 그래서 기후 문제는 '함께' 풀어야 하는 문제예요."}
 ];
+/* ══════════════════════════════════════════════════════════════════════════
+   [V9 추가 3] 퀴즈 상자 문제은행
+   --------------------------------------------------------------------------
+   왜 따로 만들었나: 학습 패널의 퀴즈는 기후당 3문항뿐이고 정답이 늘 첫 번째
+   보기에 있었다(c:0). 반 전체가 같은 문제를 같은 순서로 풀면 옆 친구 화면을
+   보고 찍게 된다. 그래서
+     · 여섯 기후 · 위도와 고도 · 무역 · 기후변화를 아우르는 문제를 넉넉히 담고
+     · 보기 순서를 매번 섞어서(정답 위치가 고정되지 않게) 내고
+     · 이미 푼 문제는 S.qbox.seen 에 적어 두어 다시 나오지 않게 했다.
+   b: 어느 기후에서 특히 잘 어울리는 문제인지(없으면 공통). 내 기후 문제가
+   조금 더 자주 나오되, 다른 기후 문제도 섞여 나와 '남의 땅'을 배우게 한다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var QUIZ_BANK=[
+ /* ---- 위도·햇빛: 기후가 갈리는 첫 번째 까닭 ---- */
+ {q:"적도 지방이 극지방보다 더운 가장 큰 까닭은?",
+  a:["햇빛을 더 수직에 가깝게 받아서","적도가 태양에 더 가까워서","적도에 바다가 없어서"],c:0,
+  why:"거리가 아니라 <b>빛이 닿는 각도</b>가 문제입니다. 수직으로 받으면 좁은 땅에 빛이 모여 뜨겁고, 비스듬히 받으면 넓게 퍼져 미지근합니다."},
+ {q:"위도가 높아질수록 기온은 대체로 어떻게 될까요?",
+  a:["낮아진다","높아진다","변화가 없다"],c:0,
+  why:"적도(0°)에서 극(90°)으로 갈수록 햇빛이 비스듬해져 기온이 내려갑니다. 그래서 기후가 <b>가로 띠 모양</b>으로 늘어섭니다."},
+ {q:"세계 기후가 지도에서 가로줄(띠) 모양으로 나타나는 까닭은?",
+  a:["위도에 따라 받는 햇빛의 양이 달라져서","나라의 국경을 따라 정해져서","바다의 깊이에 따라 정해져서"],c:0,
+  why:"기후를 가르는 첫 번째 기준은 <b>위도</b>입니다. 그래서 세계 기후도는 가로로 층층이 그려집니다."},
+ {q:"우리나라가 여름과 겨울의 기온 차가 큰 까닭과 가장 관계 깊은 것은?",
+  a:["중위도에 있어 계절에 따라 햇빛의 각도가 크게 달라져서","적도 바로 위에 있어서","해발 고도가 매우 높아서"],c:0,
+  why:"중위도는 여름엔 햇빛을 높은 각도로, 겨울엔 낮은 각도로 받습니다. 그 차이가 사계절을 만듭니다."},
+
+ /* ---- 온대 ---- */
+ {b:"temperate",q:"온대 기후에 세계 인구가 가장 많이 모여 사는 까닭은?",
+  a:["기온이 온화하고 비가 알맞아 농사짓기 좋아서","광물이 가장 많이 나와서","일 년 내내 눈이 와서"],c:0,
+  why:"먹을 것을 안정적으로 얻을 수 있는 땅에 사람이 모입니다. 온대는 그 조건을 가장 잘 갖춘 기후예요."},
+ {b:"temperate",q:"우리나라 여름에 비가 몰리는 것과 가장 관계 깊은 것은?",
+  a:["계절에 따라 방향이 바뀌는 계절풍","적도의 스콜","극지방의 눈보라"],c:0,
+  why:"여름에는 바다에서 습한 바람이, 겨울에는 대륙에서 찬 바람이 불어옵니다. 그래서 여름에 비가 집중돼요."},
+ {b:"temperate",q:"온대 지역이 다른 기후와 무역할 때 주로 내다 파는 것은?",
+  a:["쌀·밀 같은 식량","석유","빙하"],c:0,
+  why:"온대는 '세계의 식량 창고'입니다. 농사가 어려운 한대·건조 지역에 곡식을 보내고 대신 그곳의 자원을 받습니다."},
+
+ /* ---- 열대 ---- */
+ {b:"tropical",q:"열대 우림에서 거의 매일 오후에 소나기가 쏟아지는 까닭은?",
+  a:["뜨거워진 공기가 위로 올라가 구름이 되어서","바닷물이 얼어서","바람이 불지 않아서"],c:0,
+  why:"강한 햇빛에 데워진 공기가 솟아오르며 식어 구름이 됩니다. 이 소나기를 <b>스콜</b>이라고 불러요."},
+ {b:"tropical",q:"열대 지방에서 음식이 빨리 상하는 까닭은?",
+  a:["덥고 습해 세균이 잘 자라서","공기가 너무 건조해서","기온이 너무 낮아서"],c:0,
+  why:"고온다습은 세균이 가장 좋아하는 조건입니다. 그래서 열대에서는 향신료로 절이거나 말려서 보관합니다."},
+ {b:"tropical",q:"열대 우림을 '지구의 허파'라고 부르는 까닭은?",
+  a:["나무가 이산화탄소를 빨아들이고 산소를 내놓아서","비를 가장 많이 내려서","동물이 가장 많아서"],c:0,
+  why:"숲을 베어 낼수록 이산화탄소를 걸러 줄 나무가 줄어들어 지구가 더 빨리 더워집니다."},
+ {b:"tropical",q:"고상 가옥(기둥 위에 지은 집)이 열대에 많은 까닭으로 알맞은 것은?",
+  a:["습기·벌레·홍수를 피할 수 있어서","눈의 무게를 견디려고","바람을 모으려고"],c:0,
+  why:"바닥을 띄우면 땅의 습기와 벌레가 덜 올라오고, 비가 많이 와도 집이 잠기지 않습니다."},
+
+ /* ---- 건조 ---- */
+ {b:"desert",q:"사막의 하루 기온차(일교차)가 큰 까닭은?",
+  a:["구름과 수증기가 적어 밤에 열이 빨리 빠져나가서","바다가 가까워서","산이 높아서"],c:0,
+  why:"수증기와 구름은 이불 같은 역할을 합니다. 그것이 없는 사막은 낮엔 뜨겁고 밤엔 급격히 식습니다."},
+ {b:"desert",q:"사막의 집이 벽은 두껍고 창은 작은 까닭은?",
+  a:["한낮의 열이 안으로 들어오지 못하게 하려고","눈이 쌓이지 않게 하려고","벌레를 막으려고"],c:0,
+  why:"두꺼운 흙벽은 열을 천천히 통과시켜 낮에는 시원하고 밤에는 덜 춥게 해 줍니다."},
+ {b:"desert",q:"사막에서 사람들이 마을을 이루는 곳은 주로 어디일까요?",
+  a:["오아시스나 우물처럼 물을 얻을 수 있는 곳","모래언덕 꼭대기","가장 더운 한가운데"],c:0,
+  why:"건조 기후에서 사람의 삶을 정하는 것은 오직 <b>물</b>입니다. 물이 있는 곳에 길과 마을과 시장이 생깁니다."},
+ {b:"desert",q:"햇빛이 강한 사막이 특히 유리한 발전 방식은?",
+  a:["태양광 발전","수력 발전","조력 발전"],c:0,
+  why:"비가 적어 강이 드물지만 햇빛은 넘칩니다. 사하라 주변에 큰 태양광 발전소가 들어서는 까닭이에요."},
+
+ /* ---- 냉대 ---- */
+ {b:"taiga",q:"냉대에 잎이 뾰족한 침엽수가 넓게 자라는 까닭은?",
+  a:["긴 겨울 추위에 넓적한 잎은 견디지 못해서","비가 너무 많이 와서","땅이 모래라서"],c:0,
+  why:"좁고 뾰족한 잎은 수분을 덜 잃고 눈도 잘 흘려보냅니다. 그래서 추운 곳에서 살아남습니다."},
+ {b:"taiga",q:"냉대 지역 사람들의 대표적인 생업으로 알맞은 것은?",
+  a:["임업(나무 베기)과 모피·사냥","벼농사","향신료 농장"],c:0,
+  why:"여름이 짧아 곡식 농사는 어렵습니다. 대신 끝없는 침엽수림에서 나무와 모피를 얻습니다."},
+ {b:"taiga",q:"우리가 쓰는 종이와 목재 가구는 주로 어느 기후에서 올까요?",
+  a:["침엽수림이 넓은 냉대","적도의 열대","얼음뿐인 한대"],c:0,
+  why:"캐나다·시베리아·북유럽의 침엽수림이 세계 목재와 펄프의 큰 공급지입니다."},
+
+ /* ---- 한대 ---- */
+ {b:"tundra",q:"한대(툰드라)에서 농사를 지을 수 없는 가장 큰 까닭은?",
+  a:["땅이 얼어 있고 자랄 수 있는 여름이 너무 짧아서","비가 너무 많이 와서","햇빛이 너무 강해서"],c:0,
+  why:"뿌리를 내릴 땅이 <b>영구동토</b>로 얼어 있습니다. 그래서 사냥·낚시·순록 유목으로 살아갑니다."},
+ {b:"tundra",q:"툰드라에 키 큰 나무가 없고 이끼와 풀만 자라는 까닭은?",
+  a:["뿌리를 깊이 내릴 수 없고 자랄 시간이 짧아서","사람들이 다 베어 내서","비가 전혀 오지 않아서"],c:0,
+  why:"땅속이 얼어 있으면 뿌리가 내려가지 못합니다. 그래서 키가 낮은 식물만 여름 몇 달 동안 자랍니다."},
+ {b:"tundra",q:"극지방에서 여름에 해가 지지 않는 현상을 무엇이라고 할까요?",
+  a:["백야","스콜","일교차"],c:0,
+  why:"지구가 기울어진 채 돌기 때문에 여름의 극지방은 해가 지지 않고, 겨울에는 반대로 해가 뜨지 않습니다."},
+ {b:"tundra",q:"북극의 얼음이 녹으면 생기는 일로 알맞은 것은?",
+  a:["바닷물이 불어나고 북극곰의 사냥터가 줄어든다","비가 완전히 그친다","적도가 추워진다"],c:0,
+  why:"극지방은 지구에서 가장 빨리 더워지는 곳입니다. 탄소를 가장 적게 내뿜은 곳이 먼저 피해를 봅니다."},
+
+ /* ---- 고산 ---- */
+ {b:"alpine",q:"높은 산에 오를수록 추워지는 까닭은?",
+  a:["높이 올라갈수록 공기가 옅어져 열을 덜 붙잡아서","태양에서 멀어져서","바람이 없어서"],c:0,
+  why:"100m 올라갈 때마다 기온이 약 0.6°C 내려갑니다. 그래서 적도 위 산꼭대기에도 만년설이 있어요."},
+ {b:"alpine",q:"적도 근처인데도 안데스 산꼭대기에 눈이 쌓여 있는 것이 알려 주는 사실은?",
+  a:["기후는 위도뿐 아니라 고도에 따라서도 달라진다","적도가 사실은 춥다","눈은 아무 데나 내린다"],c:0,
+  why:"킬리만자로처럼 적도 위의 산도 꼭대기는 만년설입니다. <b>고도</b>도 기후를 만드는 힘이에요."},
+ {b:"alpine",q:"안데스 고산 지대에서 감자를 많이 기르는 까닭은?",
+  a:["서늘한 곳에서도 잘 자라는 작물이라서","물이 아주 많아서","일 년 내내 더워서"],c:0,
+  why:"감자의 고향이 안데스입니다. 우리나라 강원도 고랭지 배추도 같은 원리로 재배해요."},
+ {b:"alpine",q:"고산 지대가 다른 대륙에 주로 내다 파는 것은?",
+  a:["철·구리 같은 광물","바나나","석유"],c:0,
+  why:"산맥은 광물의 창고입니다. 도구를 만들 철이 여기서 나기 때문에 다른 기후는 고산과 거래해야 합니다."},
+
+ /* ---- 기후와 생활·무역 ---- */
+ {q:"기후가 다르면 사람들의 옷차림이 달라지는 까닭은?",
+  a:["더위·추위·햇빛으로부터 몸을 지켜야 해서","유행이 달라서","옷값이 달라서"],c:0,
+  why:"사막의 헐렁한 긴 옷, 한대의 모피 방한복 모두 <b>그 기후에서 살아남기 위한 지혜</b>입니다."},
+ {q:"여러 기후 지역이 서로 무역을 하는 가장 큰 까닭은?",
+  a:["기후마다 나는 것이 달라 혼자서는 다 가질 수 없어서","돈을 벌기 위해서만","나라 사이가 좋아서"],c:0,
+  why:"어느 대륙도 혼자서는 문명을 완성할 수 없습니다. 부족한 것을 주고받는 것이 무역의 출발점이에요."},
+ {q:"초콜릿·커피·바나나가 우리 식탁에 오르기까지 거치는 일은?",
+  a:["열대에서 자란 것을 배·비행기로 실어 온다","우리나라 밭에서 기른다","공장에서 흙 없이 만든다"],c:0,
+  why:"이 작물들은 덥고 비 많은 열대에서만 잘 자랍니다. 그래서 먼 곳에서 실어 옵니다."},
+ {q:"같은 기후에 사는 사람들끼리 남는 물건을 나누는 일을 무엇이라 부르면 좋을까요?",
+  a:["협력(품앗이)","무역","경쟁"],c:0,
+  why:"기후가 같으면 나는 것도 비슷합니다. 그래서 같은 팀끼리는 사고파는 무역보다 <b>서로 메워 주는 협력</b>이 어울려요."},
+ {q:"세계 여러 지역의 집 모양이 서로 다른 가장 큰 까닭은?",
+  a:["그 지역의 기후와 구할 수 있는 재료가 달라서","건축가의 취향이 달라서","집값이 달라서"],c:0,
+  why:"통나무집·흙벽돌집·고상 가옥·이글루 — 모두 그 땅의 기후와 재료가 만든 답입니다."},
+
+ /* ---- 기후변화 ---- */
+ {q:"석탄과 석유를 태울 때 나와 지구를 덥히는 기체는?",
+  a:["이산화탄소","산소","수소"],c:0,
+  why:"이산화탄소는 지구가 내보내려는 열을 붙잡아 둡니다. 이불처럼 지구를 덮는다고 해서 '온실가스'예요."},
+ {q:"탄소가 나오지 않는 발전 방식끼리 묶인 것은?",
+  a:["태양광·풍력","석탄 화력·석유 화력","석탄 화력·태양광"],c:0,
+  why:"태양광과 풍력은 연료를 태우지 않습니다. 게임에서도 태양광 패널은 탄소가 0이었지요."},
+ {q:"지구 온난화로 나타나는 변화로 알맞지 <b>않은</b> 것은?",
+  a:["극지방의 얼음이 두꺼워진다","빙하가 녹아 해수면이 높아진다","사막이 넓어진다"],c:0,
+  why:"극지방의 얼음은 오히려 빠르게 줄고 있습니다. 그 물이 바다로 흘러 해수면을 높입니다."},
+ {q:"우리나라에서 사과 재배지가 점점 북쪽으로 올라가는 까닭은?",
+  a:["기온이 올라 예전보다 남쪽이 더워져서","사람들이 북쪽을 좋아해서","땅값이 싸서"],c:0,
+  why:"기후가 바뀌면 자라는 작물의 자리도 함께 움직입니다. 기후변화가 우리 밥상까지 바꾸는 예예요."},
+ {q:"기후변화를 줄이기 위해 우리가 교실에서 할 수 있는 일은?",
+  a:["쓰지 않는 전기를 끄고 자원을 아껴 쓴다","창문을 열고 난방을 세게 튼다","일회용품을 더 많이 쓴다"],c:0,
+  why:"전기를 만들 때 대부분 탄소가 나옵니다. 아껴 쓰는 것이 가장 빠르고 확실한 방법이에요."},
+ {q:"기후변화의 피해가 가장 먼저, 가장 크게 나타나는 곳은?",
+  a:["빙하가 녹는 극지방과 물이 마르는 건조 지역","가장 큰 도시의 한가운데","바다 한가운데의 배 위"],c:0,
+  why:"탄소를 가장 적게 내뿜은 곳이 먼저 피해를 봅니다. 그래서 기후 문제는 '함께' 풀어야 합니다."}
+];
 /* 게임에서 몸으로 겪은 '배움'(S.taught 키) → 학습 노트에 정리해 보여줄 문구 */
 var LESSON_LABELS={
  heat:"🔥 사막의 한낮은 사람이 활동할 수 없을 만큼 뜨겁다 → 낮엔 실내에서 쉬고 밤에 움직인다.",
@@ -1418,7 +1607,9 @@ function genWorld(biome,seed,onProg){
     e*= clamp01(edge);
     var h=Math.round(P.base+e*P.amp*2-P.amp*0.15);
     if(biome==="alpine")h=Math.round(P.base+Math.pow(e,1.5)*P.amp*2.2);
-    hmap[z*W+x]=Math.max(2,Math.min(H-12,h));
+    /* [V9] 지형의 높낮이 계산은 예전(HGEN=44) 그대로 두고, 마지막에 통째로 LIFT 만큼
+       들어 올린다. 산의 모양·해안선은 하나도 변하지 않고 발밑 땅만 두꺼워진다. */
+    hmap[z*W+x]=Math.max(2,Math.min(HGEN-12,h))+LIFT;
   }
   for(var x2=0;x2<W;x2++){
     for(var z2=0;z2<W;z2++){
@@ -2089,7 +2280,7 @@ function updatePeerLabels(){
   for(var dkid in drops){
     var dv=drops[dkid],eld=document.getElementById("plbl_"+dkid);
     if(!eld){eld=document.createElement("div");eld.id="plbl_"+dkid;eld.className="peerLabel drop";peerLabelWrap.appendChild(eld)}
-    eld.textContent=(dv.by===myNetId?"📦 내 나눔 · ":"🤝 "+(dv.name||"친구")+" · ")+iE(dv.item)+" "+iN(dv.item)+" "+dv.n;
+    eld.textContent=(dv.by===myNetId?(dv.armed?"📦 내 나눔(다시 주울 수 있음) · ":"📦 내 나눔 · "):"🤝 "+(dv.name||"친구")+" · ")+iE(dv.item)+" "+iN(dv.item)+" "+dv.n;
     used[dkid]=1;
     var dwx=dv.x,dwy=dv.y+0.75,dwz=dv.z;
     var dcx=VP[0]*dwx+VP[4]*dwy+VP[8]*dwz+VP[12];
@@ -2100,6 +2291,24 @@ function updatePeerLabels(){
     eld.style.display="block";
     eld.style.left=((dcx/dcw*.5+.5)*Wp)+"px";eld.style.top=((-dcy/dcw*.5+.5)*Hp)+"px";
     eld.style.opacity=ddist>25?"0.55":"1";
+  }
+  /* [V9 추가 3] 퀴즈 상자 이름표 — 멀리서도 보이게 */
+  if(qbox){
+    var elq=document.getElementById("plbl_qbox");
+    if(!elq){elq=document.createElement("div");elq.id="plbl_qbox";elq.className="peerLabel drop";peerLabelWrap.appendChild(elq)}
+    elq.textContent="❓ 퀴즈 상자 — 가까이 가 보세요";
+    used["qbox"]=1;
+    var qwx=qbox.x+.5,qwy=qbox.y+1.35,qwz=qbox.z+.5;
+    var qcx=VP[0]*qwx+VP[4]*qwy+VP[8]*qwz+VP[12];
+    var qcy=VP[1]*qwx+VP[5]*qwy+VP[9]*qwz+VP[13];
+    var qcw=VP[3]*qwx+VP[7]*qwy+VP[11]*qwz+VP[15];
+    var qdist=Math.hypot(qbox.x-S.pos.x,qbox.z-S.pos.z);
+    if(qcw<=0.01||qdist>60){elq.style.display="none"}
+    else{
+      elq.style.display="block";
+      elq.style.left=((qcx/qcw*.5+.5)*Wp)+"px";elq.style.top=((-qcy/qcw*.5+.5)*Hp)+"px";
+      elq.style.opacity="1";
+    }
   }
   /* 사라진 피어의 라벨 제거 */
   var labels=peerLabelWrap.children;
@@ -2499,7 +2708,10 @@ function tryMine(dt){
   }
 }
 function breakBlock(x,y,z){
-  var b=getB(x,y,z),B=BL[b];if(!B||B.drop===null)return;
+  var b=getB(x,y,z),B=BL[b];
+  /* [V9 추가 3] 퀴즈 상자는 캐는 게 아니라 '여는' 것이다 */
+  if(b===QBOX_ID){openQuizBox();return}
+  if(!B||B.drop===null)return;
   machineUnregister(x,y,z,b);                   // [V8 추가 3·4] 기계·목장 해제(가축은 회수)
   yieldBlock(x,y,z,b,B);                        // 대상 블록 파괴 + 드롭
   S.hunger=clamp(S.hunger-.25,0,100);
@@ -3623,6 +3835,37 @@ Cloud.prototype.releasePlayer=function(room,name,cb){
     {method:"PATCH",body:JSON.stringify({owner:null})}
   ).then(function(r){cb&&cb(r.ok?null:"http "+r.status)})["catch"](function(e){cb&&cb(e)});
 };
+/* ══════════════════════════════════════════════════════════════════════════
+   [V9 수정 2] 선생님 전용 — 학생 기록 삭제 · 지도 초기화
+   --------------------------------------------------------------------------
+   왜 필요한가: 지형과 건축은 학생 개인이 아니라 (방 코드 + 기후) 단위의 공유
+   월드(worlds)에 저장된다. 그래서 학생 계정을 지우고 다시 만들어도 지도는
+   그대로였다 — 지우는 대상이 서로 달랐기 때문이다. 게다가 시드는 방 코드와
+   기후만으로 계산되므로, 행을 지워도 똑같은 지형이 다시 생겼다.
+   이제 초기화는 '새 시드 + 빈 건축 + gen(지도 번호) +1' 을 써 넣는 방식이다.
+   번호가 올라가면 학생 기기에 남아 있던 옛 건축도 자동으로 버려진다.
+   ══════════════════════════════════════════════════════════════════════════ */
+Cloud.prototype.deletePlayer=function(room,name,cb){
+  sbFetch(this._rest("players?room=eq."+encodeURIComponent(room)+"&name=eq."+encodeURIComponent(name)),
+    {method:"DELETE"}).then(function(r){cb&&cb(r.ok?null:"http "+r.status)})["catch"](function(e){cb&&cb(e)});
+};
+Cloud.prototype.deleteOffersOf=function(room,name,cb){
+  sbFetch(this._rest("offers?room=eq."+encodeURIComponent(room)+"&trader=eq."+encodeURIComponent(name)),
+    {method:"DELETE"}).then(function(){cb&&cb(null)})["catch"](function(){cb&&cb(null)});
+};
+/* 한 기후의 지도를 완전히 새로 깐다(새 지형 + 건축 0 + 지도 번호 +1) */
+Cloud.prototype.resetWorld=function(room,biome,cb){
+  var self=this;
+  this.loadWorld(room,biome,function(err,cur){
+    var gen=worldGenOf(cur)+1;
+    var seed=Math.floor(Math.random()*99999);
+    /* 새 시드가 우연히 예전과 같아지지 않게 한 칸 비켜 준다 */
+    if(cur&&cur.seed===seed)seed=(seed+1237)%99999;
+    self.saveWorld(room,{biome:biome,seed:seed,edits:packEdits({},gen),day:1},function(werr){
+      cb&&cb(werr,{seed:seed,gen:gen});
+    });
+  });
+};
 
 var CloudSvc=null;
 function initCloud(){
@@ -3637,25 +3880,45 @@ function initCloud(){
    개선: 좌표를 1차원 정수 배열로 눕혀 [x,y,z,id, x,y,z,id, ...] 형태로 압축한다.
    구조 마커 {v:1,d:[...]} 로 감싸 신·구 포맷을 자동 판별(하위 호환)한다.
    외부 라이브러리(LZString) 의존 없이 오프라인에서도 동작. ========================= */
-function packEdits(edits){
+function packEdits(edits,gen){
   var d=[];
   for(var k in edits){
     if(!edits.hasOwnProperty(k))continue;
     var a=k.split(","); if(a.length!==3)continue;
     d.push(+a[0],+a[1],+a[2],edits[k]|0);
   }
-  return {v:1,d:d};   // 압축 포맷
+  /* [V9] v:2 = 지면을 LIFT 만큼 들어 올린 새 좌표계.
+     gen 은 '몇 번째 지도인가'를 세는 번호다. 선생님이 지도를 초기화하면 1 올라가고,
+     학생 기기에 남아 있던 옛 건축은 번호가 다르므로 자동으로 버려진다. */
+  return {v:WORLD_FMT,d:d,gen:gen|0};
+}
+/* {"x,y,z":id} 맵의 y 좌표를 통째로 dy 만큼 옮긴다(옛 월드 이사용) */
+function liftMap(m,dy){
+  var out={};
+  for(var k in m){
+    if(!m.hasOwnProperty(k))continue;
+    var a=k.split(",");
+    if(a.length!==3){out[k]=m[k];continue}
+    out[(+a[0])+","+((+a[1])+dy)+","+(+a[2])]=m[k];
+  }
+  return out;
 }
 function unpackEdits(rec){
   if(!rec)return {};
-  /* 압축 포맷 {v:1,d:[...]} */
-  if(rec.v===1&&rec.d&&rec.d.length!==undefined){
+  /* 압축 포맷 {v:1|2,d:[...]} */
+  if(rec.d&&rec.d.length!==undefined){
     var out={},d=rec.d;
     for(var i=0;i+3<d.length;i+=4){ out[d[i]+","+d[i+1]+","+d[i+2]]=d[i+3]; }
-    return out;
+    /* v:1 은 지면을 들어 올리기 전 좌표 → 통째로 +LIFT 해서 새 지형에 맞춘다 */
+    return (rec.v===WORLD_FMT)?out:liftMap(out,LIFT);
   }
-  /* 구 포맷: 이미 {"x,y,z":id} 맵이면 그대로 사용(하위 호환) */
-  return rec;
+  /* 구 포맷: 이미 {"x,y,z":id} 맵이면 옛 좌표계이므로 함께 올려 준다 */
+  return liftMap(rec,LIFT);
+}
+/* 서버 월드 행이 '몇 번째 지도'인지 */
+function worldGenOf(wrec){
+  var e=wrec&&wrec.edits;
+  return (e&&typeof e.gen==="number")?e.gen:0;
 }
 
 /* ==========================================================================
@@ -3786,9 +4049,11 @@ function netStop(){
    물건의 주인이 심판을 본다(두 명이 동시에 밟아도 한 명만 가져간다).
    주인이 이미 나갔으면 0.8초 뒤 먼저 밟은 사람이 가져간다.
    ══════════════════════════════════════════════════════════════════════════ */
-var drops={};                          // { id: {id,x,y,z,item,n,by,name,t,awarded} }
+var drops={};                          // { id: {id,x,y,z,item,n,by,name,t,awarded,armed} }
 var DROP_R=1.7;                        // 이 거리 안에 들어오면 줍는다
 var DROP_LIFE=900;                     // 15분 뒤 소멸(주인이 있으면 주인에게 돌아간다)
+var DROP_ARM_R=2.8;                    // [V9 수정 4] 내 물건은 이 거리 밖으로 한 번 나가야 다시 주울 수 있다
+var DROP_SELF_WAIT=2.5;                // [V9 수정 4] 그리고 내려놓은 지 이 초는 지나야 한다
 var dropTry={};                        // 내가 집으려고 손 든 것 { id: 시각 }
 
 function dropId(){return "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
@@ -3798,15 +4063,22 @@ function dropItem(k,nn){
   nn=Math.max(1,Math.min(999,nn|0));
   if(qty(S,k)<nn){toast(iN(k)+"이(가) 부족합니다","bad");return}
   if(!take(S,k,nn))return;
-  /* 시선 방향 1.2칸 앞, 발밑 높이 */
-  var fx=S.pos.x-Math.sin(look.yaw)*1.2, fz=S.pos.z-Math.cos(look.yaw)*1.2;
+  /* 시선 방향 1.8칸 앞, 발밑 높이 — [V9 수정 4] 몸에서 조금 더 떼어 놓는다 */
+  var fx=S.pos.x-Math.sin(look.yaw)*1.8, fz=S.pos.z-Math.cos(look.yaw)*1.8;
   if(!inW(Math.floor(fx),Math.floor(S.pos.y),Math.floor(fz))){fx=S.pos.x;fz=S.pos.z}
-  var d={id:dropId(),x:fx,y:S.pos.y+0.35,z:fz,item:k,n:nn,by:myNetId,name:S.name,t:performance.now()};
+  /* [V9 수정 4] armed:false — '아직 다시 주울 수 없음' 표시.
+     예전에는 내려놓은 물건이 1.2칸 앞(= 줍는 반경 1.7칸 안)에 놓였기 때문에,
+     가방을 닫는 순간 내가 그대로 되주워 버렸다. 친구에게 주려고 내려놓아도
+     아무도 가져갈 틈이 없었던 것이다. 이제 내가 그 자리에서 한 번 멀어졌다가
+     (DROP_ARM_R 밖) 돌아와야만 다시 주울 수 있다. */
+  var d={id:dropId(),x:fx,y:S.pos.y+0.35,z:fz,item:k,n:nn,by:myNetId,name:S.name,
+         t:performance.now(),armed:false};
   drops[d.id]=d;
   if(Net&&Net.joined)try{Net.broadcast("drop",{d:d,by:myNetId})}catch(e){}
   refreshHotbar();if(panelTab)drawPanel();
   toast("📦 "+iE(k)+" "+iN(k)+" "+nn+"개를 내려놓았습니다"+((Net&&Net.joined)?" · 같은 기후 친구가 주울 수 있어요":" (아직 혼자예요)"),"good");
   teachOnce("dropped","📦 바닥에 내려놓은 물건은 <b>같은 기후 친구</b>만 주울 수 있습니다. "+
+    "내려놓은 자리에서 <b>몇 걸음 물러났다가 되돌아오면</b> 내가 다시 주울 수 있고, "+
     "아무도 줍지 않으면 <b>내가 나갈 때 가방으로 돌아옵니다</b> — 없어지지 않으니 마음 놓고 나눠 주세요.");
 }
 /* 실제로 내 가방에 넣는다 */
@@ -3837,7 +4109,13 @@ function dropScan(){
       continue;
     }
     var dx=d.x-S.pos.x,dy=d.y-(S.pos.y+0.9),dz=d.z-S.pos.z;
-    if(dx*dx+dy*dy+dz*dz>DROP_R*DROP_R)continue;
+    var d2=dx*dx+dy*dy+dz*dz;
+    /* [V9 수정 4] 내가 내려놓은 물건: 한 번 멀어졌다 돌아와야 다시 주울 수 있게 '장전'한다 */
+    if(d.by===myNetId&&!d.armed){
+      if(d2>DROP_ARM_R*DROP_ARM_R&&(now-d.t)>DROP_SELF_WAIT*1000)d.armed=true;
+      continue;                                       // 장전 전에는 절대 회수하지 않는다
+    }
+    if(d2>DROP_R*DROP_R)continue;
     if(d.by===myNetId){                               // 내 것 → 바로 회수
       dropAward(d,true);delete drops[id];delete dropTry[id];
       if(Net&&Net.joined)try{Net.broadcast("grabok",{id:id,to:myNetId,by:myNetId})}catch(e){}
@@ -4359,6 +4637,166 @@ function updateTabBadge(){
   var old=b.querySelector(".n");if(old)old.remove();
   if(S.newOffers>0){var s=document.createElement("span");s.className="n";s.textContent=S.newOffers;b.appendChild(s)}
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   [V9 추가 3] 퀴즈 상자 — 걷다가 만나는 기후 문제
+   --------------------------------------------------------------------------
+   왜 넣었나: 학습 패널의 퀴즈는 학생이 '일부러 열어야' 보인다. 그래서 대부분
+   한 번도 열지 않고 수업이 끝났다. 이제 놀다 보면 노란 상자가 눈앞에 나타나고,
+   맞히면 <b>내 기후에서는 절대 나지 않는 특별 재료</b>를 준다. 배운 것이 곧
+   살아남는 힘이 되게 만든 장치다.
+     · 문제는 매번 보기 순서를 섞어 낸다(옆자리 화면을 봐도 소용없게)
+     · 이미 푼 문제는 다시 나오지 않는다(S.qbox.seen)
+     · 상자는 내 화면에만 있는 것이라 공유 월드(edits)를 더럽히지 않는다
+   ══════════════════════════════════════════════════════════════════════════ */
+var qbox=null;                 // {x,y,z,prev,q,opts,ci,born}
+var qboxTimer=0, qboxNext=45;  // 첫 상자는 45초쯤 뒤에
+var QBOX_MIN=70, QBOX_MAX=150; // 그 뒤로는 이 사이 간격으로
+
+/* 보상: 내 기후에서 나지 않는 '특별 재료'를 준다. 무역의 맛보기이자
+   "다른 땅에는 다른 것이 난다"를 손에 쥐어 주는 장치. */
+var QBOX_REWARD={
+  temperate:[["iron",2],["glass",2],["spice",2],["coal",3],["copper",2]],
+  tropical :[["iron",2],["ice",3],["coat",1],["stone",6],["wool",2]],
+  taiga    :[["wheat",5],["glass",2],["iron",2],["spice",2],["water",5]],
+  desert   :[["water",8],["wood",6],["ice",3],["fur",2],["wheat",5]],
+  tundra   :[["wheat",5],["wood",6],["coal",4],["coat",1],["iron",2]],
+  alpine   :[["fruit",5],["wheat",5],["spice",2],["water",5],["glass",2]]
+};
+var QBOX_BONUS=[["gold",1],["hardwood",2],["rubber",2],["cacao",2],["coffee",2],["solar",1]];
+
+function qboxPickQuestion(){
+  var seen=(S.qbox&&S.qbox.seen)||{};
+  var mine=[],other=[],fresh=[];
+  QUIZ_BANK.forEach(function(Q,i){
+    if(seen[i])return;
+    fresh.push(i);
+    if(Q.b===S.biome||!Q.b)mine.push(i);else other.push(i);
+  });
+  /* 다 풀었으면 기록을 비우고 처음부터 다시(반복 학습) */
+  if(!fresh.length){S.qbox.seen={};for(var j=0;j<QUIZ_BANK.length;j++)fresh.push(j);mine=fresh;other=[]}
+  /* 70%는 내 기후·공통 문제, 30%는 다른 기후 문제 */
+  var pool=(Math.random()<.7&&mine.length)?mine:(other.length?other:fresh);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+/* 상자를 내 둘레 어딘가 지면 위에 놓는다(공유 월드에는 기록하지 않는다) */
+function qboxSpawn(){
+  if(qbox||!S||S.isVisiting)return false;
+  for(var t=0;t<24;t++){
+    var ang=Math.random()*Math.PI*2, dist=6+Math.random()*8;
+    var x=Math.floor(S.pos.x+Math.cos(ang)*dist), z=Math.floor(S.pos.z+Math.sin(ang)*dist);
+    if(x<2||z<2||x>W-3||z>W-3)continue;
+    /* [V9] 내가 서 있는 높이에서부터 아래로 내려가며 발 디딜 곳을 찾는다.
+       그래야 동굴을 파고 있을 때도, 옥상에 있을 때도 상자가 손 닿는 곳에 생긴다.
+       그 기둥에 아무것도 없으면 그 자리의 지표면을 쓴다. */
+    var gy=-1, y0=Math.min(H-2,Math.floor(S.pos.y)+3);
+    for(var y=y0;y>1;y--){var b=getB(x,y,z);if(b&&BL[b]&&BL[b].solid){gy=y;break}}
+    if(gy<0)for(var y2=H-2;y2>1;y2--){var b2=getB(x,y2,z);if(b2&&BL[b2]&&BL[b2].solid){gy=y2;break}}
+    if(gy<0)continue;
+    var py=gy+1;
+    if(getB(x,py,z)!==0)continue;              // 이미 뭔가 있는 자리는 피한다
+    if(py>=H-1)continue;
+    if(Math.abs(py-S.pos.y)>14)continue;       // 너무 높거나 낮으면 다시 뽑는다
+    var qi=qboxPickQuestion();
+    var Q=QUIZ_BANK[qi];
+    /* 보기 순서를 섞는다 — 정답이 늘 첫 번째에 있던 문제를 고친다 */
+    var order=shuffled([0,1,2].slice(0,Q.a.length));
+    qbox={x:x,y:py,z:z,prev:0,qi:qi,order:order,
+          ci:order.indexOf(Q.c),born:performance.now()};
+    setB(x,py,z,QBOX_ID);markDirty(x,z);
+    toast("❓ 퀴즈 상자가 나타났습니다! 가까이 가 보세요","good");
+    teachOnce("qbox","❓ <b>퀴즈 상자</b>는 가끔 내 둘레에 나타납니다. 다가가서 기후 문제를 맞히면 "+
+      "<b>내 대륙에서는 나지 않는 특별 재료</b>를 얻습니다.");
+    return true;
+  }
+  return false;
+}
+function qboxRemove(){
+  if(!qbox)return;
+  if(getB(qbox.x,qbox.y,qbox.z)===QBOX_ID){setB(qbox.x,qbox.y,qbox.z,qbox.prev||0);markDirty(qbox.x,qbox.z)}
+  qbox=null;
+}
+/* 매 프레임: 시간이 되면 상자를 놓고, 가까이 가면 문제를 연다 */
+function qboxTick(dt){
+  if(!S||S.isVisiting||panelTab)return;
+  if(!qbox){
+    qboxTimer+=dt;
+    if(qboxTimer>=qboxNext){qboxTimer=0;qboxNext=QBOX_MIN+Math.random()*(QBOX_MAX-QBOX_MIN);qboxSpawn()}
+    return;
+  }
+  /* 누가 그 자리를 덮어 버렸다면(친구의 건축 등) 조용히 잊는다 */
+  if(getB(qbox.x,qbox.y,qbox.z)!==QBOX_ID){qbox=null;qboxTimer=0;return}
+  /* 3분이 지나도 안 오면 조용히 치우고 다음 기회를 노린다 */
+  if(performance.now()-qbox.born>180000){qboxRemove();qboxTimer=0;qboxNext=QBOX_MIN;return}
+  var dx=(qbox.x+.5)-S.pos.x, dy=qbox.y-(S.pos.y+.9), dz=(qbox.z+.5)-S.pos.z;
+  if(dx*dx+dy*dy+dz*dz<2.6*2.6)openQuizBox();
+}
+/* 문제 창을 연다 */
+var quizOpen=false;
+function openQuizBox(){
+  if(!qbox||quizOpen)return;
+  quizOpen=true;
+  S.paused=true;
+  try{if(document.pointerLockElement)document.exitPointerLock()}catch(e){}
+  var Q=QUIZ_BANK[qbox.qi];
+  var h="<h3>❓ 기후 퀴즈 상자</h3>"+
+    "<p style='color:var(--ink);font-size:14.5px;font-weight:700;line-height:1.6'>"+Q.q+"</p>"+
+    "<div class='qopts'>";
+  qbox.order.forEach(function(oi,n){
+    h+="<button onclick='answerQuizBox("+n+")'><b>"+["㉠","㉡","㉢"][n]+"</b> "+Q.a[oi]+"</button>";
+  });
+  h+="</div><p class='note' id='qfoot'>맞히면 특별 재료를 받습니다 · 틀려도 해설을 보여 드려요</p>";
+  $("qbody").innerHTML=h;
+  $("quizbox").classList.remove("hide");
+}
+function answerQuizBox(n){
+  if(!qbox)return;
+  var Q=QUIZ_BANK[qbox.qi], ok=(n===qbox.ci);
+  if(!S.qbox)S.qbox={n:0,ok:0,seen:{}};
+  S.qbox.seen[qbox.qi]=1;
+  S.qbox.n=(S.qbox.n||0)+1;
+  var got=[];
+  if(ok){
+    S.qbox.ok=(S.qbox.ok||0)+1;
+    S.stat.quizOk=(S.stat.quizOk||0)+1;
+    var pool=QBOX_REWARD[S.biome]||QBOX_REWARD.temperate;
+    var pick=pool[Math.floor(Math.random()*pool.length)];
+    add(S,pick[0],pick[1]);S.stat.got[pick[0]]=(S.stat.got[pick[0]]||0)+pick[1];
+    got.push(pick);
+    /* 세 문제 연속 맞히듯 잘 풀면 가끔 귀한 것도 하나 더 */
+    if(Math.random()<.28){
+      var bo=QBOX_BONUS[Math.floor(Math.random()*QBOX_BONUS.length)];
+      add(S,bo[0],bo[1]);S.stat.got[bo[0]]=(S.stat.got[bo[0]]||0)+bo[1];
+      got.push(bo);
+    }
+    logAdd(S,"퀴즈 상자를 맞혀 "+got.map(function(g){return iN(g[0])+" "+g[1]+"개"}).join(", ")+"을(를) 얻었습니다.");
+  }else{
+    /* 틀려도 빈손으로 보내지 않는다 — 물 한 모금과 해설 */
+    add(S,"water",2);S.stat.got.water=(S.stat.got.water||0)+2;
+    got.push(["water",2]);
+    logAdd(S,"퀴즈 상자를 열었습니다. 해설을 읽고 다음에 다시 도전합니다.");
+  }
+  var h="<h3>"+(ok?"⭕ 정답입니다!":"❌ 아쉬워요")+"</h3>"+
+    "<p style='color:var(--ink2)'><b style='color:"+(ok?"var(--good)":"var(--warn)")+"'>정답: "+
+      Q.a[Q.c]+"</b></p>"+
+    "<p style='line-height:1.65'>"+Q.why+"</p>"+
+    "<div class='chips' style='margin-top:12px'>"+got.map(function(g){
+      return "<span class='chip ok'>"+iE(g[0])+" "+iN(g[0])+" +"+g[1]+"</span>"}).join("")+"</div>"+
+    "<p class='note'>지금까지 "+(S.qbox.n)+"문제 중 <b>"+(S.qbox.ok||0)+"문제</b>를 맞혔습니다.</p>"+
+    "<div class='crow'><button class='no' onclick='closeQuizBox()'>닫기</button></div>";
+  $("qbody").innerHTML=h;
+  refreshHotbar();
+  if(ok)toast("⭕ 정답! "+got.map(function(g){return iE(g[0])+" "+iN(g[0])+" +"+g[1]}).join(" · "),"good");
+  else toast("❌ 아쉬워요 — 해설을 읽어 보세요","warn");
+  qboxRemove();
+  cloudDirty();
+}
+function closeQuizBox(){
+  quizOpen=false;
+  $("quizbox").classList.add("hide");
+  if(S&&!panelTab)S.paused=false;
+  qboxTimer=0;qboxNext=QBOX_MIN+Math.random()*(QBOX_MAX-QBOX_MIN);
+}
+
 /* ---------- 패널 ---------- */
 var panelTab=null;
 function openPanel(tab){
@@ -4537,7 +4975,8 @@ function teamShareCard(){
   if(ks.indexOf(f.k)<0)f.k=ks[0]||"";
   var h="<div class='sec'><h3>🤝 우리 팀에게 나눠주기 <span class='sm'>"+bN(S.biome)+" 친구들</span></h3><div class='card'>"+
     "<p class='eff' style='margin-bottom:9px'>물건을 <b>바닥에 내려놓으면</b> 같은 기후 친구가 걸어와 주울 수 있습니다. "+
-    "값을 정할 필요가 없어요.<br><b>아무도 줍지 않으면 내가 나갈 때 가방으로 돌아옵니다</b> — 없어지지 않습니다.</p>"+
+    "값을 정할 필요가 없어요.<br>내려놓은 뒤 <b>그 자리에서 몇 걸음 물러나면</b> 물건이 그대로 남습니다(내가 도로 줍지 않습니다). "+
+    "<b>아무도 줍지 않으면 내가 나갈 때 가방으로 돌아옵니다</b> — 없어지지 않습니다.</p>"+
     "<div class='rw' style='margin-bottom:9px'><span class='chip "+(live?"ok":"")+"'>"+
       (live?"🛰 실시간 연결됨":"📴 연결 대기 중")+"</span>"+
       "<span class='chip'>지금 같은 대륙에 <b>"+mates+"</b>명</span></div>";
@@ -4784,6 +5223,7 @@ function uiRecord(){
   var st=S.stat,imp=Object.keys(st.imp).length;
   h+="<div class='sec'><h3>기록</h3><div class='card'><div class='chips'>"+
     "<span class='chip'>무역 <b>"+st.trades+"</b>회</span><span class='chip'>우리 팀 나눔 <b>"+(st.helps||0)+"</b>회</span>"+
+    "<span class='chip"+((S.qbox&&S.qbox.ok)?" ok":"")+"'>❓ 퀴즈 <b>"+((S.qbox&&S.qbox.ok)||0)+"</b>/"+((S.qbox&&S.qbox.n)||0)+" 정답</span>"+
     "<span class='chip'>수입 종류 <b>"+imp+"</b></span>"+
     "<span class='chip'>식량 수출 <b>"+st.foodOut+"</b></span><span class='chip'>설치한 블록 <b>"+st.placed+"</b></span>"+
     "<span class='chip'>만든 전기 <b>"+(st.powerMade||0)+"</b>(태양광 "+(st.powerClean||0)+")</span>"+
@@ -5075,6 +5515,18 @@ function uiHelp(){
     "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>❓ 퀴즈 상자 <span class='sm'>맞히면 특별 재료</span></h3><div class='card'><p class='eff'>"+
+    "돌아다니다 보면 <b>노란 퀴즈 상자</b>가 가끔 내 둘레에 나타납니다. 가까이 가면(또는 캐면) "+
+    "<b>기후 문제</b>가 하나 나오고, 맞히면 <b>내 대륙에서는 나지 않는 특별 재료</b>를 줍니다. "+
+    "틀려도 <b>왜 그런지 해설</b>을 읽을 수 있어요.<br>"+
+    "문제는 <b>"+QUIZ_BANK.length+"가지</b>가 준비되어 있고 <b>보기 순서도 매번 바뀝니다</b>. "+
+    "그래서 친구와 다른 문제를 풀게 되고, 한 번 푼 문제는 다시 나오지 않습니다.<br>"+
+    "지금까지 <b>"+((S.qbox&&S.qbox.n)||0)+"</b>문제 중 <b>"+((S.qbox&&S.qbox.ok)||0)+"</b>문제를 맞혔습니다."+
+    "</p></div></div>"+
+    "<div class='sec'><h3>🏗 하늘과 지하 <span class='sm'>넓어졌습니다</span></h3><div class='card'><p class='eff'>"+
+    "발밑으로는 <b>약 "+SEA+"칸</b>을 파고 내려갈 수 있고, 머리 위로는 <b>"+(H-1-SEA)+"칸</b>까지 쌓아 올릴 수 있습니다. "+
+    "높이 지은 집은 열대의 습기를 피하고(고상 가옥), 깊이 판 굴은 사막의 폭염과 한대의 추위를 막아 줍니다 — "+
+    "지붕 아래에 들어가면 바깥 기온이 몸에 그대로 닿지 않아요.</p></div></div>"+
     "<div class='sec'><h3>도구 <span class='sm'>맨손보다 2~6배 빠릅니다</span></h3><div class='card'><p class='eff'>"+
     "가방(<kbd>E</kbd>)의 <b>도구 제작</b>에서 ⛏️ 곡괭이·🪓 도끼·🥄 삽을 만듭니다.<br>"+
     "조준한 블록에 <b>가장 잘 듣는 도구가 저절로 쓰입니다</b> — 따로 바꿔 들 필요가 없어요. "+
@@ -5217,6 +5669,7 @@ function exitToTitle(){
   closePanel();
   $("confirm").classList.add("hide");
   mineHold=false;mining=null;target=null;mineDownT=0;
+  try{qbox=null;quizOpen=false;qboxTimer=0;qboxNext=45;$("quizbox").classList.add("hide")}catch(e){}
   keys={};moveVec.f=0;moveVec.s=0;wantJump=false;lookId=null;
   S=null;myState=null;panelTab=null;
   $("hud").classList.add("hide");
@@ -5277,8 +5730,16 @@ function resumeSave(sv,btn){
         if(!werr&&wrec){
           S.seed=wrec.seed||S.seed;
           var srv=unpackEdits(wrec.edits)||{};
-          for(var k in S.edits)if(!srv.hasOwnProperty(k))srv[k]=S.edits[k];
-          S.edits=srv;
+          /* [V9 수정 2] 선생님이 지도를 새로 깔았다면(gen 이 다르면) 이 기기에 남아 있던
+             옛 건축은 합치지 않는다. 합치는 순간 초기화가 없던 일이 되기 때문이다. */
+          var sg=worldGenOf(wrec);
+          if(sg!==(S.wgen|0)){
+            S.edits=srv;S.wgen=sg;S.hasPost=false;
+            setTimeout(function(){toast("🗺 선생님이 새 지도를 깔았습니다 — 새 대륙에서 시작합니다","warn")},900);
+          }else{
+            for(var k in S.edits)if(!srv.hasOwnProperty(k))srv[k]=S.edits[k];
+            S.edits=srv;
+          }
           if(wrec.day)S.day=Math.max(S.day||1,wrec.day);
         }
         beginWorld(true);
@@ -5316,14 +5777,15 @@ function cloudErrText(e){
 }
 function newState(name,biome,seed){
   return{ver:VER,name:name,biome:biome,seed:seed,
-    pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
+    pos:{x:W/2,y:SEA+14,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
+    wv:WORLD_FMT,wgen:0,                                  /* [V9] 좌표 규격 · 몇 번째 지도인가 */
     machines:{},ranch:{},gen:{},breed:0,
-    carbon:0,quizA:{},regrow:{},
+    carbon:0,quizA:{},regrow:{},qbox:{n:0,ok:0,seen:{}},
     stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false,
-          powerMade:0,powerClean:0,animals:0}};
+          powerMade:0,powerClean:0,animals:0,quizOk:0}};
 }
 function startKit(s){
   var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
@@ -5377,6 +5839,17 @@ function cloudSaveWorld(force,cb){
     if(!worldDirtyFlag&&!force){cloudBusy=false;cloudDirtyFlag=false;cb&&cb(perr);return}
     CloudSvc.loadWorld(S.room,S.biome,function(lerr,cur){
       if(!S){cloudBusy=false;cb&&cb(perr);return}
+      /* ── [V9 수정 2] 선생님이 방금 지도를 초기화했다면 내 옛 건축을 되살리지 않는다 ──
+         서버 월드에는 '몇 번째 지도인가'(gen)가 적혀 있다. 내가 들고 있는 번호보다
+         서버가 크면, 내가 놀고 있는 사이에 선생님이 지도를 새로 깐 것이다.
+         이때 평소처럼 합쳐 올리면 방금 지운 건물이 통째로 되살아난다. 그래서
+         업로드를 멈추고, 학생에게 나갔다 들어오라고 알린다. */
+      if(!lerr&&cur&&worldGenOf(cur)>(S.wgen|0)){
+        cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
+        cloudBlocked=true;
+        toast("🗺 선생님이 지도를 새로 깔았습니다. 나갔다가 다시 들어와 주세요","warn");
+        cb&&cb(perr);return;
+      }
       if(!lerr&&cur){
         var srv=unpackEdits(cur.edits);
         for(var k in srv){
@@ -5389,7 +5862,7 @@ function cloudSaveWorld(force,cb){
       /* seed 는 서버에 이미 있는 값을 절대 바꾸지 않는다(바꾸면 반 전체 지형이 뒤집힌다).
          내 S.seed 는 이번 세션의 지형을 만든 값이므로 그대로 두고, 쓰기만 서버 값으로 한다. */
       var useSeed=(cur&&cur.seed)||S.seed;
-      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits),day:S.day},function(werr){
+      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0),day:S.day},function(werr){
         cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
         var err0=perr||werr;
         if(err0)console.warn("cloud save fail",err0);
@@ -5460,12 +5933,29 @@ function normalizeSave(s){
   if(!s.rotT)s.rotT={};if(!s.crops)s.crops={};
   if(!s.taught)s.taught={};if(!s.decay)s.decay={};if(typeof s.hazGrace!=="number")s.hazGrace=0;
   if(typeof s.carbon!=="number")s.carbon=0;if(!s.quizA)s.quizA={};if(!s.regrow)s.regrow={};
-  if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
-  if(s.stat&&typeof s.stat.helps!=="number")s.stat.helps=0;      // [V8 추가 1] 우리 팀 나눔 횟수
-  /* [V8 추가 3·4] 기계·목장 — 예전 저장에도 빈 채로 만들어 준다 */
   if(!s.machines)s.machines={};
   if(!s.ranch)s.ranch={};
   if(!s.gen)s.gen={};
+  /* ── [V9 수정 5] 하늘·지하를 넓히기 전(v1)에 저장된 기록을 새 좌표로 이사시킨다 ──
+     지형을 통째로 LIFT 칸 위로 올렸으므로, 예전에 지은 집·심은 작물·놓은 기계도
+     똑같이 올려 주어야 제자리에 앉는다. 한 번만 실행되고 s.wv 로 표시해 둔다. */
+  if(s.wv!==WORLD_FMT){
+    s.edits=liftMap(s.edits||{},LIFT);
+    s.crops=liftMap(s.crops,LIFT);
+    s.decay=liftMap(s.decay,LIFT);
+    s.regrow=liftMap(s.regrow,LIFT);
+    s.machines=liftMap(s.machines,LIFT);
+    s.ranch=liftMap(s.ranch,LIFT);
+    s.gen=liftMap(s.gen,LIFT);
+    if(s.pos&&typeof s.pos.y==="number")s.pos.y+=LIFT;
+    s.wv=WORLD_FMT;
+    if(typeof s.wgen!=="number")s.wgen=0;
+  }
+  if(typeof s.wgen!=="number")s.wgen=0;
+  if(!s.qbox)s.qbox={n:0,ok:0,seen:{}};                          // [V9 추가 3] 퀴즈 상자 기록
+  if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
+  if(s.stat&&typeof s.stat.helps!=="number")s.stat.helps=0;      // [V8 추가 1] 우리 팀 나눔 횟수
+  if(s.stat&&typeof s.stat.quizOk!=="number")s.stat.quizOk=0;    // [V9 추가 3] 퀴즈 정답 수
   if(typeof s.breed!=="number")s.breed=0;
   if(s.stat){
     if(typeof s.stat.powerMade!=="number")s.stat.powerMade=0;
@@ -5527,6 +6017,18 @@ function bindInput(){
     /* 확인 창이 떠 있으면 ESC=취소, Enter=계속하기(안전한 쪽) */
     if(!$("confirm").classList.contains("hide")){
       if(e.code==="Escape"||e.code==="Enter"){e.preventDefault();cancelExit()}
+      return;
+    }
+    /* [V9 추가 3] 퀴즈 창이 떠 있으면 ㉠㉡㉢ 를 1·2·3 으로도 고를 수 있게 하고,
+       그 밖의 조작(이동·가방)은 모두 막는다 */
+    if(quizOpen){
+      if(/^Digit[1-3]$/.test(e.code)){
+        e.preventDefault();
+        var qb=$("qbody").querySelectorAll(".qopts button");
+        var qi2=parseInt(e.code.slice(5),10)-1;
+        if(qb&&qb[qi2])qb[qi2].click();
+      }
+      if(e.code==="Escape"&&!$("qbody").querySelector(".qopts")){e.preventDefault();closeQuizBox()}
       return;
     }
     keys[e.code]=true;
@@ -5861,7 +6363,7 @@ function startAsStudentOnline(name,bio){
       S=newState(name,bio,seed);
       S.room=MarketCfg.room;
       document.body.dataset.b=S.biome;
-      if(haveShared){S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;}
+      if(haveShared){S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;S.wgen=worldGenOf(wrec);}
       /* 개인 데이터 복원 or 신규 지급 */
       if(prec){
         S.inv=prec.inv||{};
@@ -5931,6 +6433,40 @@ function newStudentWorld(name,bio){
    ========================================================================== */
 var teacherInited=false, rosterFilter=null, rosterOpen=null, rosterDirty=false, rosterUndo=null;
 
+/* ══════════════════════════════════════════════════════════════════════════
+   [V9 수정 1] 기후 무작위 배정 — 누를 때마다 다르게 섞인다
+   --------------------------------------------------------------------------
+   예전에는 명단 순서대로 온대·열대·냉대…를 돌려 붙였다(i % 6). 그래서 몇 번을
+   눌러도 결과가 늘 똑같았고, "다시 뽑아 주세요"가 통하지 않았다.
+   이제 ① 학생 순서를 섞고 ② 여섯 기후의 순서도 섞은 뒤 ③ 차례로 나눠 준다.
+   인원은 여전히 최대 1명 차이로 고르게 맞춰지고, 누를 때마다 짝이 달라진다.
+   ══════════════════════════════════════════════════════════════════════════ */
+function shuffled(arr){
+  var a=arr.slice();
+  for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}
+  return a;
+}
+function shuffleBiomes(list){
+  var order=shuffled(list);                 // 누구부터 뽑을지
+  var bios=shuffled(BKEYS);                 // 어느 기후부터 채울지
+  var tally={};BKEYS.forEach(function(b){tally[b]=0});
+  order.forEach(function(r,i){
+    var b=bios[i%bios.length];
+    r.biome=b;tally[b]++;
+  });
+  var lo=99,hi=0;
+  BKEYS.forEach(function(b){if(tally[b]<lo)lo=tally[b];if(tally[b]>hi)hi=tally[b]});
+  return {lo:lo,hi:hi,tally:tally};
+}
+/* 새로 넣는 학생은 '지금 가장 적은 기후'로 보낸다(고르게 유지) */
+function leastBiome(){
+  var tally={};BKEYS.forEach(function(b){tally[b]=0});
+  teacherRoster.forEach(function(r){if(tally[r.biome]!==undefined)tally[r.biome]++});
+  var best=shuffled(BKEYS)[0];
+  BKEYS.forEach(function(b){if(tally[b]<tally[best])best=b});
+  return best;
+}
+
 function initTeacherPane(){
   if(!teacherInited){
     teacherInited=true;
@@ -5944,9 +6480,10 @@ function initTeacherPane(){
     });
     $("t_autofill").addEventListener("click",function(){
       if(!teacherRoster.length){toast("먼저 학생 이름을 넣어 주세요","bad");return}
-      teacherRoster.forEach(function(r,i){r.biome=BKEYS[i%BKEYS.length]});
+      rosterUndo=teacherRoster.map(function(r){return{name:r.name,biome:r.biome}});
+      var res=shuffleBiomes(teacherRoster);
       rosterMarkDirty();renderRoster();
-      toast("여섯 기후로 고르게 나눴습니다","good");
+      toast("🎲 무작위로 다시 섞었습니다 · 기후당 "+res.lo+(res.lo===res.hi?"":("~"+res.hi))+"명","good");
     });
     $("t_clear").addEventListener("click",function(){
       if(!teacherRoster.length)return;
@@ -5955,8 +6492,60 @@ function initTeacherPane(){
       toast("명단을 비웠습니다 · 되돌리려면 되돌리기를 누르세요","warn");
     });
     $("t_save").addEventListener("click",teacherSaveRoster);
+    $("t_resetAll").addEventListener("click",function(){resetMapAsk(null)});
+    $("t_wipeLocal").addEventListener("click",wipeLocalSaves);
   }
+  renderResetPick();
   renderRoster();
+}
+/* ── [V9 수정 2] 지도 초기화 ─────────────────────────────────────────────── */
+function renderResetPick(){
+  var box=$("resetPick");if(!box)return;
+  box.innerHTML=BKEYS.map(function(b){
+    return "<button style='--cc:"+BIOMES[b].c+"' onclick=\"resetMapAsk('"+b+"')\">"+
+      "<i></i>"+BIOMES[b].n+" 새로 깔기</button>";
+  }).join("");
+}
+var resetBusy=false;
+function resetMapAsk(biome){
+  var msg=$("t_resetMsg");
+  if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
+  if(!Auth.isTeacher()){msg.textContent="지도 초기화는 선생님 계정으로만 할 수 있습니다.";return}
+  if(resetBusy)return;
+  var list=biome?[biome]:BKEYS.slice();
+  var what=biome?(bN(biome)+" 대륙"):"여섯 대륙 전부";
+  if(!window.confirm(what+"의 지도를 새로 깝니다.\n\n· 지형이 완전히 새로 만들어집니다\n· 학생들이 지은 건물이 모두 사라집니다\n· 되돌릴 수 없습니다\n\n계속할까요?"))return;
+  resetBusy=true;
+  var room=MarketCfg.room,done=0,fail=0;
+  msg.textContent=what+" 지도를 새로 까는 중…";
+  list.forEach(function(b){
+    CloudSvc.resetWorld(room,b,function(err){
+      if(err)fail++;
+      done++;
+      if(done<list.length){msg.textContent="새로 까는 중… ("+done+"/"+list.length+")";return}
+      resetBusy=false;
+      msg.innerHTML=fail
+        ? "⚠ "+fail+"개 기후를 초기화하지 못했습니다. 잠시 뒤 다시 시도해 주세요."
+        : "✅ "+esc(what)+"의 지도를 새로 깔았습니다. 학생들이 다시 들어오면 새 대륙이 보입니다.";
+    });
+  });
+}
+/* 이 컴퓨터에 남아 있는 저장 슬롯을 모두 지운다(시연용 PC 정리) */
+function wipeLocalSaves(){
+  var msg=$("t_resetMsg");
+  var n=0;
+  try{
+    var kill=[];
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(k&&k.indexOf(SAVE)===0)kill.push(k);
+    }
+    if(!kill.length){msg.textContent="이 기기에는 지울 저장이 없습니다.";return}
+    if(!window.confirm("이 컴퓨터에 저장된 게임 기록 "+kill.length+"개를 지웁니다.\n(다른 컴퓨터·클라우드 기록은 그대로입니다)\n\n계속할까요?"))return;
+    kill.forEach(function(k){localStorage.removeItem(k);n++});
+  }catch(e){}
+  setupContinue();
+  msg.textContent="✅ 이 기기의 저장 "+n+"개를 지웠습니다.";
 }
 function rosterMarkDirty(on){
   rosterDirty=(on!==false);
@@ -5975,14 +6564,15 @@ function rosterAddBulk(){
   var names=raw.split(/[\n,\t;]+/).map(function(s){return s.replace(/^\s*\d+[.)]?\s*/,"").trim()})
     .filter(function(s){return s.length>0&&s.length<=12});
   if(!names.length){toast("넣을 이름이 없습니다","bad");return}
-  var added=0,dup=0,start=teacherRoster.length;
+  var added=0,dup=0;
   names.forEach(function(nm){
     if(teacherRoster.some(function(r){return r.name===nm})){dup++;return}
-    teacherRoster.push({name:nm,biome:BKEYS[(start+added)%BKEYS.length]});added++;
+    /* [V9 수정 1] 순서대로가 아니라 '지금 가장 적은 기후'로 보낸다 */
+    teacherRoster.push({name:nm,biome:leastBiome()});added++;
   });
   $("r_bulk").value="";
   rosterMarkDirty();renderRoster();
-  toast(added+"명을 넣었습니다"+(dup?" · 이미 있는 이름 "+dup+"명은 건너뜀":"")+" · 기후는 자동으로 고르게 나눴어요",added?"good":"warn");
+  toast(added+"명을 넣었습니다"+(dup?" · 이미 있는 이름 "+dup+"명은 건너뜀":"")+" · 🎲 버튼으로 다시 섞을 수 있어요",added?"good":"warn");
 }
 /* ---- 명단 그리기 ---- */
 function renderRoster(){
@@ -6023,7 +6613,8 @@ function renderRoster(){
       rows+="<div class='rpick'>"+BKEYS.map(function(b){
         return "<button style='--cc:"+BIOMES[b].c+"' aria-pressed='"+(b===r.biome)+"' "+
           "onclick=\"rosterSetBiome("+i+",'"+b+"')\">"+BIOMES[b].n+"</button>"}).join("")+
-        "<button class='rdel' onclick='rosterRemove("+i+")'>✕ 명단에서 빼기</button></div>";
+        "<button class='rdel' onclick='rosterRemove("+i+")'>✕ 명단에서 빼기</button>"+
+        "<button class='rdel' onclick=\"teacherWipeStudent('"+encodeURIComponent(r.name)+"')\">🧹 이 학생 기록 완전 삭제</button></div>";
     }
     rows+="</div>";
   });
@@ -6111,6 +6702,26 @@ function teacherRelease(nameEnc){
     msg.textContent=err?("⚠ 실패: "+err):("✅ "+name+" 학생은 이제 아무 기기에서나 이어서 할 수 있습니다.");
   });
 }
+/* [V9 수정 2] 학생 하나의 서버 기록(가방·스탯·위치·거래·배정)을 통째로 지운다.
+   지운 뒤 같은 이름을 명단에 다시 넣으면 '완전한 새 계정'으로 시작한다.
+   단, 그 학생이 지어 둔 건물은 공유 월드에 있으므로 함께 사라지지 않는다.
+   건물까지 없애려면 아래 '지도 초기화'를 눌러야 한다 — 그래서 안내에 함께 적었다. */
+function teacherWipeStudent(nameEnc){
+  var name=decodeURIComponent(nameEnc), msg=$("t_saveMsg");
+  if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
+  if(!Auth.isTeacher()){msg.textContent="학생 기록 삭제는 선생님 계정으로만 할 수 있습니다.";return}
+  if(!window.confirm(name+" 학생의 서버 기록을 지웁니다.\n\n· 가방·자원·일차·위치가 모두 사라집니다\n· 다시 접속하면 새 계정처럼 처음부터 시작합니다\n· 이미 지어 둔 건물은 남습니다(지우려면 '지도 초기화')\n\n계속할까요?"))return;
+  msg.textContent=name+" 학생 기록을 지우는 중…";
+  CloudSvc.deleteOffersOf(MarketCfg.room,name,function(){
+    CloudSvc.deletePlayer(MarketCfg.room,name,function(err){
+      if(err){msg.textContent="⚠ 삭제 실패: "+err;return}
+      /* 이 기기에 남은 같은 이름의 저장도 함께 정리한다 */
+      try{localStorage.removeItem(slotKey(name,MarketCfg.room))}catch(e){}
+      msg.innerHTML="✅ <b>"+esc(name)+"</b> 학생의 기록을 지웠습니다. 다시 접속하면 처음부터 시작합니다."+
+        "<br>지어 둔 건물까지 없애려면 왼쪽 <b>🗺 지도 초기화</b>를 눌러 주세요.";
+    });
+  });
+}
 function teacherSaveRoster(){
   var msg=$("t_saveMsg");
   if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
@@ -6146,7 +6757,7 @@ function beginWorld(isLoad){
         if(cloudActive())cloudSaveWorld(true);               // 새 월드 첫 스냅샷
       }else{
         /* 위치가 비었거나 공중이면 지면으로 내려 세운다(클라우드 로드 대응) */
-        if(!S.pos||typeof S.pos.x!=="number"){S.pos={x:W/2+.5,y:20,z:W/2+.5,};}
+        if(!S.pos||typeof S.pos.x!=="number"){S.pos={x:W/2+.5,y:SEA+14,z:W/2+.5,};}
         S.pos.y=findGround(S.pos.x,S.pos.z);
         if(!S.spawn)S.spawn={x:S.pos.x,z:S.pos.z};
         if(catchUp&&!S.isVisiting&&catchUp()>60)toast("자리를 비운 사이 시간이 흘렀습니다");
@@ -6208,11 +6819,11 @@ function startVisit(nameEnc,biome){
     $("ltx").textContent=esc(name)+"의 "+bN(rec.biome||biome)+" 대륙으로 이동 중…";
     /* 방문용 임시 상태(간단): 실제 시뮬레이션은 하지 않음 */
     var vis={ver:VER,name:name,biome:rec.biome||biome,seed:rec.seed,
-      pos:{x:W/2,y:20,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
+      pos:{x:W/2,y:SEA+14,z:W/2},vel:{x:0,y:0,z:0},yaw:0,pitch:0,onGround:false,spawn:{x:W/2,z:W/2},
       hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:S.sec,day:rec.day||1,rot:0,rotT:{},faint:0,
       inv:{},dur:{},edits:unpackEdits(rec.edits),offers:[],pending:[],done:[],log:[],titles:[],aiAcc:0,newOffers:0,   /* [V5 수정 4] */
       paused:false,isVisiting:true,room:S.room,visitOwner:name,taught:{},decay:{},hazGrace:0,
-      carbon:0,quizA:{},regrow:{},
+      carbon:0,quizA:{},regrow:{},qbox:{n:0,ok:0,seen:{}},
       stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false}};
     S=vis;document.body.dataset.b=S.biome;
     /* [V4] 구경하는 기후의 실시간 채널로 전환(그 대륙에 있는 학생들의 아바타를 실시간으로 봄) */
@@ -6294,6 +6905,7 @@ function loop(t){
     }else{
       if(mineHold)tryMine(dt);else mining=null;
       simulate(dt,false);
+      qboxTick(dt);                   // [V9 추가 3] 퀴즈 상자 등장·접근 판정
       saveAcc+=dt;if(saveAcc>5){saveAcc=0;save()}
       /* 클라우드 세이브: 변경이 있으면 10초마다 업로드 */
       if(cloudActive()){cloudAcc+=dt;if(cloudAcc>10){cloudAcc=0;if(cloudDirtyFlag)cloudSaveWorld(false)}}
