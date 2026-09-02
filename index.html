@@ -865,7 +865,9 @@ var BL={
  21:{n:"모피 덤불",c:0x8a6a4a,hard:.5,drop:"fur",solid:true},
  22:{n:"과일 잎",c:0x63a83c,hard:.35,drop:"fruit",solid:true},
  23:{n:"낚시 구멍",c:0x1f4e78,hard:3.0,drop:"fish",solid:true,infinite:true},
- 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true},
+ /* [V10 수정] 온대 들판의 야생 밀. 베면 씨앗이 함께 나와 '밭'을 만들 수 있다 —
+    사람이 어떻게 채집에서 농경으로 넘어갔는지를 손으로 겪게 하려는 것. */
+ 24:{n:"밀",c:0xd8bd57,hard:.3,drop:"wheat",solid:false,plant:true,crop:{item:"wheat",yield:[1,3],ripe:true}},
  26:{n:"감자 싹",c:0x6f8a3e,hard:.2,drop:"seed_potato",solid:false,plant:true,crop:{item:"potato",grow:27,next:27,needWater:true}},
  27:{n:"감자",c:0xb9944e,hard:.3,drop:"potato",solid:false,plant:true,crop:{item:"potato",yield:[2,4],ripe:true}},
  28:{n:"벼 모",c:0x7fae5a,hard:.2,drop:"seed_rice",solid:false,plant:true,crop:{item:"rice",grow:29,next:29,needWater:true,paddy:true}},
@@ -899,7 +901,29 @@ var BL={
  54:{n:"순록 우리",    c:0x9c8f7e,hard:.8,drop:"an_deer", solid:true,special:"ranch"},
  55:{n:"야마 우리",    c:0xc9b79a,hard:.8,drop:"an_llama",solid:true,special:"ranch"},
  /* ── [V9 추가 3] 퀴즈 상자 — 돌아다니다 우연히 만나는 '기후 문제' ─────── */
- 56:{n:"퀴즈 상자",    c:0xf0c246,hard:.4,drop:null,  solid:true,special:"quiz",light:true}
+ 56:{n:"퀴즈 상자",    c:0xf0c246,hard:.4,drop:null,  solid:true,special:"quiz",light:true},
+ /* ══ [V10 추가] 교과서에 나오는 기후별 작물을 더 심을 수 있게 ══════════════
+    열대의 화전 작물(옥수수·얌), 온대 지중해의 포도·올리브, 서부 유럽과 냉대의
+    밀, 안데스의 옥수수까지 — 교과서 '기후와 생활' 본문에 나오는 작물들이다. */
+ 57:{n:"어린 옥수수", c:0x7fa64e,hard:.2,drop:"seed_corn", solid:false,plant:true,crop:{item:"corn",grow:58,next:58,needWater:true}},
+ 58:{n:"옥수수",      c:0xe0c24a,hard:.35,drop:"corn",solid:false,plant:true,crop:{item:"corn",yield:[2,4],ripe:true}},
+ 59:{n:"어린 얌",     c:0x6f9a55,hard:.2,drop:"seed_yam",  solid:false,plant:true,crop:{item:"yam",grow:60,next:60,needWater:true}},
+ 60:{n:"얌",          c:0xb0894e,hard:.35,drop:"yam",      solid:false,plant:true,crop:{item:"yam",yield:[2,4],ripe:true}},
+ 61:{n:"어린 밀",     c:0x9ab35a,hard:.2,drop:"seed_wheat",solid:false,plant:true,crop:{item:"wheat",grow:62,next:62,needWater:true}},
+ 62:{n:"다 자란 밀",  c:0xd8bd57,hard:.3,drop:"wheat",     solid:false,plant:true,crop:{item:"wheat",yield:[3,5],ripe:true}},
+ 63:{n:"어린 포도",   c:0x6f8f4a,hard:.2,drop:"seed_grape",solid:false,plant:true,crop:{item:"grape",grow:64,next:64,dry:true}},
+ 64:{n:"포도",        c:0x8e5aa8,hard:.35,drop:"grape",    solid:false,plant:true,crop:{item:"grape",yield:[2,4],ripe:true}},
+ 65:{n:"어린 올리브", c:0x7d9060,hard:.2,drop:"seed_olive",solid:false,plant:true,crop:{item:"olive",grow:66,next:66,dry:true}},
+ 66:{n:"올리브",      c:0x6f7f3f,hard:.35,drop:"olive",    solid:false,plant:true,crop:{item:"olive",yield:[2,4],ripe:true}},
+ /* 한대의 이끼 — 농사는 못 짓지만 짧은 여름에 이끼가 자라 순록을 먹인다 */
+ 67:{n:"이끼",        c:0x7f9a6a,hard:.25,drop:"moss",     solid:false,plant:true},
+ /* ══ [V10 추가] 기후마다 기르는 가축을 두 종류로 ══════════════════════════ */
+ 68:{n:"양 목장",     c:0xe4dfd2,hard:.8,drop:"an_sheep", solid:true,special:"ranch"},
+ 69:{n:"물소 우리",   c:0x8f8a80,hard:.8,drop:"an_buffalo",solid:true,special:"ranch"},
+ 70:{n:"벌통",        c:0xd9a441,hard:.7,drop:"an_bee",   solid:true,special:"ranch"},
+ 71:{n:"염소 우리",   c:0xc9b48e,hard:.8,drop:"an_goat",  solid:true,special:"ranch"},
+ 72:{n:"사향소 우리", c:0x6f5a46,hard:.8,drop:"an_musk",  solid:true,special:"ranch"},
+ 73:{n:"알파카 우리", c:0xdcc9b4,hard:.8,drop:"an_alpaca",solid:true,special:"ranch"}
 };
 var QBOX_ID=56;
 /* 아이템 → 놓을 수 있는 블록 */
@@ -907,23 +931,35 @@ var PLACE={dirt:2,stone:33,sand:4,wood:6,plank:30,brick:31,glass:32,ice:9,iron:3
   clay:10,coal:11,snow:8,tradepost:35,monument:36,campfire:37,well:44,
   /* [V8 추가 3·4] 기계와 가축도 '놓아서' 쓴다 */
   generator:45,solar:46,greenhouse:47,heater:48,efurnace:49,
-  an_cow:50,an_hen:51,an_fox:52,an_camel:53,an_deer:54,an_llama:55};
+  an_cow:50,an_hen:51,an_fox:52,an_camel:53,an_deer:54,an_llama:55,
+  /* [V10 추가] 기후마다 두 번째 가축 */
+  an_sheep:68,an_buffalo:69,an_bee:70,an_goat:71,an_musk:72,an_alpaca:73};
 /* 씨앗 아이템 → 심으면 자라나는 '어린 작물' 블록.
    밀은 '심는 작물'이 아니라 온대 들판에 야생으로 나는 재료(빵·섬유용)라 여기 없다. */
-var SEED={seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42};
+var SEED={seed_potato:26,seed_rice:28,seed_date:40,seed_cassava:42,
+  /* [V10 추가] 교과서에 나오는 작물들 */
+  seed_corn:57,seed_yam:59,seed_wheat:61,seed_grape:63,seed_olive:65};
 /* 씨앗 → 보여줄 작물 이름(안내용) */
-var CROP_NAME={seed_potato:"감자",seed_rice:"벼",seed_date:"대추야자",seed_cassava:"카사바"};
+var CROP_NAME={seed_potato:"감자",seed_rice:"벼",seed_date:"대추야자",seed_cassava:"카사바",
+  seed_corn:"옥수수",seed_yam:"얌",seed_wheat:"밀",seed_grape:"포도",seed_olive:"올리브"};
 /* 기후별로 심을 수 있는 씨앗(=그 땅에서 자라는 작물).
    실제 기후-작물 대응(6학년 사회):
      온대=벼(세계의 곡창, 몬순 벼농사)  ·  열대=벼+카사바(고온다습)
      건조=대추야자(오아시스 농업)  ·  고산=감자(안데스 원산)
      냉대=감자만(짧은 여름의 서늘한 뿌리작물, 제한적)  ·  한대=농사 불가(영구동토) */
+/* [V10 수정] 교과서 본문 그대로 넓혔다.
+     온대  … 아시아의 벼농사 + 서부 유럽의 밀 + 지중해의 포도·올리브
+     열대  … 화전으로 짓던 옥수수·얌 + 벼·카사바
+     건조  … 오아시스 관개 농업(대추야자 + 밀)
+     냉대  … 짧은 여름에 짓는 밀·감자·옥수수
+     고산  … 안데스의 감자와 옥수수
+     한대  … 여전히 농사 불가. 대신 짧은 여름에 자라는 이끼로 순록을 친다. */
 var BIOME_CROPS={
-  temperate:["seed_rice"],
-  tropical:["seed_rice","seed_cassava"],
-  desert:["seed_date"],
-  alpine:["seed_potato"],
-  taiga:["seed_potato"],
+  temperate:["seed_rice","seed_wheat","seed_grape","seed_olive"],
+  tropical:["seed_rice","seed_cassava","seed_corn","seed_yam"],
+  desert:["seed_date","seed_wheat"],
+  alpine:["seed_potato","seed_corn"],
+  taiga:["seed_potato","seed_wheat","seed_corn"],
   tundra:[]
 };
 
@@ -937,17 +973,33 @@ var BIOME_CROPS={
    ══════════════════════════════════════════════════════════════════════════ */
 var LIVESTOCK={
   cow  :{b:"temperate",n:"소",    em:"🐄",id:50,give:"milk",gn:2,meat:4,
-         feed:["wheat","rice","potato","bread"],d:"온대의 넓은 초지에서 기르는 젖소 — 우유"},
+         feed:["wheat","rice","potato","corn"],d:"온대의 넓은 초지에서 기르는 젖소 — 우유"},
   hen  :{b:"tropical", n:"닭",    em:"🐔",id:51,give:"egg", gn:2,meat:2,
-         feed:["rice","cassava","fruit","wheat"],d:"열대 마을의 마당닭 — 달걀"},
+         feed:["corn","rice","cassava","yam"],d:"열대 마을의 마당닭 — 달걀"},
   fox  :{b:"taiga",    n:"은여우", em:"🦊",id:52,give:"fur", gn:1,meat:2,
          feed:["fish","meat","potato"],d:"냉대의 모피 사육 — 모피"},
   camel:{b:"desert",   n:"낙타",   em:"🐪",id:53,give:"milk",gn:2,meat:4,
-         feed:["date","wheat","fruit"],d:"사막 유목민의 낙타 — 젖과 짐"},
+         feed:["date","wheat","corn"],d:"사막 유목민의 낙타 — 젖과 짐"},
   deer :{b:"tundra",   n:"순록",   em:"🦌",id:54,give:"fur", gn:1,meat:5,
-         feed:["ice","fish","potato"],d:"툰드라 유목의 순록 — 눈 밑 이끼를 먹습니다"},
+         feed:["moss","ice","fish"],d:"툰드라 유목의 순록 — 눈 밑 이끼를 먹습니다"},
   llama:{b:"alpine",   n:"야마",   em:"🦙",id:55,give:"wool",gn:2,meat:3,
-         feed:["potato","wheat","rice"],d:"안데스 고산의 야마 — 양털과 짐"}
+         feed:["potato","wheat","rice"],d:"안데스 고산의 야마 — 양털과 짐"},
+  /* ══ [V10 추가] 교과서에 나오는 두 번째 가축 ══════════════════════════════
+     온대 서부 유럽의 목축업(양), 열대 아시아 논농사의 물소, 냉대 침엽수림의
+     양봉, 사막 유목민의 염소, 한대의 사향소, 안데스의 알파카.
+     "지역마다 기르는 짐승이 다르다"를 한 기후에 두 마리씩으로 넓혔다. */
+  sheep:{b:"temperate",n:"양",     em:"🐑",id:68,give:"wool",gn:2,meat:3,
+         feed:["wheat","rice","potato","corn"],d:"서부 유럽 목축업의 양 — 양털"},
+  buffalo:{b:"tropical",n:"물소",  em:"🐃",id:69,give:"milk",gn:2,meat:5,
+         feed:["rice","cassava","yam","corn"],d:"열대 아시아 논농사를 돕는 물소 — 젖과 힘"},
+  bee:{b:"taiga",      n:"꿀벌",   em:"🐝",id:70,give:"honey",gn:2,meat:0,
+         feed:["fruit","grape","wheat","potato"],d:"침엽수림의 양봉 — 꿀"},
+  goat:{b:"desert",    n:"염소",   em:"🐐",id:71,give:"milk",gn:2,meat:3,
+         feed:["date","wheat","corn"],d:"사막 유목민의 염소 — 젖과 고기"},
+  musk:{b:"tundra",    n:"사향소", em:"🐂",id:72,give:"wool",gn:2,meat:5,
+         feed:["moss","ice","fish"],d:"툰드라의 사향소 — 아주 따뜻한 털"},
+  alpaca:{b:"alpine",  n:"알파카", em:"🦙",id:73,give:"wool",gn:3,meat:2,
+         feed:["potato","corn","moss"],d:"안데스의 알파카 — 부드러운 털"}
 };
 var RANCH_ITEM={},RANCH_BY_ID={};
 (function(){for(var k in LIVESTOCK){RANCH_ITEM["an_"+k]=k;RANCH_BY_ID[LIVESTOCK[k].id]=k}})();
@@ -962,10 +1014,21 @@ var ITEMS={
  rice:{n:"쌀",em:"🍚",tier:1,val:1.2,rot:1,food:{h:22}},
  date:{n:"대추야자",em:"🌰",tier:1,val:1.4,rot:1,food:{h:16,w:6}},
  cassava:{n:"카사바",em:"🍠",tier:1,val:1.2,rot:1,food:{h:20}},
+ /* [V10 추가] 교과서에 나오는 작물 */
+ corn:{n:"옥수수",em:"🌽",tier:1,val:1.2,rot:1,food:{h:22}},
+ yam:{n:"얌",em:"🍠",tier:1,val:1.3,rot:1,food:{h:24}},
+ grape:{n:"포도",em:"🍇",tier:1,val:1.6,rot:1,food:{h:10,w:14}},
+ olive:{n:"올리브",em:"🫒",tier:1,val:1.8,rot:1,food:{h:8,w:4}},
+ moss:{n:"이끼",em:"🌿",tier:1,val:.7},
  seed_potato:{n:"감자 씨",em:"🌱",tier:1,val:.5},
  seed_rice:{n:"볍씨",em:"🌱",tier:1,val:.5},
  seed_date:{n:"대추야자 씨",em:"🌱",tier:1,val:.6},
  seed_cassava:{n:"카사바 줄기",em:"🌱",tier:1,val:.5},
+ seed_corn:{n:"옥수수 씨",em:"🌱",tier:1,val:.5},
+ seed_yam:{n:"얌 씨",em:"🌱",tier:1,val:.5},
+ seed_wheat:{n:"밀 씨",em:"🌱",tier:1,val:.5},
+ seed_grape:{n:"포도 묘목",em:"🌱",tier:1,val:.7},
+ seed_olive:{n:"올리브 묘목",em:"🌱",tier:1,val:.7},
  fruit:{n:"과일",em:"🍌",tier:1,val:1.1,rot:1,food:{h:12,w:8}},
  fish:{n:"생선",em:"🐟",tier:1,val:1.5,rot:1,food:{h:24}},
  water:{n:"물",em:"💧",tier:1,val:.6,food:{w:26}},
@@ -987,7 +1050,9 @@ var ITEMS={
  coat:{n:"방한복",em:"🧥",tier:2,val:9.5},
  shade:{n:"햇빛막이",em:"⛱️",tier:2,val:9.5},
  bread:{n:"빵",em:"🍞",tier:2,val:4.2,food:{h:36}},
- dried_fruit:{n:"말린 과일",em:"🍯",tier:2,val:3.6,food:{h:22,w:6}},
+ dried_fruit:{n:"말린 과일",em:"🫐",tier:2,val:3.6,food:{h:22,w:6}},
+ honey:{n:"꿀",em:"🍯",tier:2,val:4,food:{h:16,s:18}},
+ olive_oil:{n:"올리브유",em:"🧴",tier:2,val:6.4,food:{h:8}},
  campfire:{n:"모닥불",em:"🔥",tier:2,val:2},
  oil:{n:"원유",em:"🛢️",tier:3,val:3.6},
  gold:{n:"금",em:"🥇",tier:3,val:5.2},
@@ -1018,6 +1083,12 @@ var ITEMS={
  an_camel:{n:"낙타",em:"🐪",tier:2,val:11},
  an_deer:{n:"순록",em:"🦌",tier:2,val:11},
  an_llama:{n:"야마",em:"🦙",tier:2,val:10},
+ an_sheep:{n:"양",em:"🐑",tier:2,val:9},
+ an_buffalo:{n:"물소",em:"🐃",tier:2,val:12},
+ an_bee:{n:"꿀벌",em:"🐝",tier:2,val:8},
+ an_goat:{n:"염소",em:"🐐",tier:2,val:9},
+ an_musk:{n:"사향소",em:"🐂",tier:2,val:12},
+ an_alpaca:{n:"알파카",em:"🦙",tier:2,val:11},
  tradepost:{n:"무역소",em:"⚖️",tier:2,val:8},
  well:{n:"우물",em:"🪣",tier:2,val:5},
  monument:{n:"기념비",em:"🗽",tier:3,val:99},
@@ -1050,8 +1121,9 @@ var TOOL_KIND={
   pick  :{n:"곡괭이",em:"⛏️",for:"돌·광물",  blocks:{3:1,10:1,11:1,12:1,13:1,14:1,15:1,9:1,31:1,33:1,34:1,32:1,44:1,35:1,36:1,
                                                     45:1,46:1,48:1,49:1}},
   axe   :{n:"도끼",  em:"🪓",for:"나무·덤불",blocks:{6:1,7:1,16:1,17:1,18:1,19:1,20:1,21:1,22:1,30:1,37:1,47:1,
-                                                    50:1,51:1,52:1,53:1,54:1,55:1}},
-  shovel:{n:"삽",    em:"🥄",for:"흙·모래·눈",blocks:{1:1,2:1,4:1,8:1,24:1}}
+                                                    50:1,51:1,52:1,53:1,54:1,55:1,
+                                                    68:1,69:1,70:1,71:1,72:1,73:1}},
+  shovel:{n:"삽",    em:"🥄",for:"흙·모래·눈",blocks:{1:1,2:1,4:1,8:1,24:1,67:1}}
 };
 var TOOL_MAT={
   wood :{n:"나무",speed:2.0,save:1.6,dur:60 },
@@ -1136,11 +1208,12 @@ function carbonStep(){
   return r;
 }
 function warmDeg(){return carbonStep().d}     // ambient() 에 더해지는 온난화 보정(°C)
-var SPECIAL={temperate:["wheat","wood","clay","bread","milk","an_cow"],
- tropical:["rubber","cacao","coffee","spice","hardwood","fruit","egg","an_hen"],
- taiga:["wood","fur","coal","an_fox"],desert:["sand","oil","gold","glass","an_camel"],
- tundra:["ice","fish","meat","an_deer"],
- alpine:["iron_ore","copper","stone","iron","wool","an_llama"]};
+var SPECIAL={temperate:["wheat","wood","clay","bread","milk","grape","olive","olive_oil","an_cow","an_sheep"],
+ tropical:["rubber","cacao","coffee","spice","hardwood","fruit","egg","corn","yam","an_hen","an_buffalo"],
+ taiga:["wood","fur","coal","honey","an_fox","an_bee"],
+ desert:["sand","oil","gold","glass","date","an_camel","an_goat"],
+ tundra:["ice","fish","meat","moss","an_deer","an_musk"],
+ alpine:["iron_ore","copper","stone","iron","wool","potato","an_llama","an_alpaca"]};
 var SOURCE={};
 for(var _b in SPECIAL)SPECIAL[_b].forEach(function(k){(SOURCE[k]=SOURCE[k]||[]).push(_b)});
 function whereFrom(k){
@@ -1168,7 +1241,7 @@ var CLIMATE_EDU={
    why:"적도와 극의 <b>가운데</b>라 햇빛을 알맞게 받습니다. 우리나라는 여기에 속하고, 여름과 겨울에 부는 바람의 방향이 바뀌는 <b>계절풍</b> 때문에 여름에 비가 몰립니다.",
    summary:"사계절이 뚜렷하고 여름에 비가 집중됩니다. 온화해 사람이 살기 좋습니다.",
    clothes:"계절마다 옷을 바꿔 입습니다(여름 얇은 옷·겨울 두꺼운 옷).",
-   food:"벼·밀 농사가 잘 되어 <b>식량이 풍부</b>합니다.",
+   food:"아시아는 <b>벼농사</b>, 서부 유럽은 <b>밀 농사와 목축업</b>, 지중해 주변은 <b>포도·올리브</b>를 기릅니다. 소와 양을 함께 칩니다.",
    house:"계절 변화에 맞춘 일반 가옥(기와집·목조 등).",
    industry:"세계의 식량 창고 · 농업(1차 산업)",
    life:"오늘 먹은 <b>쌀밥</b>이 여기서 났습니다. 살기 좋아 세계 인구가 가장 많이 모여 사는 기후대예요.",
@@ -1191,7 +1264,7 @@ var CLIMATE_EDU={
    why:"적도라 햇빛이 <b>거의 수직으로</b> 내리쬡니다. 뜨거워진 공기가 위로 올라가며 구름이 되어 거의 매일 오후 소나기(스콜)가 쏟아집니다.",
    summary:"일 년 내내 덥고 비가 많이 옵니다. 습기와 벌레·홍수가 큰 문제입니다.",
    clothes:"얇고 <b>통풍이 잘 되는 옷</b>을 입어 더위와 습기를 피합니다.",
-   food:"과일·향신료·카카오가 풍부하지만 <b>음식이 빨리 상해</b> 절이거나 바로 팔아야 합니다.",
+   food:"전통적으로 <b>화전 농업</b>으로 옥수수·카사바·<b>얌</b>을 길렀고, 오늘날에는 천연고무·카카오·바나나·커피를 <b>대규모로 재배</b>합니다. 닭과 물소를 기릅니다. 다만 <b>음식이 빨리 상합니다</b>.",
    house:"습기·벌레·홍수를 피하려고 <b>기둥을 세워 바닥을 띄운 고상 가옥</b>을 짓습니다.",
    industry:"플랜테이션 · 사치작물(향신료·커피·고무)",
    life:"<b>초콜릿·커피·바나나·고무 타이어</b>가 모두 열대에서 옵니다. 우리 교실에도 열대가 들어와 있는 셈이에요.",
@@ -1214,9 +1287,9 @@ var CLIMATE_EDU={
    why:"햇빛이 비스듬히 들어와 겨울이 길고 매섭습니다. 잎이 <b>바늘처럼 뾰족한 침엽수</b>만 이 추위를 견뎌 냅니다.",
    summary:"겨울이 길고 매우 춥습니다. 여름은 짧습니다. 침엽수 숲이 넓게 펼쳐집니다.",
    clothes:"두꺼운 옷과 <b>모피</b>로 추위를 막습니다.",
-   food:"추워서 <b>농사가 어렵고</b>, 낚시·사냥과 감자 등으로 먹고삽니다.",
+   food:"짧은 여름에만 <b>밀·감자·옥수수</b>를 기르고 겨울에는 농사를 짓지 못합니다. 낚시·사냥과 <b>양봉(꿀)</b>, 모피 사육으로 보탭니다.",
    house:"주변에 많은 나무로 지은 <b>통나무집</b>. 추워서 음식은 잘 상하지 않습니다.",
-   industry:"임업 · 모피 · 보존·가공재",
+   industry:"임업 · 목재와 펄프 · 모피 · 보존·가공재",
    life:"우리가 쓰는 <b>공책·종이·가구</b>의 나무가 이 침엽수림에서 옵니다.",
    warm:"얼어 있던 땅(<b>영구동토</b>)이 녹으면서 갇혀 있던 온실가스가 새어 나오고, 여름 산불이 크게 늘고 있습니다.",
    temp:[-9,-8,-2,7,14,18,20,18,12,5,-2,-7],
@@ -1237,7 +1310,7 @@ var CLIMATE_EDU={
    why:"적도에서 올라간 공기가 이 위도쯤에서 <b>다시 내려오며 바짝 마릅니다</b>. 그래서 사막은 적도가 아니라 그 옆 위도에 <b>띠처럼</b> 늘어서 있습니다.",
    summary:"비가 거의 오지 않고 <b>한낮은 매우 뜨겁고 밤은 서늘</b>합니다(일교차 큼).",
    clothes:"온몸을 덮는 <b>헐렁하고 긴 옷</b>으로 햇빛·모래·수분 증발을 막습니다.",
-   food:"물이 귀해 대추야자·가축(유목)에 의지합니다.",
+   food:"오아시스에서 <b>대추야자와 밀</b>을 관개해 기르고, 초원에서는 <b>낙타·염소를 데리고 유목</b>하며 이동식 가옥에서 삽니다.",
    house:"<b>흙벽돌집</b>: 벽을 두껍게, 창을 작게 만들어 열을 막습니다.",
    industry:"석유·광물 등 지하자원 · 첨단재(유리)",
    life:"우리가 쓰는 <b>플라스틱·휘발유</b>의 원료인 석유가 이 지역에서 많이 나옵니다. 햇빛이 강해 <b>태양광 발전</b>에도 가장 유리한 땅이에요.",
@@ -1260,9 +1333,9 @@ var CLIMATE_EDU={
    why:"햇빛이 <b>아주 비스듬히</b> 들어와 같은 양의 빛이 넓은 땅에 퍼집니다. 그래서 데워지지 않습니다. 여름엔 해가 지지 않는 <b>백야</b>가 있어요.",
    summary:"일 년 내내 춥고 <b>겨울밤이 깁니다</b>. 나무가 자라지 못합니다.",
    clothes:"동물 <b>모피로 만든 두꺼운 방한복</b>으로 체온을 지킵니다.",
-   food:"<b>농사가 불가능</b>해 낚시·사냥(순록·물고기)으로만 먹고삽니다.",
+   food:"<b>농사가 불가능</b>합니다. 짧은 여름에 땅이 녹아 <b>이끼</b>가 자라는 곳에서 <b>순록·사향소를 치며 유목</b>하고, 사냥과 낚시로 먹고삽니다.",
    house:"눈·얼음으로 만든 이글루 등 <b>단단히 막고 불로 데우는 집</b>.",
-   industry:"어업 · 자원 · 보존·특수재",
+   industry:"어업 · 순록 유목 · 지하자원 · 오로라·빙하 관광",
    life:"얼음이 녹아 <b>북극 항로</b>가 열리면서, 지하자원을 두고 여러 나라가 이 땅에 관심을 쏟고 있습니다.",
    warm:"지구에서 <b>가장 빨리 더워지는 곳</b>입니다. 빙하가 녹아 바닷물이 불어나고, 북극곰의 사냥터인 바다 얼음이 사라지고 있어요.",
    temp:[-25,-27,-25,-18,-7,1,4,3,-1,-9,-18,-23],
@@ -1283,7 +1356,7 @@ var CLIMATE_EDU={
    why:"위도가 아니라 <b>높이</b>가 만든 기후입니다. 100m 올라갈 때마다 기온이 약 <b>0.6°C</b> 내려가서, 적도 바로 위 안데스산맥 꼭대기에도 만년설이 있습니다.",
    summary:"고도가 높아 <b>일 년 내내 서늘하고 일교차가 큽니다</b>. 공기가 희박합니다.",
    clothes:"낮과 밤의 큰 기온차에 대비해 <b>겹겹이 껴입습니다</b>(판초).",
-   food:"감자 등 고랭지 작물과 가축(라마·야크)에 의지합니다.",
+   food:"<b>감자와 옥수수</b>를 주로 기르고 <b>라마(야마)·알파카</b>를 쳐서 털과 짐을 얻습니다.",
    house:"바람과 추위를 막는 <b>돌집</b>.",
    industry:"광업(철·구리) · 중화학",
    life:"우리가 먹는 <b>감자</b>의 고향이 안데스 고산 지대입니다. 여름 배추가 나는 강원도 고랭지도 같은 원리예요.",
@@ -1450,7 +1523,75 @@ var QUIZ_BANK=[
   why:"전기를 만들 때 대부분 탄소가 나옵니다. 아껴 쓰는 것이 가장 빠르고 확실한 방법이에요."},
  {q:"기후변화의 피해가 가장 먼저, 가장 크게 나타나는 곳은?",
   a:["빙하가 녹는 극지방과 물이 마르는 건조 지역","가장 큰 도시의 한가운데","바다 한가운데의 배 위"],c:0,
-  why:"탄소를 가장 적게 내뿜은 곳이 먼저 피해를 봅니다. 그래서 기후 문제는 '함께' 풀어야 합니다."}
+  why:"탄소를 가장 적게 내뿜은 곳이 먼저 피해를 봅니다. 그래서 기후 문제는 '함께' 풀어야 합니다."},
+
+ /* ---- [V10 추가] 기후별 농업과 목축 (교과서 본문) ---- */
+ {b:"tropical",q:"열대 지방에서 숲을 태워 그 재를 거름 삼아 농사짓던 방식을 무엇이라 할까요?",
+  a:["화전 농업","계단식 농업","시설 원예"],c:0,
+  why:"숲을 태운 자리에 옥수수·카사바·얌을 심었습니다. 몇 해 뒤 땅심이 떨어지면 자리를 옮기는 농사였어요."},
+ {b:"tropical",q:"열대 지방에서 전통적으로 화전을 일구어 재배하던 작물끼리 묶인 것은?",
+  a:["옥수수·카사바·얌","밀·보리·호밀","포도·올리브"],c:0,
+  why:"셋 다 덥고 비 많은 땅에서 잘 자라는 작물입니다. 특히 카사바와 얌은 뿌리에 양분을 저장하는 구황작물이에요."},
+ {b:"tropical",q:"오늘날 열대 지방에서 넓은 농장을 만들어 대규모로 기르는 작물이 아닌 것은?",
+  a:["밀","천연고무","카카오"],c:0,
+  why:"밀은 서늘하고 비가 적당한 곳에서 자랍니다. 열대의 대농장에서는 고무·카카오·바나나·커피를 기릅니다."},
+ {b:"tropical",q:"열대 아시아에서 논농사를 도우며 젖도 주는 가축은?",
+  a:["물소","순록","낙타"],c:0,
+  why:"물소는 무논에 발이 빠지지 않아 논을 갈기에 알맞습니다. 열대 아시아 농촌의 대표 가축이에요."},
+
+ {b:"desert",q:"사막 주변 초원에서 가축을 데리고 물과 풀을 찾아 옮겨 다니는 생활을 무엇이라 할까요?",
+  a:["유목","화전","플랜테이션"],c:0,
+  why:"한곳에 머물면 풀이 금세 동납니다. 그래서 이동식 가옥(게르·유르트)에 살며 낙타·양·염소를 몰고 옮겨 다닙니다."},
+ {b:"desert",q:"사막의 오아시스에서 물을 끌어와 기르는 작물끼리 묶인 것은?",
+  a:["대추야자·밀","벼·카사바","포도·올리브"],c:0,
+  why:"물을 끌어다 대는 <b>관개 농업</b>으로 좁은 땅에 대추야자와 밀·보리를 기릅니다."},
+ {b:"desert",q:"사막 유목민이 낙타와 함께 많이 기르는 가축은?",
+  a:["염소와 양","순록","물소"],c:0,
+  why:"염소와 양은 거친 풀도 먹고 이동에 잘 견딥니다. 젖·고기·털을 모두 얻을 수 있어요."},
+
+ {b:"temperate",q:"지중해 주변 지역에서 특히 많이 기르는 작물끼리 묶인 것은?",
+  a:["포도와 올리브","벼와 카사바","순록 먹이용 이끼"],c:0,
+  why:"지중해는 여름이 덥고 건조합니다. 뿌리를 깊이 내려 가뭄을 견디는 포도·올리브가 이 기후에 딱 맞아요."},
+ {b:"temperate",q:"서부 유럽에서 밀 농사와 함께 발달한 산업은?",
+  a:["소·양을 기르는 목축업","석유 산업","빙하 관광"],c:0,
+  why:"서부 유럽은 여름이 서늘하고 비가 고르게 옵니다. 풀이 잘 자라 소와 양을 기르기에 좋습니다."},
+ {b:"temperate",q:"아시아의 온대 지역에서 가장 많이 짓는 농사는?",
+  a:["벼농사","올리브 농사","순록 유목"],c:0,
+  why:"여름에 비가 몰리는 계절풍 기후라 물을 댄 논에서 벼를 기르기에 알맞습니다."},
+
+ {b:"taiga",q:"냉대 지역이 여름에만 기를 수 있는 작물끼리 묶인 것은?",
+  a:["밀·감자·옥수수","바나나·카카오","포도·올리브"],c:0,
+  why:"겨울이 길고 몹시 추워 농사를 지을 수 있는 기간이 짧습니다. 그래서 빨리 자라는 작물만 기릅니다."},
+ {b:"taiga",q:"냉대의 침엽수림에서 목재와 함께 활발히 생산되는 것은?",
+  a:["펄프(종이의 원료)","올리브유","천연고무"],c:0,
+  why:"침엽수는 섬유가 길어 종이를 만들기에 좋습니다. 우리가 쓰는 공책이 이 숲에서 옵니다."},
+ {b:"taiga",q:"냉대의 숲에서 꽃꿀을 모아 얻는 것은?",
+  a:["꿀","고무","석유"],c:0,
+  why:"침엽수림 사이의 들꽃을 찾아 벌을 치는 양봉이 러시아·캐나다에서 활발합니다."},
+
+ {b:"tundra",q:"한대 지방에서 짧은 여름에 땅이 녹으면 자라는 작은 식물은?",
+  a:["이끼","벼","올리브"],c:0,
+  why:"땅속이 얼어 있어 뿌리를 깊이 내릴 수 없습니다. 이 이끼를 먹여 순록을 기르며 유목을 합니다."},
+ {b:"tundra",q:"한대 지방 사람들이 이끼가 자라는 곳에서 기르는 가축은?",
+  a:["순록","물소","돼지"],c:0,
+  why:"순록은 눈을 헤치고 이끼를 찾아 먹습니다. 고기·젖·가죽을 모두 주는 한대의 살림 밑천이에요."},
+ {b:"tundra",q:"최근 한대 지방에서 발달하고 있는 산업으로 알맞은 것은?",
+  a:["오로라와 빙하를 보러 오는 관광 산업","벼농사","고무 농장"],c:0,
+  why:"지하자원 개발과 극지방 기후 연구도 함께 활발합니다. 얼음이 녹으며 북극 항로도 열리고 있어요."},
+
+ {b:"alpine",q:"안데스 고산 지역에서 주로 기르는 작물끼리 묶인 것은?",
+  a:["감자와 옥수수","바나나와 카카오","대추야자와 밀"],c:0,
+  why:"서늘한 고산에서도 잘 자라는 작물입니다. 감자의 고향이 바로 이 안데스예요."},
+ {b:"alpine",q:"안데스 고산 지역에서 털과 짐 나르기를 위해 기르는 동물은?",
+  a:["알파카와 라마","낙타와 염소","순록과 사향소"],c:0,
+  why:"알파카는 부드러운 털을, 라마는 짐 나르는 힘을 줍니다. 높고 공기 옅은 땅에 잘 견디는 동물이에요."},
+
+ {q:"같은 밀이라도 서부 유럽·냉대·오아시스에서 모두 기를 수 있는 까닭은?",
+  a:["밀은 서늘하고 비가 아주 많지 않아도 자라는 작물이라서","밀이 물속에서도 자라서","밀이 얼음 위에서도 자라서"],c:0,
+  why:"작물마다 견디는 조건이 다릅니다. 그 조건과 그 땅의 기후가 만나는 곳에서 농사가 시작돼요."},
+ {q:"기후에 따라 기르는 가축이 달라지는 까닭으로 알맞은 것은?",
+  a:["그 땅에서 나는 먹이와 기온을 견딜 수 있어야 해서","사람들이 좋아하는 동물이 달라서","동물의 값이 달라서"],c:0,
+  why:"툰드라에 낙타가 없고 사막에 순록이 없는 까닭입니다. 가축도 그 기후를 견딜 수 있어야 살아남습니다."}
 ];
 /* 게임에서 몸으로 겪은 '배움'(S.taught 키) → 학습 노트에 정리해 보여줄 문구 */
 var LESSON_LABELS={
@@ -1514,6 +1655,15 @@ var RECIPES=[
  {id:"well",out:{well:1},need:{stone:4,plank:2},eff:"땅에 놓으면 마르지 않는 물이 나옵니다 (사막·고지대에서 물 확보)"},
  {id:"seed_potato",out:{seed_potato:2},need:{potato:1},eff:"감자로 씨감자 · 냉대·고산에서 농사"},
  {id:"seed_rice",out:{seed_rice:3},need:{rice:1},eff:"쌀로 볍씨 · 온대·열대 물가(논)에 심기"},
+ /* [V10 추가] 교과서에 나오는 작물의 씨앗과 가공품 */
+ {id:"seed_wheat",out:{seed_wheat:3},need:{wheat:1},eff:"밀알로 씨앗 · 온대(서부 유럽)·냉대 여름·오아시스에서 농사"},
+ {id:"seed_corn",out:{seed_corn:2},need:{corn:1},eff:"옥수수로 씨앗 · 열대 화전 · 냉대 여름 · 안데스 고산"},
+ {id:"seed_yam",out:{seed_yam:2},need:{yam:1},eff:"얌으로 씨앗 · 열대의 전통 뿌리작물"},
+ {id:"seed_grape",out:{seed_grape:2},need:{grape:2},eff:"포도 묘목 · 지중해처럼 여름이 건조해도 잘 자랍니다"},
+ {id:"seed_olive",out:{seed_olive:2},need:{olive:2},eff:"올리브 묘목 · 지중해 기후의 대표 작물"},
+ {id:"olive_oil",out:{olive_oil:1},need:{olive:3},eff:"🧴 올리브유 — 지중해 지역이 옛날부터 배에 실어 팔던 특산물"},
+ {id:"corn_bread",out:{bread:2},need:{corn:3,water:1},eff:"🍞 옥수수빵 — 밀이 없는 기후에서도 든든한 식량"},
+ {id:"fiber_moss",out:{fiber:1},need:{moss:3},eff:"🌿 이끼를 꼬아 만든 실 — 나무도 밀도 없는 한대의 살림법"},
  {id:"tradepost",out:{tradepost:1},need:{plank:4,stone:2},eff:"놓으면 그 자리에서 무역할 수 있습니다"},
  {id:"monument",out:{monument:1},need:{power:3,iron:5,glass:3,brick:4,rubber:2,gold:2,spice:2,ice:2,chocolate:1,brew:1},
   eff:"여섯 대륙의 자원이 모두 필요합니다. 놓으면 문명 완성!"},
@@ -1672,6 +1822,14 @@ function genWorld(biome,seed,onProg){
   if(biome==="temperate")for(var q=0;q<160;q++){
     var qx=2+Math.floor(r()*(W-4)),qz=2+Math.floor(r()*(W-4));
     if(hmap[qz*W+qx]>SEA&&getB(qx,hmap[qz*W+qx],qz)===1)setB(qx,hmap[qz*W+qx]+1,qz,24);
+  }
+  /* [V10 추가] 한대의 이끼 — 교과서: "짧은 여름에 땅이 녹아 이끼와 같은 작은 풀이
+     자라는 곳에서는 순록을 기르며 유목을 한다". 농사는 못 지어도 이끼는 자란다. */
+  if(biome==="tundra")for(var m=0;m<220;m++){
+    var mx=2+Math.floor(r()*(W-4)),mz=2+Math.floor(r()*(W-4)),mh=hmap[mz*W+mx];
+    if(mh<=SEA)continue;
+    var mb=getB(mx,mh,mz);
+    if((mb===8||mb===1||mb===2)&&getB(mx,mh+1,mz)===0)setB(mx,mh+1,mz,67);
   }
   if(biome==="tundra"){
     /* 낚시 구멍이 너무 적게 생긴 시드에서도 굶어 죽지 않도록 최소 개수를 보장한다 */
@@ -2907,8 +3065,8 @@ function overlapsPlayer(bx,by,bz){
 /* --- 핫바 --- */
 var hotbar=[],hotIdx=0;
 function refreshHotbar(){
-  var pri=["seed_rice","seed_potato","seed_date","seed_cassava",
-    "an_cow","an_hen","an_fox","an_camel","an_deer","an_llama",
+  var pri=["seed_rice","seed_wheat","seed_potato","seed_corn","seed_date","seed_cassava","seed_yam","seed_grape","seed_olive",
+    "an_cow","an_sheep","an_hen","an_buffalo","an_fox","an_bee","an_camel","an_goat","an_deer","an_musk","an_llama","an_alpaca",
     "generator","solar","greenhouse","heater","efurnace",
     "plank","stone","brick","glass","wood","dirt","sand","clay","ice","iron","snow","coal","campfire","wheat","well","tradepost","monument"];
   var arr=Object.keys(S.inv).filter(function(k){return (PLACE[k]||SEED[k])&&S.inv[k]>0});
@@ -3015,8 +3173,10 @@ function growCrops(dt,quiet){
     /* [V8 추가 3] 온실 안이면 물·기후와 상관없이 잘 자란다 */
     var inGreen=greenhouseAt(x,y,z);
     var watered=raining||waterNear(x,y,z)||inGreen;
-    /* 물 있으면 정상 속도, 없으면 1/4 속도(가뭄엔 거의 안 자람) */
-    var rate=watered?1:0.25;
+    /* 물 있으면 정상 속도, 없으면 1/4 속도(가뭄엔 거의 안 자람).
+       [V10 추가] 포도·올리브는 뿌리를 깊이 내려 여름 가뭄을 견딘다(dry) —
+       지중해 지역이 건조한 여름에도 이 둘을 기르는 까닭이다. */
+    var rate=watered?1:(B.crop.dry?0.8:0.25);
     if(inGreen)rate*=2.5;
     /* 열대는 덥고 습해 조금 빨리, 고산·건조는 조금 느리게 */
     if(S.biome==="tropical")rate*=1.25;
@@ -3060,7 +3220,7 @@ function machineRegister(x,y,z,id){
     S.stat.animals=(S.stat.animals||0)+1;
     var sp=LIVESTOCK[kind],own=(sp.b===S.biome);
     toast(sp.em+" "+sp.n+"을(를) 풀어놓았습니다"+(own?"":" · 이 기후에는 맞지 않아 거의 자라지 않습니다"),own?"good":"warn");
-    teachOnce("ranch","🐄 <b>목축</b>을 시작했습니다. 먹이와 물을 주면 새끼가 자라 <b>산물</b>(우유·달걀·모피·양털)을 계속 내줍니다. "+
+    teachOnce("ranch","🐄 <b>목축</b>을 시작했습니다. 먹이와 물을 주면 새끼가 자라 <b>산물</b>(우유·달걀·모피·양털·꿀)을 계속 내줍니다. "+
       "가방 화면의 <b>목축</b>에서 상태를 보고 <b>도축</b>할 수도 있어요.<br>"+
       "<b>자기 기후의 가축만</b> 잘 자랍니다 — 사막에 순록이, 툰드라에 낙타가 없는 까닭입니다.");
   }
@@ -4263,12 +4423,12 @@ function netTick(dt){
 var AI_NAMES={temperate:["초원 상단","밀밭 마을","강가 농장"],tropical:["정글 시장","우림 상단","향신료 배"],
  taiga:["침엽수 캠프","모피 상인","숯가마"],desert:["오아시스 대상","모래 유리방","유전 캠프"],
  tundra:["빙하 기지","얼음 창고","심해 어선"],alpine:["산맥 광산","대장간 마을","돌산 캠프"]};
-var WANTS={temperate:["iron","glass","ice","rubber","spice","gold","coal","wool","power"],
- tropical:["wheat","bread","ice","iron","coat","stone","milk","wool"],
- taiga:["wheat","bread","water","glass","iron","spice","wool","egg"],
- desert:["wheat","bread","water","wood","ice","fur","meat","wool"],
- tundra:["wheat","bread","wood","coal","fur","iron","wool","power"],
- alpine:["wheat","bread","fruit","coal","water","spice","milk","egg"]};
+var WANTS={temperate:["iron","glass","ice","rubber","spice","gold","coal","wool","power","yam"],
+ tropical:["wheat","bread","ice","iron","coat","stone","milk","wool","olive_oil"],
+ taiga:["wheat","bread","water","glass","iron","spice","wool","egg","grape"],
+ desert:["wheat","bread","water","wood","ice","fur","meat","wool","honey"],
+ tundra:["wheat","bread","wood","coal","fur","iron","wool","power","honey","corn"],
+ alpine:["wheat","bread","fruit","coal","water","spice","milk","egg","olive_oil"]};
 function valOf(bag){var v=0;for(var k in bag)v+=iV(k)*bag[k];return v}
 function bagLine(bag){var o=[];for(var k in bag)o.push(iE(k)+" "+iN(k)+" "+bag[k]);return o.join(", ")}
 function mkOffer(){
@@ -5515,6 +5675,16 @@ function uiHelp(){
     "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>🌾 내 대륙의 농사와 목축 <span class='sm'>교과서 그대로</span></h3><div class='card'><p class='eff'>"+
+    (function(){
+      var cr=(BIOME_CROPS[S.biome]||[]).map(function(k){return "<b>"+(CROP_NAME[k]||iN(k))+"</b>"}).join(" · ");
+      var an=[];for(var lk in LIVESTOCK)if(LIVESTOCK[lk].b===S.biome)
+        an.push(LIVESTOCK[lk].em+" <b>"+LIVESTOCK[lk].n+"</b>("+iN(LIVESTOCK[lk].give)+")");
+      return "심을 수 있는 작물: "+(cr||"<b>없음</b> — 땅이 얼어 있어 농사를 지을 수 없습니다")+"<br>"+
+        "기를 수 있는 가축: "+an.join(" · ")+"<br>"+
+        "다른 기후의 씨앗·가축은 여기서 거의 자라지 않습니다. 그 땅의 것을 얻으려면 <b>무역</b>을 해야 해요 "+
+        "(🏡 온실이 있으면 기술로 그 제약을 넘을 수 있습니다).";
+    })()+"</p></div></div>"+
     "<div class='sec'><h3>❓ 퀴즈 상자 <span class='sm'>맞히면 특별 재료</span></h3><div class='card'><p class='eff'>"+
     "돌아다니다 보면 <b>노란 퀴즈 상자</b>가 가끔 내 둘레에 나타납니다. 가까이 가면(또는 캐면) "+
     "<b>기후 문제</b>가 하나 나오고, 맞히면 <b>내 대륙에서는 나지 않는 특별 재료</b>를 줍니다. "+
@@ -5788,12 +5958,13 @@ function newState(name,biome,seed){
           powerMade:0,powerClean:0,animals:0,quizOk:0}};
 }
 function startKit(s){
-  var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:6},
-    tropical:{fruit:6,wood:6,water:4,plank:4,stone:2,seed_rice:4,seed_cassava:3},
-    taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2,seed_potato:4},
-    desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1,seed_date:4},
-    tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2},
-    alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4}}[s.biome];
+  /* [V10 수정] 교과서에 나오는 그 기후의 대표 작물 씨앗을 처음부터 손에 쥐어 준다 */
+  var kit={temperate:{wheat:4,wood:4,water:4,plank:4,stone:2,seed_rice:5,seed_wheat:4,seed_grape:2,seed_olive:2},
+    tropical:{fruit:6,wood:6,water:4,plank:4,stone:2,seed_rice:3,seed_cassava:3,seed_corn:3,seed_yam:3},
+    taiga:{wood:6,fur:2,coal:2,water:3,plank:4,stone:2,seed_potato:4,seed_wheat:3,seed_corn:2},
+    desert:{sand:8,water:6,plank:6,stone:3,glass:1,shade:1,seed_date:4,seed_wheat:3},
+    tundra:{fish:5,ice:4,water:4,coat:1,wood:5,campfire:1,plank:4,stone:2,moss:6},
+    alpine:{stone:6,iron_ore:2,copper:1,water:4,plank:4,seed_potato:4,seed_corn:3}}[s.biome];
   for(var k in kit)add(s,k,kit[k]);
   /* [V8 추가 4] 그 기후에서 기르는 가축 한 마리를 들려 보낸다.
      "기후마다 기르는 짐승이 다르다"를 첫날부터 손에 쥐고 시작하게 하려는 것. */
