@@ -218,6 +218,13 @@ summary:hover{color:var(--ink2)}
 .cbox .crow button.yes{background:var(--bad);border-color:var(--bad);color:#fff}
 .cbox .crow button.yes:hover{filter:brightness(1.1)}
 .cbox .crow button:disabled{opacity:.55;cursor:progress}
+/* [V11] 비밀번호 보기 단추 — 다른 컴퓨터에서 한/영이 바뀐 채 친 것을 눈으로 잡아낸다 */
+.pwrow{position:relative}
+.pwrow .inp{padding-right:44px;width:100%}
+.pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:0;
+  font-size:16px;padding:6px 8px;cursor:pointer;opacity:.65;line-height:1}
+.pweye:hover{opacity:1}
+.pweye[aria-pressed="true"]{opacity:1;filter:drop-shadow(0 0 4px var(--accent))}
 /* [V9 추가 3] 퀴즈 상자 창 — 확인 창과 같은 뼈대를 쓰되 보기 버튼을 크게 */
 #quizbox{position:fixed;inset:0;z-index:62;background:#060a0ed6;backdrop-filter:blur(4px);
   display:flex;align-items:center;justify-content:center;padding:16px}
@@ -543,14 +550,26 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
           <h4>🔐 선생님 로그인</h4>
           <p class="thint">서버 주소와 키는 앱에 들어 있습니다. 명단을 저장하려면 선생님 계정으로 로그인하세요. 학생은 <b>방 코드와 이름</b>만 넣으면 배정된 기후로 바로 들어갑니다.</p>
           <label class="lb" for="t_email">이메일</label>
-          <input class="inp" id="t_email" type="email" placeholder="teacher@school.kr" autocomplete="username">
+          <input class="inp" id="t_email" type="email" placeholder="teacher@school.kr" autocomplete="username"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email">
           <label class="lb" for="t_pw">비밀번호</label>
-          <input class="inp" id="t_pw" type="password" placeholder="••••••••" autocomplete="current-password">
+          <div class="pwrow">
+            <input class="inp" id="t_pw" type="password" placeholder="••••••••" autocomplete="current-password"
+                   autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button type="button" class="pweye" id="t_pweye" aria-label="비밀번호 보기">👁</button>
+          </div>
+          <p class="thint" id="t_pwwarn" style="display:none"></p>
           <label class="lb" for="t_room">방 코드 <span class="free">학생에게 알려 줄 코드</span></label>
           <input class="inp" id="t_room" placeholder="class-1" autocomplete="off">
           <button class="go sm" id="t_connect">로그인하고 명단 불러오기</button>
           <button class="go ghost sm hide" id="t_logout">로그아웃</button>
+          <div class="trow" style="margin-top:6px">
+            <button class="mini" id="t_diag">🔎 로그인 진단</button>
+            <button class="mini" id="t_forget">이 기기의 로그인 지우고 다시</button>
+          </div>
           <div id="t_status" class="note"></div>
+          <div id="t_diagbox" class="note hide" style="white-space:pre-wrap;font-family:var(--m);font-size:11px;
+               background:#0b1219;border:1px solid var(--edge);border-radius:9px;padding:9px;margin-top:7px"></div>
         </div>
 
         <div class="tcard">
@@ -562,6 +581,20 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
             <button class="mini" id="t_autofill">🎲 6기후로 무작위 섞기</button>
             <button class="mini" id="t_clear">전체 비우기</button>
           </div>
+        </div>
+
+        <div class="tcard" id="acctCard">
+          <h4>👥 학생 계정 한꺼번에 관리 <span class="cnt">자리를 바꿨을 때</span></h4>
+          <p class="thint">다른 컴퓨터에 앉은 학생이 <b>“이 이름은 다른 기기에서 먼저 접속한 기록이 있습니다”</b>로
+          막힐 때 씁니다. 한 명씩 풀지 않고 <b>반 전체</b>를 한 번에 처리합니다.<br>
+          반 이름 명단(누가 어느 기후인지)은 <b>지워지지 않습니다</b> — 학생들은 같은 이름·같은 대륙으로 다시 들어옵니다.</p>
+          <div class="trow">
+            <button class="mini" id="t_unlockAll">🔓 전체 기기 잠금 풀기</button>
+            <button class="mini" id="t_wipeAll">👥 전체 학생 계정 초기화</button>
+          </div>
+          <p class="thint" style="margin-top:6px">먼저 <b>🔓 잠금 풀기</b>를 눌러 보세요. 가방과 진행이 그대로 남습니다.
+          그래도 안 들어와지면 <b>👥 계정 초기화</b>를 누르세요(가방은 처음부터, 지어 둔 건물과 대륙은 그대로).</p>
+          <p class="note" id="t_acctMsg"></p>
         </div>
 
         <div class="tcard" id="resetCard">
@@ -3924,6 +3957,48 @@ Cloud.prototype.saveRoster=function(room,rows,cb){
     cb&&cb(r.ok?null:(r.status===403?"선생님 계정으로 로그인해야 저장할 수 있습니다":"http "+r.status));
   })["catch"](function(e){cb&&cb(e)});
 };
+/* ══════════════════════════════════════════════════════════════════════════
+   [V11 수정] "학생을 지웠는데 명단을 다시 불러오면 되살아난다"
+   --------------------------------------------------------------------------
+   원인: saveRoster 는 <b>덮어쓰기(upsert)만</b> 했다. 명단에서 뺀 학생은 화면에서만
+   사라지고 서버 roster 행은 그대로 남아 있었다. 그래서 다시 불러오면 되돌아왔다.
+   고침: 저장할 때 서버의 현재 명단과 비교해, 화면에 없는 이름은 실제로 지운다.
+   ══════════════════════════════════════════════════════════════════════════ */
+Cloud.prototype.syncRoster=function(room,rows,cb){
+  var self=this;
+  var keep={};rows.forEach(function(r){keep[r.name]=1});
+  self.listRoster(room,function(lerr,srv){
+    var gone=(lerr||!srv)?[]:srv.filter(function(r){return !keep[r.name]}).map(function(r){return r.name});
+    var i=0,failed=0;
+    (function next(){
+      if(i>=gone.length){
+        self.saveRoster(room,rows,function(serr){ cb&&cb(serr,{removed:gone.length-failed,failed:failed}) });
+        return;
+      }
+      self.deleteRosterRow(room,gone[i++],function(derr){ if(derr)failed++; next() });
+    })();
+  });
+};
+/* [V11 추가] 방 전체의 학생 기록을 한 번에 지운다(=전체 계정 초기화).
+   기기 잠금(owner)도 함께 사라지므로, 자리를 바꾼 학생들이 모두 다시 들어올 수 있다. */
+Cloud.prototype.deleteAllPlayers=function(room,cb){
+  sbFetch(this._rest("players?room=eq."+encodeURIComponent(room)),{method:"DELETE"})
+    .then(function(r){cb&&cb(r.ok?null:"http "+r.status)})["catch"](function(e){cb&&cb(e)});
+};
+Cloud.prototype.deleteAllOffers=function(room,cb){
+  sbFetch(this._rest("offers?room=eq."+encodeURIComponent(room)),{method:"DELETE"})
+    .then(function(){cb&&cb(null)})["catch"](function(){cb&&cb(null)});
+};
+/* 방 전체의 기기 잠금만 풀어 본다. 서버 규칙상 막힐 수 있으므로 '실제로 몇 줄이
+   바뀌었는지'를 돌려받아 확인한다 — 0줄이면 계정 초기화를 권해야 한다. */
+Cloud.prototype.releaseAllPlayers=function(room,cb){
+  sbFetch(this._rest("players?room=eq."+encodeURIComponent(room)),
+    {method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({owner:null})}
+  ).then(function(r){
+    if(!r.ok){cb&&cb("http "+r.status,0);return}
+    r.json().then(function(rows){cb&&cb(null,(rows&&rows.length)||0)})["catch"](function(){cb&&cb(null,-1)});
+  })["catch"](function(e){cb&&cb(e,0)});
+};
 Cloud.prototype.listRoster=function(room,cb){
   sbJson(this._rest("roster?room=eq."+encodeURIComponent(room)+"&order=name.asc"))
     .then(function(rows){cb(null,rows||[])})["catch"](function(e){cb(e)});
@@ -3991,9 +4066,18 @@ Cloud.prototype.listWorlds=function(room,cb){
 };
 /* --- 선생님 전용: 학생이 기기를 바꿨을 때 이름의 소유권을 풀어 준다 --- */
 Cloud.prototype.releasePlayer=function(room,name,cb){
+  /* [V11 수정] 예전에는 요청이 200 이면 무조건 "풀렸다"고 알렸다. 그런데 서버 규칙에
+     막혀 <b>0줄만 바뀌는</b> 경우가 있어, 선생님은 풀었다고 믿고 학생은 계속 못 들어왔다.
+     이제 실제로 바뀐 줄 수를 돌려받아, 0이면 솔직히 실패라고 말한다. */
   sbFetch(this._rest("players?room=eq."+encodeURIComponent(room)+"&name=eq."+encodeURIComponent(name)),
-    {method:"PATCH",body:JSON.stringify({owner:null})}
-  ).then(function(r){cb&&cb(r.ok?null:"http "+r.status)})["catch"](function(e){cb&&cb(e)});
+    {method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({owner:null})}
+  ).then(function(r){
+    if(!r.ok){cb&&cb("http "+r.status,0);return}
+    r.json().then(function(rows){
+      var n=(rows&&rows.length)||0;
+      cb&&cb(n?null:"no_rows",n);
+    })["catch"](function(){cb&&cb(null,-1)});
+  })["catch"](function(e){cb&&cb(e,0)});
 };
 /* ══════════════════════════════════════════════════════════════════════════
    [V9 수정 2] 선생님 전용 — 학생 기록 삭제 · 지도 초기화
@@ -4012,6 +4096,25 @@ Cloud.prototype.deletePlayer=function(room,name,cb){
 Cloud.prototype.deleteOffersOf=function(room,name,cb){
   sbFetch(this._rest("offers?room=eq."+encodeURIComponent(room)+"&trader=eq."+encodeURIComponent(name)),
     {method:"DELETE"}).then(function(){cb&&cb(null)})["catch"](function(){cb&&cb(null)});
+};
+/* [V13] 계정 초기화 도장을 여섯 기후 월드에 찍는다.
+   지도·건축·시드는 그대로 두고 arst 만 바꾼다 — 학생 기기의 옛 가방을 무효로 만드는 표시다. */
+Cloud.prototype.stampAccountReset=function(room,biomes,cb){
+  var self=this,stamp=Math.floor(Date.now()/1000),i=0,fail=0;
+  (function next(){
+    if(i>=biomes.length){cb&&cb(fail?("일부 실패("+fail+")"):null,stamp);return}
+    var b=biomes[i++];
+    self.loadWorld(room,b,function(lerr,cur){
+      if(lerr||!cur){ next(); return }               // 아직 만들어지지 않은 대륙은 건너뛴다
+      var e=cur.edits&&cur.edits.d?cur.edits:{v:WORLD_FMT,d:[],gen:0};
+      e.arst=stamp;
+      /* 반 전체를 처음으로 되돌리는 것이므로 공유 '일차'도 1일차로 함께 되돌린다.
+         지형과 건축(seed·edits)은 손대지 않는다. */
+      self.saveWorld(room,{biome:b,seed:cur.seed,edits:e,day:1},function(werr){
+        if(werr)fail++; next();
+      });
+    });
+  })();
 };
 /* 한 기후의 지도를 완전히 새로 깐다(새 지형 + 건축 0 + 지도 번호 +1) */
 Cloud.prototype.resetWorld=function(room,biome,cb){
@@ -4040,7 +4143,9 @@ function initCloud(){
    개선: 좌표를 1차원 정수 배열로 눕혀 [x,y,z,id, x,y,z,id, ...] 형태로 압축한다.
    구조 마커 {v:1,d:[...]} 로 감싸 신·구 포맷을 자동 판별(하위 호환)한다.
    외부 라이브러리(LZString) 의존 없이 오프라인에서도 동작. ========================= */
-function packEdits(edits,gen){
+/* 32비트로 잘리지 않는 안전한 숫자 변환(도장 값은 초 단위 시각이라 크다) */
+function num0(v){ v=Number(v); return isFinite(v)?v:0 }
+function packEdits(edits,gen,arst){
   var d=[];
   for(var k in edits){
     if(!edits.hasOwnProperty(k))continue;
@@ -4049,8 +4154,12 @@ function packEdits(edits,gen){
   }
   /* [V9] v:2 = 지면을 LIFT 만큼 들어 올린 새 좌표계.
      gen 은 '몇 번째 지도인가'를 세는 번호다. 선생님이 지도를 초기화하면 1 올라가고,
-     학생 기기에 남아 있던 옛 건축은 번호가 다르므로 자동으로 버려진다. */
-  return {v:WORLD_FMT,d:d,gen:gen|0};
+     학생 기기에 남아 있던 옛 건축은 번호가 다르므로 자동으로 버려진다.
+     [V13] arst 는 '계정을 언제 초기화했나'를 적어 두는 도장이다. 지도는 그대로 두고
+     가방만 비울 때 쓴다. 학생 기기의 localStorage 는 선생님이 손댈 수 없으므로,
+     이 도장을 보고 학생 쪽이 스스로 옛 가방을 버리게 만든다. */
+  /* arst 에 |0 을 쓰면 안 된다 — Date.now() 는 32비트를 넘어 값이 뭉개진다 */
+  return {v:WORLD_FMT,d:d,gen:gen|0,arst:num0(arst)};
 }
 /* {"x,y,z":id} 맵의 y 좌표를 통째로 dy 만큼 옮긴다(옛 월드 이사용) */
 function liftMap(m,dy){
@@ -4079,6 +4188,11 @@ function unpackEdits(rec){
 function worldGenOf(wrec){
   var e=wrec&&wrec.edits;
   return (e&&typeof e.gen==="number")?e.gen:0;
+}
+/* 계정 초기화 도장 — 선생님이 가방을 비운 시각 */
+function worldArstOf(wrec){
+  var e=wrec&&wrec.edits;
+  return (e&&typeof e.arst==="number")?e.arst:0;
 }
 
 /* ==========================================================================
@@ -5911,6 +6025,16 @@ function resumeSave(sv,btn){
             S.edits=srv;
           }
           if(wrec.day)S.day=Math.max(S.day||1,wrec.day);
+          /* [V13] 계정 초기화 도장이 내 것보다 새로우면, 이 기기에 남은 가방은
+             '초기화 이전 것'이다. 지도는 그대로 두고 가방만 처음으로 되돌린다. */
+          var sa=worldArstOf(wrec);
+          if(sa>num0(S.arst)){
+            S.arst=sa;S.inv={};S.dur={};S.ranch={};S.machines={};S.day=1;S.synced=false;
+            S.stat=newState(S.name,S.biome,S.seed).stat;
+            startKit(S);
+            try{localStorage.removeItem(slotKey(S.name,S.room))}catch(e){}
+            setTimeout(function(){toast("👥 선생님이 계정을 초기화했습니다 — 가방을 처음부터 시작합니다","warn")},900);
+          }
         }
         beginWorld(true);
       });
@@ -5951,7 +6075,7 @@ function newState(name,biome,seed){
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
-    wv:WORLD_FMT,wgen:0,                                  /* [V9] 좌표 규격 · 몇 번째 지도인가 */
+    wv:WORLD_FMT,wgen:0,arst:0,synced:false,              /* [V9·V13] 좌표 규격 · 지도 번호 · 계정 초기화 도장 · 서버에 올라간 적 있는가 */
     machines:{},ranch:{},gen:{},breed:0,
     carbon:0,quizA:{},regrow:{},qbox:{n:0,ok:0,seen:{}},
     stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false,
@@ -6001,6 +6125,9 @@ function cloudSaveWorld(force,cb){
   CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
     pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(perr){
     if(!S){cloudBusy=false;cb&&cb(perr);return}
+    /* [V13] 한 번이라도 서버에 올라갔다는 표시. 나중에 서버에서 이 기록이 사라져
+       있으면 "선생님이 지웠다"는 뜻이 되어, 이 기기 사본을 되살리지 않는다. */
+    if(!perr)S.synced=true;
     /* ── [V8 수정 7] 공유 월드는 '덮어쓰기'가 아니라 '합치기' ────────────────
        예전엔 내 S.edits 를 통째로 worlds 행에 덮어썼다. 그래서 내가 잠깐 끊겼거나
        늦게 들어온 사이 친구가 지은 건물이, 내가 저장하는 순간 전부 지워졌다.
@@ -6021,6 +6148,14 @@ function cloudSaveWorld(force,cb){
         toast("🗺 선생님이 지도를 새로 깔았습니다. 나갔다가 다시 들어와 주세요","warn");
         cb&&cb(perr);return;
       }
+      /* [V13] 놀고 있는 사이에 선생님이 계정을 초기화한 경우.
+         그냥 두면 10초 뒤 자동 저장이 옛 가방을 서버에 되올려 초기화가 없던 일이 된다. */
+      if(!lerr&&cur&&worldArstOf(cur)>num0(S.arst)){
+        cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
+        cloudBlocked=true;
+        toast("👥 선생님이 계정을 초기화했습니다. 나갔다가 다시 들어와 주세요","warn");
+        cb&&cb(perr);return;
+      }
       if(!lerr&&cur){
         var srv=unpackEdits(cur.edits);
         for(var k in srv){
@@ -6033,7 +6168,10 @@ function cloudSaveWorld(force,cb){
       /* seed 는 서버에 이미 있는 값을 절대 바꾸지 않는다(바꾸면 반 전체 지형이 뒤집힌다).
          내 S.seed 는 이번 세션의 지형을 만든 값이므로 그대로 두고, 쓰기만 서버 값으로 한다. */
       var useSeed=(cur&&cur.seed)||S.seed;
-      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0),day:S.day},function(werr){
+      /* [V13] 서버에 찍힌 초기화 도장을 그대로 되돌려 보낸다 —
+         빼먹으면 학생이 저장하는 순간 도장이 지워져 초기화가 무효가 된다. */
+      var keepArst=Math.max(worldArstOf(cur),num0(S.arst));
+      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0,keepArst),day:S.day},function(werr){
         cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
         var err0=perr||werr;
         if(err0)console.warn("cloud save fail",err0);
@@ -6123,6 +6261,8 @@ function normalizeSave(s){
     if(typeof s.wgen!=="number")s.wgen=0;
   }
   if(typeof s.wgen!=="number")s.wgen=0;
+  if(typeof s.arst!=="number")s.arst=0;                            // [V13] 계정 초기화 도장
+  if(typeof s.synced!=="boolean")s.synced=false;                   // [V13] 서버에 올라간 적 있는가
   if(!s.qbox)s.qbox={n:0,ok:0,seen:{}};                          // [V9 추가 3] 퀴즈 상자 기록
   if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
   if(s.stat&&typeof s.stat.helps!=="number")s.stat.helps=0;      // [V8 추가 1] 우리 팀 나눔 횟수
@@ -6494,16 +6634,35 @@ function bootNotice(html,tone){
    PC가 초기화된 학생은 아예 들어올 방법이 없었다. 이제 원인과 해결책을 같이 알려 준다. */
 function bootNameLocked(name,bio){
   var hasLocal=!!findLocalSlot(MarketCfg.room,name);
+  /* [V11 수정] 예전에는 이 기기에 저장이 없으면 '다시 시도' 말고 길이 없어서,
+     선생님이 풀어 줄 때까지 학생은 화면만 보고 앉아 있어야 했다.
+     이제 저장이 없어도 '이 기기에서 새로 시작'으로 수업에 참여할 수 있다. */
   bootNotice(
     "<b style='color:var(--warn)'>⚠ 이 이름은 다른 기기에서 먼저 접속한 기록이 있습니다.</b>"+
     "<div style='margin-top:6px;line-height:1.55'>컴퓨터를 바꿨거나 PC가 초기화되면 이렇게 됩니다."+
-    "<br>선생님 화면 → <b>명단</b>에서 <b>"+esc(name)+"</b> 옆의 <b>↻ 기기 바꿈</b>을 눌러 달라고 하세요."+
+    "<br>선생님 화면 → <b>👥 학생 계정 한꺼번에 관리</b> → <b>🔓 전체 기기 잠금 풀기</b>를 눌러 달라고 하세요."+
+    "<br>(한 명만 풀 때는 <b>명단</b>에서 <b>"+esc(name)+"</b> 옆의 <b>↻ 기기 바꿈</b>)"+
     "<br>선생님이 눌러 주신 뒤 아래 <b>다시 시도</b>를 누르면 그대로 이어집니다.</div>"+
     "<div style='margin-top:9px;display:flex;gap:6px;flex-wrap:wrap'>"+
     "<button class='mini acc' onclick='startAsStudent()'>다시 시도</button>"+
-    (hasLocal?"<button class='mini' onclick=\"startLocalOnly()\">이 기기에 저장된 것으로 계속하기</button>":"")+
+    (hasLocal?"<button class='mini' onclick=\"startLocalOnly()\">이 기기에 저장된 것으로 계속하기</button>":
+              "<button class='mini' onclick=\"startOfflineFresh()\">이 기기에서 새로 시작하기</button>")+
     "</div>","");
-  toast("선생님께 '기기 바꿈'을 요청하세요","bad");
+  toast("선생님께 '기기 잠금 풀기'를 요청하세요","bad");
+}
+/* 서버에 못 들어가는 상태에서도 수업은 하게 한다 — 이 기기에만 저장되는 새 판.
+   나중에 잠금이 풀리면 같은 이름으로 다시 들어가면 된다. */
+function startOfflineFresh(){
+  var name=$("nm").value.trim()||"개척자";
+  var bio=assignedBiome||picked;
+  if(!bio||!BIOMES[bio]){toast("먼저 대륙이 배정되어야 합니다","bad");return}
+  if(!window.confirm("이 컴퓨터에서만 저장되는 새 판으로 시작합니다.\n\n· 친구들과 같은 대륙을 함께 쓰지는 못합니다\n· 선생님이 잠금을 풀어 주면 원래 기록으로 돌아갈 수 있습니다\n\n계속할까요?"))return;
+  cloudBlocked=true;
+  S=newState(name,bio,seedFor(MarketCfg.room,bio));
+  startKit(S);
+  document.body.dataset.b=S.biome;
+  toast("이 기기에만 저장됩니다. 수업 뒤 선생님께 알려 주세요","warn");
+  beginWorld(false);
 }
 /* 서버에 못 쓰는 상태로라도 수업은 이어가게 한다(이 기기에만 저장) */
 function startLocalOnly(){
@@ -6535,6 +6694,23 @@ function startAsStudentOnline(name,bio){
       S.room=MarketCfg.room;
       document.body.dataset.b=S.biome;
       if(haveShared){S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;S.wgen=worldGenOf(wrec);}
+      /* ══════════════════════════════════════════════════════════════════════
+         [V13 수정] "계정을 초기화했는데 가방이 그대로다"
+         ----------------------------------------------------------------------
+         원인: 선생님이 지우는 것은 <b>서버</b>의 기록이다. 그런데 학생 기기의
+         localStorage 에는 같은 내용이 한 벌 더 남아 있고, 아래 '서버가 비었으면
+         이 기기 것을 살린다'는 안전망이 그것을 그대로 되살려 놓았다. 원래는
+         업로드를 놓친 학생을 구하려고 넣은 장치인데, 초기화와 조건이 똑같았다.
+         고침: 공유 월드에 찍힌 <b>초기화 도장</b>(arst)이 내 것보다 새로우면
+         이 기기의 기록은 '초기화 이전 것'이므로 쓰지 않는다.
+         ══════════════════════════════════════════════════════════════════════ */
+      var srvArst=worldArstOf(wrec);
+      var wiped=(srvArst>num0(localSv&&localSv.arst));
+      S.arst=srvArst;
+      if(wiped&&localSv){
+        localSv=null;                                   // 초기화 이전의 이 기기 기록은 없는 셈 친다
+        try{localStorage.removeItem(slotKey(name,MarketCfg.room))}catch(e){}
+      }
       /* 개인 데이터 복원 or 신규 지급 */
       if(prec){
         S.inv=prec.inv||{};
@@ -6557,14 +6733,21 @@ function startAsStudentOnline(name,bio){
         }else{
           logAdd(S,"클라우드에서 데이터를 불러왔습니다.");
         }
-      }else if(localSv&&invCount(localSv.inv)>0){
-        /* 서버에 내 행이 없는데 이 기기엔 기록이 있다 → 새로 주지 말고 그대로 이어받는다 */
+      }else if(localSv&&invCount(localSv.inv)>0&&!localSv.synced){
+        /* 서버에 내 행이 없는데 이 기기엔 기록이 있다 → 새로 주지 말고 그대로 이어받는다.
+           [V13] 단, 이 기기 기록이 <b>서버에 올라간 적이 있다면</b>(synced) 이야기가 다르다.
+           올라갔던 것이 지금 서버에 없다는 건 선생님이 지웠다는 뜻이므로 되살리지 않는다. */
         S.inv=localSv.inv;S.dur=localSv.dur||{};
         if(localSv.stat)S.stat=localSv.stat;
         S.day=Math.max(S.day,localSv.day||1);
         if(localSv.pos&&typeof localSv.pos.x==="number")S.pos=localSv.pos;
         logAdd(S,"이 기기에 저장된 기록을 이어받았습니다.");
       }else{
+        if(localSv&&invCount(localSv.inv)>0){
+          try{localStorage.removeItem(slotKey(name,MarketCfg.room))}catch(e){}
+          logAdd(S,"선생님이 계정을 초기화하여 처음부터 시작합니다.");
+          setTimeout(function(){toast("👥 선생님이 계정을 초기화했습니다 — 처음부터 시작합니다","warn")},900);
+        }
         startKit(S);
         logAdd(S,bN(S.biome)+" 대륙에 도착했습니다. "+BIOMES[S.biome].role);
       }
@@ -6645,6 +6828,25 @@ function initTeacherPane(){
     $("t_email").value=Auth.isTeacher()?(Auth.email()||""):"";
     $("t_connect").addEventListener("click",teacherConnect);
     $("t_logout").addEventListener("click",teacherLogout);
+    /* [V11] 비밀번호 눈으로 확인 + 한글·Caps Lock 실시간 경고 */
+    var eye=$("t_pweye");
+    if(eye)eye.addEventListener("click",function(){
+      var f=$("t_pw"),on=f.type==="password";
+      f.type=on?"text":"password";
+      eye.setAttribute("aria-pressed",on?"true":"false");
+      eye.textContent=on?"🙈":"👁";
+      f.focus();
+    });
+    ["t_pw","t_email"].forEach(function(id){
+      var el=$(id);if(!el)return;
+      el.addEventListener("keyup",function(ev){
+        var w=$("t_pwwarn"),tips=pwDiagnose($("t_email").value,$("t_pw").value,ev);
+        var hot=tips.filter(function(t){return t.indexOf("한글")>=0||t.indexOf("Caps")>=0});
+        if(hot.length){w.innerHTML="⚠ "+hot.join(" · ");w.style.color="var(--warn)";w.style.display="block"}
+        else w.style.display="none";
+      });
+      el.addEventListener("keydown",function(ev){if(ev.key==="Enter")teacherConnect()});
+    });
     $("r_add").addEventListener("click",rosterAddBulk);
     $("r_bulk").addEventListener("keydown",function(e){
       if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();rosterAddBulk()}
@@ -6665,6 +6867,10 @@ function initTeacherPane(){
     $("t_save").addEventListener("click",teacherSaveRoster);
     $("t_resetAll").addEventListener("click",function(){resetMapAsk(null)});
     $("t_wipeLocal").addEventListener("click",wipeLocalSaves);
+    $("t_unlockAll").addEventListener("click",unlockAllStudents);
+    $("t_diag").addEventListener("click",loginDiagnose);
+    $("t_forget").addEventListener("click",forgetLogin);
+    $("t_wipeAll").addEventListener("click",wipeAllStudents);
   }
   renderResetPick();
   renderRoster();
@@ -6676,6 +6882,74 @@ function renderResetPick(){
     return "<button style='--cc:"+BIOMES[b].c+"' onclick=\"resetMapAsk('"+b+"')\">"+
       "<i></i>"+BIOMES[b].n+" 새로 깔기</button>";
   }).join("");
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   [V11 추가] 반 전체 기기 잠금 풀기 · 전체 계정 초기화
+   --------------------------------------------------------------------------
+   컴퓨터실 자리는 매 시간 바뀐다. 학생 하나하나 ↻ 를 눌러 주다 보면 수업이
+   시작도 못 한 채 10분이 지나간다. 그래서 반 단위 단추를 만들었다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var acctBusy=false;
+function acctGuard(msgEl){
+  if(!(CloudSvc&&CloudSvc.online)){msgEl.textContent="먼저 선생님 계정으로 로그인하세요.";return false}
+  if(!Auth.isTeacher()){msgEl.textContent="이 기능은 선생님 계정으로만 쓸 수 있습니다.";return false}
+  if(acctBusy)return false;
+  return true;
+}
+function unlockAllStudents(){
+  var msg=$("t_acctMsg");if(!acctGuard(msg))return;
+  if(!window.confirm("반 전체(방 '"+MarketCfg.room+"')의 기기 잠금을 풉니다.\n\n· 학생들의 가방·진행은 그대로 남습니다\n· 어느 컴퓨터에서든 이름만 넣으면 이어서 할 수 있게 됩니다\n\n계속할까요?"))return;
+  acctBusy=true;msg.textContent="반 전체 기기 잠금을 푸는 중…";
+  CloudSvc.releaseAllPlayers(MarketCfg.room,function(err,n){
+    acctBusy=false;
+    if(err){
+      msg.innerHTML="⚠ 잠금을 풀지 못했습니다("+esc(String(err))+").<br>"+
+        "<b>👥 전체 학생 계정 초기화</b>를 쓰면 확실히 들어올 수 있습니다.";
+      return;
+    }
+    if(n===0){
+      msg.innerHTML="⚠ 서버가 잠금 해제를 허용하지 않았습니다(0명 변경).<br>"+
+        "<b>👥 전체 학생 계정 초기화</b>를 눌러 주세요 — 가방은 처음부터지만 대륙과 건물은 그대로입니다.";
+      return;
+    }
+    msg.innerHTML="✅ <b>"+(n<0?"전체":n+"명")+"</b>의 기기 잠금을 풀었습니다. 학생 화면에서 <b>다시 시도</b>를 누르면 그대로 이어집니다.";
+  });
+}
+function wipeAllStudents(){
+  var msg=$("t_acctMsg");if(!acctGuard(msg))return;
+  var n=teacherRoster.length;
+  if(!window.confirm("방 '"+MarketCfg.room+"'의 학생 계정을 모두 초기화합니다.\n\n· 모든 학생의 가방·자원·일차가 사라집니다\n· 기기 잠금이 모두 풀립니다\n· 반 명단(이름·기후 배정)은 그대로 남습니다\n· 지어 둔 건물과 대륙도 그대로입니다\n\n되돌릴 수 없습니다. 계속할까요?"))return;
+  if(!window.confirm("한 번 더 확인합니다.\n\n정말로 "+(n?n+"명 ":"")+"전체 학생의 가방을 처음부터로 되돌릴까요?"))return;
+  acctBusy=true;msg.textContent="전체 학생 계정을 초기화하는 중…";
+  CloudSvc.deleteAllOffers(MarketCfg.room,function(){
+    CloudSvc.deleteAllPlayers(MarketCfg.room,function(err){
+      if(err){acctBusy=false;msg.textContent="⚠ 초기화 실패: "+err;return}
+      msg.textContent="학생 기기에 남은 가방까지 무효로 만드는 중…";
+      /* [V13] 서버만 지우면 학생 기기의 localStorage 사본이 그대로 되살아난다.
+         여섯 대륙에 초기화 도장을 찍어, 학생 쪽이 스스로 옛 가방을 버리게 한다. */
+      CloudSvc.stampAccountReset(MarketCfg.room,BKEYS.slice(),function(serr){
+      acctBusy=false;
+      /* 이 컴퓨터에 남은 같은 방 저장도 함께 치운다 */
+      var local=0;
+      try{
+        var kill=[];
+        for(var i=0;i<localStorage.length;i++){
+          var k=localStorage.key(i);
+          if(k&&k.indexOf(SAVE)===0)kill.push(k);
+        }
+        kill.forEach(function(k){
+          try{var v=JSON.parse(localStorage.getItem(k));if(v&&v.room===MarketCfg.room){localStorage.removeItem(k);local++}}catch(e){}
+        });
+      }catch(e){}
+      setupContinue();
+      msg.innerHTML="✅ 전체 학생 계정을 초기화했습니다"+(local?(" · 이 기기의 저장 "+local+"개도 정리"):"")+
+        ".<br>학생들은 <b>같은 이름·같은 대륙</b>으로 다시 들어와 처음부터 시작합니다."+
+        (serr?"<br><span style=\'color:var(--warn)\'>⚠ 일부 대륙에 초기화 표시를 남기지 못했습니다("+esc(String(serr))+
+              "). 그 대륙 학생은 가방이 되살아날 수 있으니 다시 한 번 눌러 주세요.</span>"
+             :"<br>학생 컴퓨터에 남아 있던 가방도 함께 무효가 됩니다.");
+      });
+    });
+  });
 }
 var resetBusy=false;
 function resetMapAsk(biome){
@@ -6817,9 +7091,160 @@ function rosterUndoLast(){
   teacherRoster=rosterUndo;rosterUndo=null;rosterMarkDirty();renderRoster();
   toast("되돌렸습니다","good");
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   [V11 수정] 다른 컴퓨터에서만 "Invalid login credentials" 가 뜨던 문제
+   --------------------------------------------------------------------------
+   내 PC·내 폰에서는 되는데 남의 PC에서만 로그인이 안 되면, 계정이 잘못된 게
+   아니라 '입력된 글자'가 달라진 것이다. 교실에서 실제로 겪는 원인은 이렇다.
+     ① 한/영 키가 한글에 있어 비밀번호가 한글로 입력됨 (●로 가려져 안 보인다)
+     ② Caps Lock 이 켜져 대문자로 입력됨
+     ③ 태블릿·모바일 키보드가 이메일 첫 글자를 자동으로 대문자로 바꿈
+     ④ 복사해 붙여넣을 때 앞뒤 공백이 딸려 들어옴
+   그래서 이메일은 공백을 없애고 소문자로 바꿔 보내고, 비밀번호는 앞뒤 공백만
+   털어 낸 뒤, 위 네 가지를 미리 잡아내 '무엇을 고쳐야 하는지' 알려 준다.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* 복사·붙여넣기에 딸려 오는 '눈에 안 보이는 글자'를 털어 낸다.
+   메신저·메모장에서 옮기면 폭 없는 공백(U+200B)이나 BOM(U+FEFF), 줄바꿈이 함께
+   붙어 온다. 화면에는 아무것도 안 보이는데 서버는 다른 비밀번호로 읽는다. */
+function cleanCred(v){
+  return String(v||"").replace(/[\u200B-\u200D\uFEFF\u2060]/g,"")
+                      .replace(/\u00A0/g," ").trim();
+}
+function hasInvisible(v){ return /[\u200B-\u200D\uFEFF\u2060\u00A0]/.test(String(v||"")) }
+function pwDiagnose(email,pw,ev){
+  var out=[];
+  if(hasInvisible(pw))out.push("비밀번호에 <b>눈에 보이지 않는 글자</b>가 붙어 있습니다(복사할 때 딸려 옴) — 자동으로 떼어 냅니다");
+  if(hasInvisible(email))out.push("이메일에 <b>눈에 보이지 않는 글자</b>가 붙어 있습니다 — 자동으로 떼어 냅니다");
+  if(/[\u3131-\uD79D]/.test(pw))out.push("비밀번호에 <b>한글</b>이 섞여 있습니다 — <b>한/영 키</b>를 눌러 영문으로 바꾸세요");
+  if(/[\u3131-\uD79D]/.test(email))out.push("이메일에 <b>한글</b>이 섞여 있습니다 — <b>한/영 키</b>를 확인하세요");
+  try{ if(ev&&ev.getModifierState&&ev.getModifierState("CapsLock"))out.push("<b>Caps Lock</b> 이 켜져 있습니다"); }catch(e){}
+  if(pw!==pw.trim())out.push("비밀번호 앞뒤에 <b>공백</b>이 붙어 있습니다");
+  if(email!==email.trim())out.push("이메일 앞뒤에 <b>공백</b>이 붙어 있습니다");
+  if(email&&email.indexOf("@")<0)out.push("이메일에 <b>@</b> 가 없습니다");
+  if(/[A-Z]/.test(email))out.push("이메일에 대문자가 있습니다 — 자동으로 소문자로 바꿔 보냅니다");
+  return out;
+}
+function loginFailHtml(raw,email,pw){
+  var msg=String(raw&&raw.message?raw.message:raw||"");
+  var bad=/invalid.*credential|invalid_grant|400/i.test(msg);
+  var tips=pwDiagnose($("t_email").value,$("t_pw").value,null);
+  var h="⚠ 로그인 실패: "+esc(bad?"이메일 또는 비밀번호가 서버와 다릅니다":msg);
+  h+="<div style=\'margin-top:7px;line-height:1.6\'>";
+  if(tips.length)h+="<b style=\'color:var(--warn)\'>먼저 이것부터 확인하세요</b><br>· "+tips.join("<br>· ")+"<br><br>";
+  h+="<b style=\'color:var(--warn)\'>먼저 이것부터 의심하세요</b><br>"+
+     "내 컴퓨터·내 폰은 <b>한 번 로그인해 둔 세션</b>으로 열립니다. 그 뒤로는 비밀번호를 "+
+     "다시 검사하지 않기 때문에, <b>비밀번호가 서버와 달라도 내 기기는 멀쩡히 열립니다</b>. "+
+     "처음 보는 컴퓨터에서만 실패하는 것은 거기서만 진짜 검사가 일어나기 때문입니다.<br>"+
+     "<b>확인하는 법</b> — 내 컴퓨터에서 위 <b>이 기기의 로그인 지우고 다시</b>를 누른 뒤 "+
+     "같은 비밀번호로 로그인해 보세요. <b>여기서도 실패하면</b> 비밀번호 자체가 다른 것이니 "+
+     "Supabase 대시보드에서 새로 정하면 됩니다.<br><br>"+
+     "<b>그 다음 확인할 것</b><br>"+
+     "· 위 <b>🔎 로그인 진단</b>을 두 컴퓨터에서 각각 눌러 <b>프로젝트 이름이 같은지</b> 비교<br>"+
+     "· 오른쪽 <b>👁</b> 로 비밀번호가 영문으로 찍혔는지 확인<br>"+
+     "· 브라우저가 <b>다른 계정을 자동 완성</b>하지 않았는지 (칸을 비우고 직접 입력)";
+  h+="</div>";
+  return h;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   [V12 추가] 로그인 진단 — 컴퓨터마다 무엇이 다른지 눈으로 비교한다
+   --------------------------------------------------------------------------
+   "여기서는 되고 저기서는 안 된다"는 문제는 두 화면을 나란히 놓고 <b>같은 값이
+   찍히는지</b> 보면 대개 5초 만에 끝난다. 그래서 서버 주소·프로젝트 번호·저장된
+   세션·입력한 글자의 생김새를 한 번에 보여 주고, 서버에 실제로 한 번 물어본다.
+   ══════════════════════════════════════════════════════════════════════════ */
+function credShape(v){
+  v=String(v||"");
+  if(!v)return "(비어 있음)";
+  var kinds=[];
+  if(/[a-z]/.test(v))kinds.push("영소문자");
+  if(/[A-Z]/.test(v))kinds.push("영대문자");
+  if(/[0-9]/.test(v))kinds.push("숫자");
+  if(/[^A-Za-z0-9]/.test(v))kinds.push("기호");
+  if(/[\u3131-\uD79D]/.test(v))kinds.push("★한글★");
+  if(hasInvisible(v))kinds.push("★보이지않는글자★");
+  return v.length+"글자 · "+kinds.join("+");
+}
+function forgetLogin(){
+  var st=$("t_status");
+  try{localStorage.removeItem("sixcont_auth_v1")}catch(e){}
+  Auth.signOut()["catch"](function(){});
+  $("t_logout").classList.add("hide");
+  teacherRoster=[];renderRoster();
+  st.innerHTML="🧹 이 기기에 저장된 로그인을 지웠습니다."+
+    "<div style=\'margin-top:5px;color:var(--ink3)\'>이제 <b>비밀번호를 넣고</b> 로그인해 보세요. "+
+    "여기서도 실패한다면 비밀번호 자체가 서버와 다른 것이므로, 다른 컴퓨터 탓이 아닙니다.</div>";
+}
+function loginDiagnose(){
+  var box=$("t_diagbox");box.classList.remove("hide");
+  var host="";try{host=SUPABASE_URL.replace(/^https?:\/\//,"")}catch(e){}
+  var ref=host.split(".")[0];
+  var envUsed=!!(window.APP_ENV&&window.APP_ENV.SUPABASE_URL);
+  var sess=null;try{sess=JSON.parse(localStorage.getItem("sixcont_auth_v1")||"null")}catch(e){}
+  var lines=[];
+  lines.push("① 이 컴퓨터가 말을 거는 서버");
+  lines.push("   프로젝트  : "+ref);
+  lines.push("   주소      : "+host);
+  lines.push("   키 끝 6자 : …"+String(SUPABASE_ANON_KEY).slice(-6));
+  lines.push("   설정 출처 : "+(envUsed?"env.js (배포 설정)":"파일에 들어 있는 기본값"));
+  lines.push("   ▸ 다른 컴퓨터와 이 세 줄이 다르면, 서로 '다른 서버'에 로그인하는 중입니다.");
+  lines.push("");
+  lines.push("② 이 기기에 저장된 로그인");
+  if(!sess)lines.push("   없음 → 비밀번호를 진짜로 검사합니다");
+  else lines.push("   "+(sess.anon?"학생(익명) 세션":"선생님 세션: "+(sess.email||"?"))+
+                  " · 만료 "+new Date(sess.expires_at||0).toLocaleString());
+  if(sess&&!sess.anon)lines.push("   ▸ 이 기기는 저장된 세션으로 열립니다. 비밀번호가 맞는지는 알 수 없습니다.");
+  lines.push("");
+  lines.push("③ 지금 칸에 적힌 값");
+  lines.push("   이메일    : "+(cleanCred($("t_email").value).toLowerCase()||"(비어 있음)"));
+  lines.push("   비밀번호  : "+credShape(cleanCred($("t_pw").value)));
+  lines.push("   ▸ 다른 컴퓨터와 '글자 수'가 다르면 입력이 다른 것입니다.");
+  lines.push("");
+  lines.push("④ 서버에 직접 물어보는 중…");
+  box.textContent=lines.join("\n");
+
+  var email=cleanCred($("t_email").value).toLowerCase(), pw=cleanCred($("t_pw").value);
+  if(!email||!pw){
+    box.textContent=lines.join("\n").replace("④ 서버에 직접 물어보는 중…",
+      "④ 서버 확인 건너뜀 — 이메일과 비밀번호를 넣고 다시 눌러 주세요");
+    return;
+  }
+  fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{
+    method:"POST",headers:{"apikey":SUPABASE_ANON_KEY,"Content-Type":"application/json"},
+    body:JSON.stringify({email:email,password:pw})
+  }).then(function(r){
+    return r.text().then(function(t){
+      var j=null;try{j=t?JSON.parse(t):null}catch(e){}
+      var out=lines.slice(0,-1);
+      out.push("④ 서버 응답");
+      out.push("   HTTP "+r.status+(j&&(j.error_code||j.error)?(" · "+(j.error_code||j.error)):""));
+      out.push("   "+((j&&(j.msg||j.error_description||j.message))||(r.ok?"로그인 성공":"메시지 없음")));
+      out.push("");
+      if(r.ok){
+        out.push("✅ 이 비밀번호는 맞습니다. 다른 컴퓨터에서 실패했다면 그 컴퓨터의");
+        out.push("   ① 항목(서버 주소)이 이 화면과 같은지 비교해 보세요.");
+      }else if(r.status===400){
+        out.push("❌ 서버가 '이 이메일+비밀번호 조합은 없다'고 답했습니다.");
+        out.push("   · 내 기기에서 되던 것은 저장된 세션 덕분이지, 비밀번호가 맞아서가 아닙니다");
+        out.push("   · Supabase 대시보드 → Authentication → Users 에서");
+        out.push("     "+email);
+        out.push("     계정이 프로젝트 '"+ref+"' 에 있는지, 비밀번호를 새로 정해 주세요");
+      }else if(r.status===429){
+        out.push("⏳ 너무 여러 번 시도해 서버가 잠시 막았습니다. 10분쯤 뒤에 다시 해 보세요.");
+      }else if(r.status===401||r.status===403){
+        out.push("🔑 서버 키(apikey)가 이 프로젝트와 맞지 않습니다 — 배포 설정(env.js)을 확인하세요.");
+      }
+      box.textContent=out.join("\n");
+    });
+  })["catch"](function(e){
+    var out=lines.slice(0,-1);
+    out.push("④ 서버에 닿지 못했습니다: "+(e&&e.message?e.message:e));
+    out.push("   학교 방화벽이 supabase.co 를 막고 있을 수 있습니다.");
+    box.textContent=out.join("\n");
+  });
+}
 /* ---- 로그인 · 저장 ---- */
 function teacherConnect(){
-  var email=$("t_email").value.trim(), pw=$("t_pw").value, room=$("t_room").value.trim()||DEFAULT_ROOM;
+  var email=cleanCred($("t_email").value).toLowerCase(), pw=cleanCred($("t_pw").value), room=$("t_room").value.trim()||DEFAULT_ROOM;
   var st=$("t_status");
   if(!BACKEND_ON){st.textContent="이 빌드에는 서버 주소가 들어 있지 않습니다. 개발자가 .env 를 채워 다시 배포해야 합니다.";return}
   MarketCfg.room=room;MarketCfg.mode="supabase";
@@ -6842,15 +7267,40 @@ function teacherConnect(){
     });
   }
 
-  /* 이미 선생님으로 로그인되어 있으면 비밀번호를 다시 묻지 않는다 */
-  if(Auth.isTeacher()&&(!email||email===Auth.email())){afterLogin();return}
+  /* ══════════════════════════════════════════════════════════════════════════
+     [V12 수정] "내 PC·내 폰은 되는데 다른 PC만 로그인 실패"의 진짜 원인
+     --------------------------------------------------------------------------
+     예전 코드는 여기서 이렇게 했다.
+         if(Auth.isTeacher() && ...) { afterLogin(); return }   ← 비밀번호를 건너뜀
+     한 번 로그인에 성공하면 세션이 localStorage 에 남고, 그 뒤로는 refresh_token
+     으로 스스로 갱신된다. 그래서 <b>내 기기에서는 비밀번호를 다시 검사한 적이 없다</b>.
+     비밀번호가 바뀌었거나 처음부터 다르게 기억하고 있어도 내 기기는 멀쩡히 열린다.
+     반면 처음 보는 컴퓨터에는 세션이 없으니 진짜 검사가 일어나고, 그제서야
+     "Invalid login credentials" 가 나온다. 기기 문제가 아니라, 내 기기가
+     <b>확인을 건너뛰고 있었을 뿐</b>이다.
+     그래서 이제 비밀번호 칸에 무언가 적혀 있으면 <b>반드시 서버에 물어본다</b>.
+     비워 두었을 때만 저장된 세션을 쓰고, 그 사실을 화면에 분명히 밝힌다.
+     ══════════════════════════════════════════════════════════════════════════ */
+  if(Auth.isTeacher()&&!pw&&(!email||email===Auth.email())){
+    st.innerHTML="🔑 이 기기에 <b>저장된 로그인</b>으로 들어갑니다 — <b>비밀번호는 확인하지 않았습니다</b>."+
+      "<div style=\'margin-top:5px;color:var(--ink3)\'>비밀번호가 맞는지 시험해 보려면, 비밀번호를 넣고 다시 누르세요.</div>";
+    setTimeout(afterLogin,900);return;
+  }
   if(!email||!pw){st.textContent="선생님 이메일과 비밀번호를 입력하세요.";return}
+  /* 보내기 전에 미리 잡아 준다 — 서버에 물어보기 전에 원인을 아는 편이 빠르다 */
+  var pre=pwDiagnose($("t_email").value,$("t_pw").value,null);
+  var hangul=pre.filter(function(t){return t.indexOf("한글")>=0});
+  if(hangul.length){
+    st.innerHTML="⚠ "+hangul.join("<br>⚠ ")+
+      "<div style=\'margin-top:6px\'>오른쪽 <b>👁</b> 를 눌러 확인한 뒤 다시 입력해 주세요.</div>";
+    return;
+  }
   st.textContent="로그인 중…";
   Auth.signInPassword(email,pw).then(function(){
-    $("t_pw").value="";
+    $("t_pw").value="";$("t_pwwarn").style.display="none";
     afterLogin();
   })["catch"](function(e){
-    st.textContent="⚠ 로그인 실패: "+(e&&e.message?e.message:e);
+    st.innerHTML=loginFailHtml(e,email,pw);
   });
 }
 function teacherLogout(){
@@ -6869,8 +7319,15 @@ function teacherRelease(nameEnc){
   var name=decodeURIComponent(nameEnc), msg=$("t_saveMsg");
   if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 로그인하세요.";return}
   msg.textContent=name+" 학생의 기기 잠금을 푸는 중…";
-  CloudSvc.releasePlayer(MarketCfg.room,name,function(err){
-    msg.textContent=err?("⚠ 실패: "+err):("✅ "+name+" 학생은 이제 아무 기기에서나 이어서 할 수 있습니다.");
+  CloudSvc.releasePlayer(MarketCfg.room,name,function(err,n){
+    if(!err){msg.innerHTML="✅ <b>"+esc(name)+"</b> 학생은 이제 아무 기기에서나 이어서 할 수 있습니다. 학생 화면에서 <b>다시 시도</b>를 눌러 주세요.";return}
+    if(err==="no_rows"){
+      msg.innerHTML="⚠ 잠금을 풀지 못했습니다(서버가 허용하지 않음).<br>"+
+        "이럴 때는 아래 <b>🧹 이 학생 기록 완전 삭제</b>를 누르면 확실히 들어올 수 있습니다 "+
+        "(가방은 초기화되지만 대륙과 건물은 그대로입니다). 반 전체가 이렇다면 <b>👥 전체 학생 계정 초기화</b>를 쓰세요.";
+      return;
+    }
+    msg.textContent="⚠ 실패: "+err;
   });
 }
 /* [V9 수정 2] 학생 하나의 서버 기록(가방·스탯·위치·거래·배정)을 통째로 지운다.
@@ -6881,15 +7338,21 @@ function teacherWipeStudent(nameEnc){
   var name=decodeURIComponent(nameEnc), msg=$("t_saveMsg");
   if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
   if(!Auth.isTeacher()){msg.textContent="학생 기록 삭제는 선생님 계정으로만 할 수 있습니다.";return}
-  if(!window.confirm(name+" 학생의 서버 기록을 지웁니다.\n\n· 가방·자원·일차·위치가 모두 사라집니다\n· 다시 접속하면 새 계정처럼 처음부터 시작합니다\n· 이미 지어 둔 건물은 남습니다(지우려면 '지도 초기화')\n\n계속할까요?"))return;
+  if(!window.confirm(name+" 학생을 완전히 지웁니다.\n\n· 가방·자원·일차·위치가 모두 사라집니다\n· 반 명단에서도 빠집니다\n· 기기 잠금도 함께 풀립니다\n· 이미 지어 둔 건물은 남습니다(지우려면 '지도 초기화')\n\n계속할까요?"))return;
   msg.textContent=name+" 학생 기록을 지우는 중…";
   CloudSvc.deleteOffersOf(MarketCfg.room,name,function(){
     CloudSvc.deletePlayer(MarketCfg.room,name,function(err){
       if(err){msg.textContent="⚠ 삭제 실패: "+err;return}
-      /* 이 기기에 남은 같은 이름의 저장도 함께 정리한다 */
-      try{localStorage.removeItem(slotKey(name,MarketCfg.room))}catch(e){}
-      msg.innerHTML="✅ <b>"+esc(name)+"</b> 학생의 기록을 지웠습니다. 다시 접속하면 처음부터 시작합니다."+
-        "<br>지어 둔 건물까지 없애려면 왼쪽 <b>🗺 지도 초기화</b>를 눌러 주세요.";
+      /* [V11 수정] 명단(roster) 행까지 지운다. 예전에는 players 만 지워서,
+         명단을 다시 불러오면 지운 학생이 그대로 되살아났다. */
+      CloudSvc.deleteRosterRow(MarketCfg.room,name,function(){
+        try{localStorage.removeItem(slotKey(name,MarketCfg.room))}catch(e){}
+        for(var i=teacherRoster.length-1;i>=0;i--)if(teacherRoster[i].name===name)teacherRoster.splice(i,1);
+        rosterOpen=null;renderRoster();
+        msg.innerHTML="✅ <b>"+esc(name)+"</b> 학생을 명단과 서버에서 모두 지웠습니다."+
+          "<br>그 학생이 쓰던 컴퓨터에 사본이 남아 있어도 다시 접속하면 자동으로 버려집니다."+
+          "<br>지어 둔 건물까지 없애려면 <b>🗺 지도 초기화</b>를 눌러 주세요.";
+      });
     });
   });
 }
@@ -6897,14 +7360,19 @@ function teacherSaveRoster(){
   var msg=$("t_saveMsg");
   if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
   if(!Auth.isTeacher()){msg.textContent="명단 저장은 선생님 계정으로 로그인해야 합니다.";return}
-  if(!teacherRoster.length){msg.textContent="저장할 명단이 없습니다.";return}
   var miss=teacherRoster.filter(function(r){return !BIOMES[r.biome]});
   if(miss.length){msg.textContent="⚠ 기후가 정해지지 않은 학생이 "+miss.length+"명 있습니다.";return}
+  if(!teacherRoster.length&&!window.confirm("명단이 비어 있습니다.\n저장하면 서버의 학생 명단도 모두 지워집니다.\n\n계속할까요?"))return;
   msg.textContent="저장 중…";
-  CloudSvc.saveRoster(MarketCfg.room,teacherRoster,function(err){
+  /* [V11 수정] saveRoster → syncRoster. 화면에서 뺀 학생을 서버에서도 지운다 */
+  CloudSvc.syncRoster(MarketCfg.room,teacherRoster,function(err,info){
     if(err){msg.textContent="⚠ 저장 실패: "+err;return}
     rosterMarkDirty(false);rosterUndo=null;
-    msg.textContent="✅ "+teacherRoster.length+"명을 방 '"+MarketCfg.room+"'에 저장했습니다. 학생들은 방 코드와 이름만 넣으면 됩니다.";
+    var rm=(info&&info.removed)||0, fl=(info&&info.failed)||0;
+    msg.innerHTML="✅ <b>"+teacherRoster.length+"명</b>을 방 '"+esc(MarketCfg.room)+"'에 저장했습니다."+
+      (rm?" · 명단에서 뺀 <b>"+rm+"명</b>을 서버에서도 지웠습니다.":"")+
+      (fl?" <span style=\'color:var(--warn)\'>("+fl+"명은 지우지 못했습니다)</span>":"")+
+      "<br>학생들은 방 코드와 이름만 넣으면 됩니다.";
   });
 }
 function beginWorld(isLoad){
