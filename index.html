@@ -567,6 +567,7 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
             <button class="mini" id="t_diag">🔎 로그인 진단</button>
             <button class="mini" id="t_forget">이 기기의 로그인 지우고 다시</button>
           </div>
+          <div id="t_server" class="note" style="font-family:var(--m);font-size:10.5px"></div>
           <div id="t_status" class="note"></div>
           <div id="t_diagbox" class="note hide" style="white-space:pre-wrap;font-family:var(--m);font-size:11px;
                background:#0b1219;border:1px solid var(--edge);border-radius:9px;padding:9px;margin-top:7px"></div>
@@ -6962,6 +6963,7 @@ function initTeacherPane(){
       $("t_acctMsg").textContent="📋 SQL 을 복사했습니다. Supabase → SQL Editor 에 붙여넣고 Run 하세요.";
     });
     $("t_diag").addEventListener("click",loginDiagnose);
+    renderServerBadge();
     $("t_forget").addEventListener("click",forgetLogin);
     $("t_wipeAll").addEventListener("click",wipeAllStudents);
   }
@@ -7249,10 +7251,18 @@ function loginFailHtml(raw,email,pw){
   var msg=String(raw&&raw.message?raw.message:raw||"");
   var bad=/invalid.*credential|invalid_grant|400/i.test(msg);
   var tips=pwDiagnose($("t_email").value,$("t_pw").value,null);
+  var e0=envSource();
   var h="⚠ 로그인 실패: "+esc(bad?"이메일 또는 비밀번호가 서버와 다릅니다":msg);
   h+="<div style=\'margin-top:7px;line-height:1.6\'>";
+  if(bad){
+    h+="<b style=\'color:var(--warn)\'>이 컴퓨터가 물어본 서버: "+esc(e0.ref)+"</b>"+
+       (e0.hasEnv?"":" <span style=\'color:var(--warn)\'>(env.js 를 못 찾아 기본 서버로 접속 중)</span>")+
+       (e0.isFile?" <span style=\'color:var(--warn)\'>(파일을 직접 열었습니다)</span>":"")+
+       "<br><span style=\'color:var(--ink3)\'>선생님 컴퓨터에서 이 이름과 <b>같은지</b> 먼저 비교하세요. "+
+       "다르면 비밀번호가 아니라 <b>서버가 다른 것</b>입니다.</span><br><br>";
+  }
   if(tips.length)h+="<b style=\'color:var(--warn)\'>먼저 이것부터 확인하세요</b><br>· "+tips.join("<br>· ")+"<br><br>";
-  h+="<b style=\'color:var(--warn)\'>먼저 이것부터 의심하세요</b><br>"+
+  h+="<b>서버 이름이 같다면 — 다음을 의심하세요</b><br>"+
      "내 컴퓨터·내 폰은 <b>한 번 로그인해 둔 세션</b>으로 열립니다. 그 뒤로는 비밀번호를 "+
      "다시 검사하지 않기 때문에, <b>비밀번호가 서버와 달라도 내 기기는 멀쩡히 열립니다</b>. "+
      "처음 보는 컴퓨터에서만 실패하는 것은 거기서만 진짜 검사가 일어나기 때문입니다.<br>"+
@@ -7273,6 +7283,33 @@ function loginFailHtml(raw,email,pw){
    찍히는지</b> 보면 대개 5초 만에 끝난다. 그래서 서버 주소·프로젝트 번호·저장된
    세션·입력한 글자의 생김새를 한 번에 보여 주고, 서버에 실제로 한 번 물어본다.
    ══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   [V15 추가] "어느 서버에 말을 걸고 있는가"를 늘 보이게 한다
+   --------------------------------------------------------------------------
+   비밀번호가 맞는데도 다른 컴퓨터에서만 실패한다면, 남은 원인은 사실상 하나다 —
+   <b>두 컴퓨터가 서로 다른 서버(프로젝트)에 로그인하고 있다</b>.
+   접속 정보는 index.html 옆의 env.js 에서 온다. 그래서 파일만 복사해 가거나,
+   USB·내려받기 폴더에서 index.html 을 그냥 열면 env.js 가 없어 <b>파일에 박혀 있는
+   기본 서버</b>로 붙는다. 선생님 계정은 그 서버에 없으니 아무리 정확히 쳐도
+   "이메일 또는 비밀번호가 다릅니다"가 나온다. 계정 문제가 아니라 주소 문제다.
+   두 화면에서 이 한 줄만 비교하면 5초 만에 판별된다.
+   ══════════════════════════════════════════════════════════════════════════ */
+function envSource(){
+  var hasEnv=!!(window.APP_ENV&&window.APP_ENV.SUPABASE_URL);
+  var isFile=(location.protocol==="file:");
+  return {hasEnv:hasEnv,isFile:isFile,
+          ref:String(SUPABASE_URL).replace(/^https?:\/\//,"").split(".")[0]};
+}
+function renderServerBadge(){
+  var el=$("t_server");if(!el)return;
+  var e=envSource();
+  var warn=(!e.hasEnv||e.isFile);
+  el.innerHTML="접속 서버 <b>"+esc(e.ref)+"</b> · 설정 "+
+    (e.hasEnv?"env.js":"<span style='color:var(--warn)'>기본값(env.js 없음)</span>")+
+    (e.isFile?" · <span style='color:var(--warn)'>파일로 직접 열림</span>":"");
+  el.style.color=warn?"var(--warn)":"var(--ink3)";
+  if(warn)el.innerHTML+="<br><span style='color:var(--ink3)'>다른 컴퓨터와 이 줄이 다르면 서로 다른 서버에 로그인하는 중입니다.</span>";
+}
 function credShape(v){
   v=String(v||"");
   if(!v)return "(비어 있음)";
@@ -7422,6 +7459,8 @@ function teacherConnect(){
     afterLogin();
   })["catch"](function(e){
     st.innerHTML=loginFailHtml(e,email,pw);
+    /* [V15] 한 번 더 누르게 하지 말고, 실패하는 순간 원인을 바로 조사한다 */
+    try{loginDiagnose()}catch(e2){}
   });
 }
 function teacherLogout(){
