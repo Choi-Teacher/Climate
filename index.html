@@ -779,6 +779,13 @@ var Auth=(function(){
                             function(e){pending=null;throw e});
       return pending;
     },
+    /* [V16] 이 기기의 신분을 <b>완전히</b> 버린다.
+       예전 ensureFreshIdentity 는 localStorage 만 지웠는데, 클로저 안의 sess 가
+       그대로 남아 있어 refresh_token 으로 <b>같은 uid</b> 를 도로 받아왔다.
+       즉 "새 신분 받기"가 실제로는 아무 일도 하지 않았다. */
+    forget:function(){
+      sess=null; store(); if(timer)clearTimeout(timer); pending=null;
+    },
     /* 401 을 만났을 때 강제로 새 세션을 받는다 */
     renew:function(){
       if(pending)return pending;
@@ -3871,13 +3878,53 @@ SupabaseMarket.prototype.myTaken=function(owner,room,cb){
    예전에는 "설정이 supabase 면 온라인"이라고 표시했다. 서버가 죽어 있어도 화면에는
    '🌐 온라인'이라 적혀 있으니, 아무것도 안 되는데 왜 안 되는지 알 길이 없었다.
    이제는 실제 요청의 성패를 기록해 화면과 진단 문구에 그대로 보여준다. */
-var MarketNet={ok:null,err:"",errAt:0,at:0};
+var MarketNet={ok:null,err:"",errAt:0,at:0,healAt:0,healing:false,healed:0};
+/* ══════════════════════════════════════════════════════════════════════════
+   [V16 수정] 무역만 막히는 403 — 방 등록(players 행)이 사라진 것이다
+   --------------------------------------------------------------------------
+   거래소를 읽을 수 있는 조건은 "이 방에 내 players 행이 있는가" 하나다.
+   그런데 그 행은 이런 일로 사라진다.
+     · 선생님이 <b>전체 학생 계정 초기화</b>를 눌렀다(수업 중이었다면 바로 이 증상)
+     · 접속 신분(익명 계정)이 새로 발급되어 예전 행의 주인과 달라졌다
+   이때 실시간 채팅·아바타는 멀쩡하다(브로드캐스트는 그 행을 안 보니까).
+   그래서 "친구는 보이는데 무역만 안 되는" 이상한 모습이 된다.
+   예전에는 학생이 <b>나갔다 다시 들어오는 것</b> 말고는 방법이 없었다.
+   이제 403 을 만나면 <b>방 등록을 스스로 다시 하고</b> 새로고침한다.
+   ══════════════════════════════════════════════════════════════════════════ */
+function marketSelfHeal(){
+  if(MarketNet.healing)return;
+  if(!(CloudSvc&&CloudSvc.online&&S&&!S.isVisiting&&!cloudBlocked))return;
+  if(Date.now()-MarketNet.healAt<15000)return;          // 15초에 한 번까지만
+  MarketNet.healing=true;MarketNet.healAt=Date.now();
+  CloudSvc.joinRoom(S.room||marketRoom(),S.name,S.biome,function(err){
+    MarketNet.healing=false;
+    if(err){
+      if(err==="name_taken"){
+        MarketNet.err="이 이름이 다른 기기에 묶여 있어 거래소를 쓸 수 없습니다. 선생님께 기록 삭제를 요청하세요.";
+        MarketNet.errAt=Date.now();
+      }
+      return;
+    }
+    MarketNet.healed++;
+    toast("🔧 거래소 연결을 되살렸습니다","good");
+    try{pollMarket(true)}catch(e){}
+  });
+}
 function marketHealth(ok,e){
   MarketNet.ok=!!ok; MarketNet.at=Date.now();
   if(!ok&&e){
     MarketNet.err=marketErrText(e); MarketNet.errAt=Date.now();
     try{console.warn("[거래소]",e&&e.status,e&&e.message)}catch(x){}
+    /* 권한에 막힌 것이면 방 등록부터 다시 해 본다 */
+    if(e&&(e.status===403||e.status===401))marketSelfHeal();
   }
+}
+/* 학생이 직접 누르는 '연결 되살리기' — 기다리지 않고 즉시 시도한다 */
+function marketHealNow(){
+  MarketNet.healAt=0;
+  toast("거래소 연결을 되살리는 중…");
+  marketSelfHeal();
+  setTimeout(function(){ if(panelTab==="trade")drawPanel() },1500);
 }
 /* 최근 2분 안에 난 오류만 화면에 남긴다 — 읽기는 되는데 '거래 수락'만 막히는
    경우(권한 규칙 누락)를 선생님이 바로 알아볼 수 있게 하기 위한 것이다. */
@@ -5382,12 +5429,17 @@ function uiTrade(){
     "<b>"+marketLabel()+"</b><span class='tier'>방 "+esc(marketRoom())+"</span><span style='flex:1'></span>"+
     "<button class='mini' onclick='pollMarket(true)'>새로고침</button></div>"+
     "<div class='eff' style='margin-top:6px'>"+(bad?
-      "<b style='color:var(--bad)'>서버 요청이 막혔습니다.</b><br>"+esc(lastErr||MarketNet.err)
+      "<b style='color:var(--bad)'>서버 요청이 막혔습니다.</b><br>"+esc(lastErr||MarketNet.err)+
+      "<br><span style='color:var(--ink3)'>거래소는 <b>방 등록</b>이 있어야 읽을 수 있습니다. "+
+      "선생님이 계정을 초기화했거나 접속 신분이 바뀌면 이 등록이 사라집니다 — "+
+      "친구 아바타는 그대로 보이는데 무역만 막히는 까닭입니다. 아래 <b>연결 되살리기</b>를 눌러 보세요.</span>"
       :(online?
       "여섯 대륙의 실제 친구들과 같은 거래소를 공유합니다. 올린 물건은 DB에 저장되어 다른 대륙 친구에게 실시간으로 보입니다."
       :"백엔드가 연결되지 않아 오프라인 거래소로 동작합니다(같은 기기의 다른 탭끼리는 실시간 동기화). 아래에서 글로벌 거래소를 켤 수 있습니다."))+
     "</div>"+
-    "<div style='margin-top:9px'><button class='mini' onclick='toggleDiag()'>"+(diagOpen?"진단 닫기":"🔍 왜 안 보이지? 진단")+"</button></div>"+
+    "<div style='margin-top:9px;display:flex;gap:6px;flex-wrap:wrap'>"+
+    (bad?"<button class='mini acc' onclick='marketHealNow()'>🔧 연결 되살리기</button>":"")+
+    "<button class='mini' onclick='toggleDiag()'>"+(diagOpen?"진단 닫기":"🔍 왜 안 보이지? 진단")+"</button></div>"+
     (diagOpen?diagCard():"")+
     "</div></div>";
 
@@ -6648,9 +6700,12 @@ function ensureFreshIdentity(room,name,cb){
   if(prev===tag){cb();return}
   try{localStorage.setItem(IDKEY,tag)}catch(e){}
   if(!prev){cb();return}                       // 이 기기의 첫 사용자 → 그대로
-  /* 앞 사람의 익명 신분을 물려받지 않도록 세션을 버리고 새로 받는다 */
-  try{localStorage.removeItem("sixcont_auth_v1")}catch(e){}
-  Auth.renew().then(function(){cb()})["catch"](function(){cb()});
+  /* 앞 사람의 익명 신분을 물려받지 않도록 세션을 버리고 새로 받는다.
+     [V16] Auth.forget() 으로 메모리 세션까지 지워야 진짜 새 uid 가 나온다.
+     선생님 계정으로 로그인해 둔 기기라면 건드리지 않는다. */
+    if(Auth.isTeacher()){cb();return}
+  Auth.forget();
+  Auth.ensure().then(function(){cb()})["catch"](function(){cb()});
 }
 function joinWithRetry(room,name,bio,cb){
   ensureFreshIdentity(room,name,function(){
@@ -7324,7 +7379,7 @@ function credShape(v){
 }
 function forgetLogin(){
   var st=$("t_status");
-  try{localStorage.removeItem("sixcont_auth_v1")}catch(e){}
+  Auth.forget();
   Auth.signOut()["catch"](function(){});
   $("t_logout").classList.add("hide");
   teacherRoster=[];renderRoster();
