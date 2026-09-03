@@ -2488,10 +2488,114 @@ function pushBox(P,C,cx,cy,cz,hx,hy,hz,col,yaw,shadeBase){
     for(var i=0;i<6;i++){var v=q[ord[i]];P.push(v[0],v[1],v[2]);C.push(r,g,b)}
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   [V18 추가] 살아 움직이는 가축
+   --------------------------------------------------------------------------
+   지금까지 가축은 '우리 블록' 하나였다. 놓아도 아무 일이 없어 보이니 학생이
+   목축을 하고 있다는 실감이 없었고, 무엇을 하는 기능인지도 알기 어려웠다.
+   이제 우리마다 짐승 한 마리가 나와 <b>둘레를 어슬렁거린다</b>. 다 자라면 몸이
+   커지고, 배가 고프면 멈춰 서서 고개를 숙인다 — 상태를 눈으로 읽을 수 있다.
+   좌표는 저장하지 않는다(화면에서만 사는 것). 우리 블록이 사라지면 함께 사라진다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var ANIMAL_ART={
+  cow    :{body:[210,208,200],spot:[70,66,62],  leg:[60,56,52], w:.30,h:.26,l:.46,horn:false,ear:true},
+  sheep  :{body:[238,236,228],spot:[228,226,216],leg:[70,66,60], w:.28,h:.26,l:.40,wooly:true,ear:true},
+  hen    :{body:[236,232,224],spot:[214,70,60], leg:[224,170,60],w:.17,h:.17,l:.22,beak:true},
+  buffalo:{body:[112,108,102],spot:[86,82,78],  leg:[62,58,54], w:.33,h:.29,l:.50,horn:true},
+  fox    :{body:[196,110,52], spot:[240,236,228],leg:[58,50,46], w:.20,h:.19,l:.36,tail:true,ear:true},
+  bee    :{body:[232,190,60], spot:[46,42,38],  leg:[46,42,38], w:.12,h:.12,l:.16,fly:true},
+  camel  :{body:[206,176,124],spot:[186,154,104],leg:[150,124,86],w:.28,h:.30,l:.46,hump:true},
+  goat   :{body:[220,212,196],spot:[120,110,96], leg:[80,74,66], w:.24,h:.24,l:.36,horn:true,ear:true},
+  deer   :{body:[168,132,96], spot:[236,232,224],leg:[92,76,58], w:.24,h:.27,l:.44,antler:true,ear:true},
+  musk   :{body:[92,74,58],   spot:[64,52,42],  leg:[54,46,40], w:.34,h:.30,l:.50,horn:true,wooly:true},
+  llama  :{body:[214,196,172],spot:[176,156,132],leg:[124,110,94],w:.24,h:.34,l:.38,neck:true,ear:true},
+  alpaca :{body:[232,220,204],spot:[200,186,168],leg:[122,108,92],w:.26,h:.32,l:.36,neck:true,wooly:true,ear:true}
+};
+var animals={};                      // { 우리키: {x,y,z,yaw,tx,tz,step,rest} }
+var ANIM_R=2.6;                      // 우리에서 이만큼까지 돌아다닌다
+
+function animalGround(x,z,fromY){
+  for(var y=Math.min(H-2,fromY+3);y>1;y--){var b=getB(x,y,z);if(b&&BL[b]&&BL[b].solid)return y+1}
+  return fromY;
+}
+/* 매 프레임: 우리마다 한 마리를 두고, 목표 지점으로 천천히 걸어가게 한다 */
+function animalTick(dt){
+  if(!S||!S.ranch)return;
+  var seen={};
+  for(var k in S.ranch){
+    if(!S.ranch.hasOwnProperty(k))continue;
+    var e=S.ranch[k],sp=LIVESTOCK[e.k];if(!sp)continue;
+    var a=k.split(","),px=+a[0]+.5,py=+a[1],pz=+a[2]+.5;
+    seen[k]=1;
+    var m=animals[k];
+    if(!m){ m=animals[k]={x:px,y:py,z:pz,yaw:Math.random()*6.28,tx:px,tz:pz,step:0,rest:1+Math.random()*2}; }
+    /* 배가 고프면 그 자리에 서서 쉰다(눈으로 보이는 신호) */
+    if(e.hungry){ m.step=0; m.y=animalGround(Math.floor(m.x),Math.floor(m.z),py); continue; }
+    m.rest-=dt;
+    if(m.rest<=0){                                  // 새 목표 지점 고르기
+      var ang=Math.random()*6.283, rad=Math.random()*ANIM_R;
+      m.tx=px+Math.cos(ang)*rad; m.tz=pz+Math.sin(ang)*rad;
+      m.rest=1.5+Math.random()*3.5;
+    }
+    var dx=m.tx-m.x, dz=m.tz-m.z, d=Math.hypot(dx,dz);
+    if(d>0.08){
+      var v=(sp.b===S.biome?0.85:0.5)*dt;            // 제 기후가 아니면 기운이 없다
+      if(v>d)v=d;
+      m.x+=dx/d*v; m.z+=dz/d*v;
+      m.yaw=Math.atan2(dx,dz);
+      m.step+=dt*6.5;
+    }else m.step*=0.9;
+    m.y=animalGround(Math.floor(m.x),Math.floor(m.z),py);
+  }
+  for(var kk in animals)if(!seen[kk])delete animals[kk];   // 우리가 없어지면 짐승도 사라짐
+}
+/* 짐승 한 마리를 상자들로 그린다 */
+function pushAnimal(P,C,m,e,shade){
+  var sp=LIVESTOCK[e.k]; if(!sp)return;
+  var A=ANIMAL_ART[e.k]||ANIMAL_ART.cow;
+  var g=e.grown?1:0.62;                              // 새끼는 작다
+  var w=A.w*g,h=A.h*g,l=A.l*g;
+  var y=m.y+h+ (A.fly?0.55+Math.sin(m.step*2.2)*0.12 : 0.28*g);
+  var yaw=m.yaw, sN=Math.sin(yaw), cN=Math.cos(yaw);
+  function put(ox,oy,oz,hx,hy,hz,col){
+    var wx=ox*cN - oz*sN, wz=ox*sN + oz*cN;
+    pushBox(P,C,m.x+wx,y+oy,m.z+wz,hx,hy,hz,col,yaw,shade);
+  }
+  put(0,0,0,w,h,l,A.body);                                        // 몸통
+  if(A.wooly)put(0,h*0.55,0,w*1.06,h*0.55,l*0.96,A.spot);         // 복슬복슬한 등
+  if(A.hump) put(0,h*0.95,0,w*0.62,h*0.55,l*0.36,A.spot);         // 낙타 혹
+  var neckY=A.neck?h*1.15:h*0.35;
+  var headZ=l+ (A.neck?0.05:0.02)*g;
+  if(A.neck)put(0,h*0.7,l*0.55,w*0.34,h*0.75,w*0.34,A.body);      // 긴 목
+  var hs=(A.fly?0.9:1)*g;
+  put(0,neckY,headZ,w*0.62*hs,h*0.62*hs,h*0.60*hs,A.body);        // 머리
+  if(A.beak)put(0,neckY,headZ+h*0.62*hs,w*0.22,h*0.16,h*0.22,[236,170,50]);
+  if(A.ear){ put(-w*0.5,neckY+h*0.55*hs,headZ,w*0.16,h*0.20,h*0.10,A.spot);
+             put( w*0.5,neckY+h*0.55*hs,headZ,w*0.16,h*0.20,h*0.10,A.spot); }
+  if(A.horn){ put(-w*0.42,neckY+h*0.78*hs,headZ,w*0.12,h*0.30,h*0.12,[232,226,206]);
+              put( w*0.42,neckY+h*0.78*hs,headZ,w*0.12,h*0.30,h*0.12,[232,226,206]); }
+  if(A.antler){ put(-w*0.36,neckY+h*1.1*hs,headZ,w*0.09,h*0.55,h*0.09,[150,122,86]);
+                put( w*0.36,neckY+h*1.1*hs,headZ,w*0.09,h*0.55,h*0.09,[150,122,86]); }
+  if(A.tail)put(0,h*0.45,-l-w*0.2,w*0.28,h*0.28,w*0.34,A.spot);
+  if(A.fly){                                                       // 날개
+    var flap=Math.sin(m.step*7)*0.35;
+    put(-w*1.1,h*0.5+flap*0.1,0,w*0.8,h*0.06,l*0.7,[232,238,244]);
+    put( w*1.1,h*0.5+flap*0.1,0,w*0.8,h*0.06,l*0.7,[232,238,244]);
+    return;
+  }
+  /* 다리 네 개 — 걸을 때 앞뒤로 흔들린다 */
+  var sw=Math.sin(m.step)*0.13*g, sw2=Math.sin(m.step+Math.PI)*0.13*g;
+  var lg=(A.neck?0.30:0.22)*g, lw=w*0.24;
+  put(-w*0.62,-h-lg*0.5,  l*0.55+sw, lw,lg,lw,A.leg);
+  put( w*0.62,-h-lg*0.5,  l*0.55+sw2,lw,lg,lw,A.leg);
+  put(-w*0.62,-h-lg*0.5, -l*0.55+sw2,lw,lg,lw,A.leg);
+  put( w*0.62,-h-lg*0.5, -l*0.55+sw, lw,lg,lw,A.leg);
+}
 function drawPeers(){
   var ids=Object.keys(peers);
   var dids=(typeof drops==="object"&&drops)?Object.keys(drops):[];
-  if(!ids.length&&!dids.length)return;
+  var aids=Object.keys(animals);
+  if(!ids.length&&!dids.length&&!aids.length)return;
   var P=[],C=[];
   var parts=avatarParts();
   /* [V8 추가 2] 바닥에 놓인 나눔 물건 — 천천히 도는 작은 금빛 상자 */
@@ -2501,6 +2605,11 @@ function drawPeers(){
     var bob=Math.sin(performance.now()/450+di)*0.09;
     pushBox(P,C,dd.x,dd.y+bob,dd.z,0.19,0.19,0.19,[236,190,86],spin,.3+.7*lightF);
     pushBox(P,C,dd.x,dd.y+bob,dd.z,0.21,0.07,0.21,[150,108,40],spin,.3+.7*lightF);
+  }
+  /* [V18] 내 목장의 가축들 */
+  if(S&&S.ranch)for(var ak in animals){
+    if(!S.ranch[ak])continue;
+    pushAnimal(P,C,animals[ak],S.ranch[ak],.3+.7*lightF);
   }
   for(var n=0;n<ids.length;n++){
     var q=peers[ids[n]];
@@ -2842,8 +2951,8 @@ function clearSpawn(cx,cz){
   if(ground<SEA)ground=SEA+1;
   for(var dx=-2;dx<=2;dx++)for(var dz=-2;dz<=2;dz++){
     var x=cx+dx,z=cz+dz;
-    for(var y2=ground+1;y2<=ground+5;y2++){setB(x,y2,z,0);S.edits[x+","+y2+","+z]=0}
-    if(!solidAt(x,ground,z)){var fill=BIOMES[S.biome].grass||1;setB(x,ground,z,fill);S.edits[x+","+ground+","+z]=fill}
+    for(var y2=ground+1;y2<=ground+5;y2++){setB(x,y2,z,0);SE(x+","+y2+","+z,0)}
+    if(!solidAt(x,ground,z)){var fill=BIOMES[S.biome].grass||1;setB(x,ground,z,fill);SE(x+","+ground+","+z,fill)}
   }
   for(var cx2=0;cx2<W/CH;cx2++)for(var cz2=0;cz2<W/CH;cz2++){
     var inx=cx>=cx2*CH-2&&cx<=cx2*CH+CH+2, inz=cz>=cz2*CH-2&&cz<=cz2*CH+CH+2;
@@ -2974,7 +3083,10 @@ function tryMine(dt){
     if(S.stam<3){toast("스태미나가 없습니다. 잠시 쉬세요","bad");return}
     /* [V7] 조준한 블록에 가장 잘 듣는 도구를 자동으로 집는다 */
     var tl=bestToolFor(target.b);
-    mining={key:aimKey,t:0,
+    /* [V18] 시작할 때의 블록 종류를 적어 둔다. 캐기가 끝나는 순간 그 칸이 다른
+       블록으로 바뀌어 있으면(친구가 먼저 부쉈거나 통신이 늦게 도착) 캐지 않는다.
+       "같은 곳을 캤는데 다른 것이 캐졌다"를 막는 마지막 확인이다. */
+    mining={key:aimKey,t:0,b0:target.b,
       need:aimB.hard*(1+(mod-1)*.5)/toolSpeed(tl,target.b),
       tool:tl?tl.key:null,grace:0};
   }else if(aimKey===mining.key){
@@ -2993,6 +3105,13 @@ function tryMine(dt){
   S.stam=clamp(S.stam-aimB.hard*3.2*mod*dt/toolSave(mt,target.b),0,100);   // [V7] 도구를 쓰면 덜 지친다
   if(mining.t>=mining.need){
     var usedTool=mt;
+    /* [V18] 마지막 확인 — 캐는 동안 그 칸이 바뀌었으면 취소한다 */
+    var ak=mining.key.split(",");
+    if(typeof mining.b0==="number"&&getB(+ak[0],+ak[1],+ak[2])!==mining.b0){
+      mining=null;
+      toast("친구가 먼저 캤습니다 — 다시 겨냥해 주세요","warn");
+      return;
+    }
     breakBlock(target.x,target.y,target.z);
     if(usedTool&&qty(S,usedTool.key)>0)useTool(usedTool);                  // [V7] 내구도 1 소모
     mining=null;
@@ -3028,7 +3147,7 @@ function yieldBlock(x,y,z,b,B){
   else if(b===7||b===22)n=Math.random()<.5?1:0;
   else if(b===11||b===12||b===13)n=ri(1,2);
   if(!B.infinite){regrowRegister(x,y,z,b);
-    setB(x,y,z,0);S.edits[x+","+y+","+z]=0;markDirty(x,z);
+    setB(x,y,z,0);SE(x+","+y+","+z,0);markDirty(x,z);
     if(S.crops)delete S.crops[x+","+y+","+z];        // 성장 타이머 제거
     netBroadcastEdit(x,y,z,0);}     // [V4] 캐기 실시간 동기화
   if(n>0&&item){add(S,item,n);S.stat.got[item]=(S.stat.got[item]||0)+n;
@@ -3106,7 +3225,7 @@ function tryPlace(){
   var id=PLACE[sel];
   if(!id){toast(iN(sel)+"은(는) 설치할 수 없는 아이템입니다","bad");return}
   if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
-  setB(bx,by,bz,id);S.edits[bx+","+by+","+bz]=id;markDirty(bx,bz);
+  setB(bx,by,bz,id);SE(bx+","+by+","+bz,id);markDirty(bx,bz);
   netBroadcastEdit(bx,by,bz,id);    // [V4] 설치 실시간 동기화
   machineRegister(bx,by,bz,id);     // [V8 추가 3·4] 기계·목장 등록
   S.stat.placed++;
@@ -3176,7 +3295,7 @@ function plantSeed(sel,bx,by,bz,tg){
     return;
   }
   if(!take(S,sel,1)){toast(iN(sel)+"이(가) 부족합니다","bad");return}
-  setB(bx,by,bz,youngId);S.edits[bx+","+by+","+bz]=youngId;markDirty(bx,bz);
+  setB(bx,by,bz,youngId);SE(bx+","+by+","+bz,youngId);markDirty(bx,bz);
   netBroadcastEdit(bx,by,bz,youngId);
   /* 성장 예약: 이 칸에 성장 타이머를 건다 */
   if(!S.crops)S.crops={};
@@ -3262,7 +3381,7 @@ function regrowPlace(x,y,z,b,quiet){
   var made=[];
   function put(px,py,pz,pb){
     if(!inW(px,py,pz)||getB(px,py,pz)!==0)return;
-    setB(px,py,pz,pb);S.edits[px+","+py+","+pz]=pb;made.push([px,py,pz,pb]);
+    setB(px,py,pz,pb);SE(px+","+py+","+pz,pb);made.push([px,py,pz,pb]);
   }
   if(REGROW_TREE[b]){                                 // 어린 나무 한 그루로 되살아난다
     var th=3+Math.floor(Math.random()*2);
@@ -3317,7 +3436,7 @@ function growCrops(dt,quiet){
     S.crops[key]+=dt*rate;
     if(S.crops[key]>=CROP_TIME){
       var nx=B.crop.next;
-      setB(x,y,z,nx);S.edits[key]=nx;markDirty(x,z);
+      setB(x,y,z,nx);SE(key,nx);markDirty(x,z);
       netBroadcastEdit(x,y,z,nx);
       if(BL[nx].crop&&BL[nx].crop.ripe){
         delete S.crops[key];                            // 다 자람 → 타이머 종료
@@ -3572,7 +3691,7 @@ function slaughter(key){
   add(S,"meat",got);
   S.stat.got.meat=(S.stat.got.meat||0)+got;
   delete S.ranch[key];
-  setB(x,y,z,0);S.edits[key]=0;markDirty(x,z);netBroadcastEdit(x,y,z,0);
+  setB(x,y,z,0);SE(key,0);markDirty(x,z);netBroadcastEdit(x,y,z,0);
   toast("🍖 고기 +"+got+" ("+sp.em+" "+sp.n+")","good");
   teachOnce("slaughter","🍖 가축을 잡았습니다. 고기는 많이 나오지만 <b>그 짐승은 사라집니다</b>. "+
     "계속 산물을 받을지, 지금 고기를 얻을지 — 목축은 늘 이 선택입니다.");
@@ -3656,7 +3775,8 @@ function simulate(dt,quiet){
   growCrops(dt,quiet);                                  // [농사] 심은 작물 성장
   regrowTick(dt,quiet);                                 // [자원] 캔 자리에 숲이 다시 자람
   powerTick(dt,quiet);                                  // [V8] 발전기·기계
-  ranchTick(dt,quiet);                                  // [V8] 목축
+  ranchTick(dt,quiet);
+  animalTick(dt);                                       // [V18] 가축이 우리 둘레를 걸어 다닌다                                  // [V8] 목축
   S.hunger=clamp(S.hunger-.075*m.hunger*dt,0,100);
   /* [날씨] 비가 오면 야외에서 수분이 덜 마른다(습도↑) */
   var hydraMod=m.hydra*(isRaining()&&!shelt?.6:1);
@@ -3705,7 +3825,7 @@ function simulate(dt,quiet){
       S.decay[dk]-=dt;
       if(S.decay[dk]<=0){
         var da=dk.split(","),dx=+da[0],dy=+da[1],dz=+da[2];
-        if(HOUSE[getB(dx,dy,dz)]){setB(dx,dy,dz,0);S.edits[dk]=0;markDirty(dx,dz);netBroadcastEdit(dx,dy,dz,0);}
+        if(HOUSE[getB(dx,dy,dz)]){setB(dx,dy,dz,0);SE(dk,0);markDirty(dx,dz);netBroadcastEdit(dx,dy,dz,0);}
         delete S.decay[dk];
         if(!quiet){toast("🌿 습기와 해충으로 집이 썩어 무너졌습니다","bad");refreshHotbar();}
       }
@@ -4184,7 +4304,11 @@ Cloud.prototype.joinRoom=function(room,name,biome,cb){
 };
 /* --- worlds: (room,biome) 공유 월드. 같은 기후 학생들이 seed+edits 를 함께 씀 --- */
 Cloud.prototype.saveWorld=function(room,rec,cb){
-  var body=[{room:room,biome:rec.biome,seed:rec.seed,edits:rec.edits,day:rec.day}];
+  /* [V18] 시계(sec)를 edits 안에 함께 실어 보낸다 — 표를 고치지 않고도
+     같은 기후 친구들이 같은 '일차'와 같은 시각을 쓰게 하려는 것이다. */
+  var e=rec.edits;
+  if(e&&typeof rec.sec==="number")e.sec=rec.sec;
+  var body=[{room:room,biome:rec.biome,seed:rec.seed,edits:e,day:rec.day}];
   sbFetch(this._rest("worlds"),{method:"POST",
     headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
     body:JSON.stringify(body)
@@ -4269,7 +4393,7 @@ Cloud.prototype.stampAccountReset=function(room,biomes,cb){
     self.loadWorld(room,b,function(lerr,cur){
       if(lerr||!cur){ next(); return }               // 아직 만들어지지 않은 대륙은 건너뛴다
       var e=cur.edits&&cur.edits.d?cur.edits:{v:WORLD_FMT,d:[],gen:0};
-      e.arst=stamp;
+      e.arst=stamp; e.sec=8/24*DAYSEC;             // [V18] 대륙 시계도 1일차 아침으로
       /* 반 전체를 처음으로 되돌리는 것이므로 공유 '일차'도 1일차로 함께 되돌린다.
          지형과 건축(seed·edits)은 손대지 않는다. */
       self.saveWorld(room,{biome:b,seed:cur.seed,edits:e,day:1},function(werr){
@@ -4350,6 +4474,11 @@ function unpackEdits(rec){
 function worldGenOf(wrec){
   var e=wrec&&wrec.edits;
   return (e&&typeof e.gen==="number")?e.gen:0;
+}
+/* 공유 시계 — 같은 기후는 같은 일차·같은 시각을 쓴다 */
+function worldSecOf(wrec){
+  var e=wrec&&wrec.edits;
+  return (e&&typeof e.sec==="number")?e.sec:-1;
 }
 /* 계정 초기화 도장 — 선생님이 가방을 비운 시각 */
 function worldArstOf(wrec){
@@ -4638,9 +4767,30 @@ function onNetEvent(event,p){
   }
 }
 /* 원격 블록 변경 적용: edits 갱신 + 청크 재빌드(설치=blockId>0, 캐기=0) */
+/* ══════════════════════════════════════════════════════════════════════════
+   [V18 수정] "친구가 지은 집이 나에게는 막혀 있고, 지은 사람은 뚫고 지나간다"
+   --------------------------------------------------------------------------
+   병합 규칙이 틀렸다. 예전 코드는 이랬다.
+       for (k in 서버) { if (내_edits 에 k 가 있으면) continue;  // "내 값이 더 최신" }
+   "내가 한 번이라도 건드린 칸은 내 값이 항상 최신"이라고 가정한 것이다.
+   그런데 내가 흙을 놓은 칸을 친구가 나중에 부수면, 서버는 '빈칸'인데 내 기기는
+   '흙'을 계속 들고 있으면서 그 칸을 <b>영원히 무시</b>한다. 게다가 저장할 때마다
+   내 옛 값을 다시 올려 서로 값을 되살린다. 두 사람의 월드가 갈라지는 이유다.
+   갈라진 월드는 캐기까지 어긋나게 만든다 — 내 화면에만 있는 블록을 겨냥하니
+   "같은 곳을 캤는데 다른 곳이 캐지는" 일이 생긴다.
+   고침: '마지막으로 서버에 올린 뒤 내가 실제로 바꾼 칸'만 내 값이 이긴다.
+   그 밖의 칸은 서버가 이긴다. pendingEdits 가 그 목록이다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var pendingEdits={};                 // 아직 서버에 못 올린 '내가 바꾼 칸'
+function SE(k,v){                    // 내 손으로 바꾼 칸을 적을 때 쓰는 유일한 통로
+  if(S){S.edits[k]=v;pendingEdits[k]=1}
+  return v;
+}
 function applyRemoteEdit(x,y,z,b){
   if(!S||!world)return;
   if(!inW(x,y,z))return;
+  /* [V18] 내가 지금 캐고 있는 칸이 남의 손에 바뀌면 그 자리에서 캐기를 멈춘다 */
+  if(mining&&mining.key===(x+","+y+","+z))mining=null;
   setB(x,y,z,b);
   /* [V7 수정 9] 구경(관전) 중에는 임시 상태를 건드리지 않는다.
      예전엔 남의 월드를 보는 동안 들어온 변경이 임시 S.edits 에 쌓였고,
@@ -6191,7 +6341,10 @@ function resumeSave(sv,btn){
             for(var k in S.edits)if(!srv.hasOwnProperty(k))srv[k]=S.edits[k];
             S.edits=srv;
           }
-          if(wrec.day)S.day=Math.max(S.day||1,wrec.day);
+          /* [V18] 대륙 시계가 앞서 있으면 따라간다(같은 기후 = 같은 일차) */
+          var ws2=worldSecOf(wrec);
+          if(ws2>(S.sec||0)){S.sec=ws2;S.day=1+Math.floor(ws2/DAYSEC)}
+          else if(wrec.day)S.day=Math.max(S.day||1,wrec.day);
           /* [V13] 계정 초기화 도장이 내 것보다 새로우면, 이 기기에 남은 가방은
              '초기화 이전 것'이다. 지도는 그대로 두고 가방만 처음으로 되돌린다. */
           var sa=worldArstOf(wrec);
@@ -6325,8 +6478,10 @@ function cloudSaveWorld(force,cb){
       }
       if(!lerr&&cur){
         var srv=unpackEdits(cur.edits);
+        /* [V18] 아직 못 올린 내 변경만 내가 이긴다. 나머지는 서버를 따른다. */
         for(var k in srv){
-          if(S.edits.hasOwnProperty(k))continue;        // 내 값이 더 최신 → 유지
+          if(pendingEdits[k])continue;                  // 내가 방금 바꾼 칸 → 내 값 유지
+          if(S.edits[k]===srv[k])continue;              // 이미 같음
           S.edits[k]=srv[k];
           var a=k.split(","),ax=+a[0],ay=+a[1],az=+a[2];
           if(typeof inW==="function"&&inW(ax,ay,az)){setB(ax,ay,az,srv[k]);markDirty(ax,az)}
@@ -6338,8 +6493,14 @@ function cloudSaveWorld(force,cb){
       /* [V13] 서버에 찍힌 초기화 도장을 그대로 되돌려 보낸다 —
          빼먹으면 학생이 저장하는 순간 도장이 지워져 초기화가 무효가 된다. */
       var keepArst=Math.max(worldArstOf(cur),num0(S.arst));
-      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0,keepArst),day:S.day},function(werr){
+      var sending=Object.keys(pendingEdits);
+      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0,keepArst),day:S.day,sec:S.sec},function(werr){
         cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
+        /* 올리기에 성공한 칸만 '내 것' 표시를 뗀다. 그 뒤로는 서버가 이긴다. */
+        if(!werr)for(var si=0;si<sending.length;si++)delete pendingEdits[sending[si]];
+        /* [V18] 서버 시계가 나보다 앞서 있으면 맞춘다(먼저 들어온 친구 기준) */
+        var cs=worldSecOf(cur);
+        if(cs>(S.sec||0)+2){S.sec=cs;S.day=1+Math.floor(cs/DAYSEC)}
         var err0=perr||werr;
         if(err0)console.warn("cloud save fail",err0);
         cb&&cb(err0);
@@ -6959,7 +7120,13 @@ function startAsStudentOnline(name,bio){
       S=newState(name,bio,seed);
       S.room=MarketCfg.room;
       document.body.dataset.b=S.biome;
-      if(haveShared){S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;S.wgen=worldGenOf(wrec);}
+      if(haveShared){
+        S.edits=unpackEdits(wrec.edits)||{};S.day=wrec.day||1;S.wgen=worldGenOf(wrec);
+        /* [V18] 같은 대륙의 시계를 그대로 이어받는다 — 뒤늦게 들어와도
+           친구들과 같은 '○일차'에서 시작한다. */
+        var ws=worldSecOf(wrec);
+        if(ws>=0){S.sec=ws;S.day=1+Math.floor(ws/DAYSEC)}
+      }
       /* ══════════════════════════════════════════════════════════════════════
          [V13 수정] "계정을 초기화했는데 가방이 그대로다"
          ----------------------------------------------------------------------
@@ -6985,7 +7152,9 @@ function startAsStudentOnline(name,bio){
           if(S.stat.ranch){S.ranch=S.stat.ranch;delete S.stat.ranch}  // [V8] 기르던 가축 되찾기
         }
         if(!S.dur)S.dur={};
-        if(prec.day)S.day=Math.max(S.day,prec.day);
+        /* [V18] 개인 기록의 일차보다 <b>대륙 시계</b>가 우선이다.
+           예전에는 각자의 일차가 따로 흘러 같은 기후인데 3일차·7일차가 섞였다. */
+        if(prec.day&&worldSecOf(wrec)<0)S.day=Math.max(S.day,prec.day);
         if(prec.pos&&typeof prec.pos.x==="number")S.pos=prec.pos;
         /* [V8 수정 10] 클라우드 가방은 비었는데 이 기기에는 물건이 남아 있는 경우 —
            예전 버전에서 업로드를 놓친 흔적이다. 빈 쪽을 믿지 말고 남아 있는 쪽을 살린다. */
@@ -7803,7 +7972,7 @@ function beginWorld(isLoad){
         S.spawn={x:S.pos.x,z:S.pos.z};
         var gx=Math.floor(S.pos.x)+2,gz=Math.floor(S.pos.z),gy=Math.floor(findGround(gx,gz));
         setB(gx,gy,gz,35);                                   // 스폰 옆 무역소
-        S.edits[gx+","+gy+","+gz]=35;markDirty(gx,gz);
+        SE(gx+","+gy+","+gz,35);markDirty(gx,gz);
         S.hasPost=true;
         if(cloudActive())cloudSaveWorld(true);               // 새 월드 첫 스냅샷
       }else{
