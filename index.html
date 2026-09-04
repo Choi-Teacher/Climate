@@ -139,19 +139,6 @@ details{margin-top:26px;border-top:1px solid var(--edge);padding-top:14px}
 summary{font-family:var(--m);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);cursor:pointer}
 summary:hover{color:var(--ink2)}
 .note{font-size:12.5px;color:#3d6076;line-height:1.6;margin-top:10px}
-/* [V20] 밝은 시작 화면용 보정 */
-#boot .thint{color:#5c7d92}
-#boot .tcard h4{color:#123047}
-#boot summary{color:#5c7d92}
-#boot details{border-top-color:#dbe7ee}
-#boot .latnote{color:#4a6a7d}
-#boot .tpaste,#boot textarea{background:#f2f7fa;border-color:#d3e3ec;color:#16232e}
-#boot .mini{background:#fff;border:1.5px solid #d3e3ec;color:#2c5d7a;box-shadow:0 3px 0 #dbe7ee}
-#boot .mini:hover{border-color:var(--accent);color:#123047}
-#boot .mini.acc{background:var(--accent);color:#0d2416;border-color:var(--accent);box-shadow:0 3px 0 #4f8f43}
-#boot .rrow,#boot .rpick button{color:#16232e}
-#boot #assignInfo{color:#31536b}
-#boot .cnt{color:#5c7d92}
 
 /* --- 학생/선생님 전환 --- */
 .toggle{display:inline-flex;border:1.5px solid #ffffff;border-radius:999px;overflow:hidden;
@@ -188,6 +175,54 @@ summary:hover{color:var(--ink2)}
   border-radius:5px;padding:3px 7px;white-space:nowrap}
 .band[aria-pressed=true] .bd{color:var(--cc);border-color:var(--cc)}
 .band.alt{border-style:dashed}
+
+/* ══ [V21] 선생님 화면 — 밝은 배경에 맞춰 통째로 다시 칠한다 ══════════════
+   지난 버전에서 시작 화면만 밝게 바꾸고 선생님 카드는 어두운 채로 두었더니,
+   글자색만 진하게 덮여 <b>학생 이름이 검은 카드 위 검은 글씨</b>가 되어 사라졌다.
+   여기서는 배경·테두리·글자를 한 벌로 맞춘다. #boot 를 앞에 붙여 우선순위를
+   확실히 이겨 두었다(원래 .tcard 규칙이 아래쪽에 있어 그냥 쓰면 밀린다). */
+#boot .tcard{background:#ffffffe8;border:1px solid #ffffff;border-radius:18px;padding:18px;
+  box-shadow:0 14px 34px #1d3c5416,0 2px 0 #ffffff inset;margin-top:14px}
+#boot .tcard>h4{color:#123047;font-size:14.5px}
+#boot .tcard>h4 .cnt{color:#7a94a5}
+#boot .thint{color:#5c7d92}
+#boot .note{color:#3d6076}
+#boot summary{color:#3c7a54;font-weight:700}
+#boot details{border-top-color:#e2edf3}
+#boot .latnote{color:#4a6a7d}
+#boot .tpaste,#boot textarea{background:#f4f8fa;border:1.5px solid #d9e6ee;color:#16232e}
+#boot .tpaste::placeholder{color:#9db3c1}
+/* 작은 버튼 */
+#boot .mini{background:#fff;border:1.5px solid #d9e6ee;color:#2c5d7a;box-shadow:0 3px 0 #e4edf2;font-weight:700}
+#boot .mini:hover{border-color:var(--accent);color:#123047}
+#boot .mini:active{transform:translateY(2px);box-shadow:0 1px 0 #e4edf2}
+#boot .mini.acc{background:var(--accent);color:#0d2416;border-color:#63ab52;box-shadow:0 3px 0 #4f8f43}
+/* 기후별 인원 요약 */
+#boot .tsum button{background:#f4f8fa;border:1.5px solid #dfeaf1;color:#2c5d7a}
+#boot .tsum button b{color:#123047}
+#boot .tsum button[aria-pressed=true]{background:#fff;border-color:var(--cc);color:#123047}
+/* ── 학생 명단 한 줄 — 여기가 안 보이던 곳 ── */
+#boot .rrow{background:#ffffff;border:1.5px solid #e2edf3;border-radius:14px;
+  box-shadow:0 3px 10px #1d3c540f}
+#boot .rrow:focus-within{border-color:var(--accent);box-shadow:0 4px 14px #7cc46a2e}
+#boot .rname{color:#16232e;font-weight:700;font-size:15px}
+#boot .rname:focus{border-bottom-color:var(--accent)}
+#boot .rname::placeholder{color:#a8bcc9}
+#boot .rbio{background:#f7fbfd;filter:brightness(.82)}
+#boot .rmore{color:#7a94a5}
+#boot .rmore:hover{color:#123047;background:#eef5f9}
+#boot .rpick{background:#f7fbfd}
+#boot .rpick button{background:#fff;border:1.5px solid #dfeaf1;color:#3d6076}
+#boot .rpick button[aria-pressed=true]{background:#fff;border-color:var(--cc);color:#123047;font-weight:800}
+#boot .rpick .rdel{color:var(--bad);border-color:transparent;background:none}
+/* 로그인·이름 안내 */
+#boot #assignInfo{color:#31536b}
+#boot #assignInfo.ok{color:#1f6b3f}
+#boot #t_server,#boot #t_status,#boot #t_diagbox{color:#3d6076}
+#boot #t_diagbox{background:#f4f8fa;border-color:#d9e6ee}
+#boot .chip{background:#f4f8fa;border:1px solid #dfeaf1;color:#2c5d7a}
+#boot .chip b{color:#123047}
+#boot .toggle button:not([aria-pressed=true]):hover{color:#123047}
 .lat.locked .band{opacity:.32;pointer-events:none;filter:saturate(.4)}
 .lat.locked .band[aria-pressed=true]{opacity:1;filter:none}
 .latend{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;margin-top:6px}
@@ -6537,7 +6572,7 @@ function newState(name,biome,seed){
     hp:100,stam:100,hunger:80,hydra:82,temp:36.5,sec:8/24*DAYSEC,day:1,rot:0,rotT:{},faint:0,
     inv:{},dur:{},edits:{},crops:{},offers:[],pending:[],done:[],log:[],titles:[],aiAcc:24,newOffers:0,paused:false,
     isVisiting:false,room:marketRoom(),taught:{},decay:{},hazGrace:3,
-    wv:WORLD_FMT,wgen:0,arst:0,synced:false,              /* [V9·V13] 좌표 규격 · 지도 번호 · 계정 초기화 도장 · 서버에 올라간 적 있는가 */
+    wv:WORLD_FMT,wgen:0,arst:0,synced:false,up:0,              /* [V9·V13] 좌표 규격 · 지도 번호 · 계정 초기화 도장 · 서버에 올라간 적 있는가 */
     machines:{},ranch:{},gen:{},breed:0,
     carbon:0,quizA:{},regrow:{},qbox:{n:0,ok:0,seen:{}},
     stat:{got:{},made:{},trades:0,helps:0,foodOut:0,placed:0,imp:{},carbon:0,monument:false,
@@ -6587,6 +6622,7 @@ function cloudSaveWorld(force,cb){
   statOut.dur=S.dur||{};
   statOut.ranch=S.ranch||{};        // [V8 추가 4] 기르던 가축도 함께 저장(새 열 없이)
   statOut.vit={h:S.hunger,w:S.hydra,t:S.temp,p:S.hp,s:S.stam};   // [V19] 허기·수분·체온·체력
+  statOut.up=S.up|0;                                             // [V21] 받은 업데이트 번호
   CloudSvc.savePlayer(S.room,{name:S.name,biome:S.biome,inv:S.inv,stat:statOut,
     pos:{x:S.pos.x,y:S.pos.y,z:S.pos.z},day:S.day},function(perr){
     if(!S){cloudBusy=false;cb&&cb(perr);return}
@@ -6735,6 +6771,7 @@ function normalizeSave(s){
   }
   if(typeof s.wgen!=="number")s.wgen=0;
   if(typeof s.arst!=="number")s.arst=0;                            // [V13] 계정 초기화 도장
+  if(typeof s.up!=="number")s.up=0;                                // [V21] 받은 업데이트 번호
   if(typeof s.synced!=="boolean")s.synced=false;                   // [V13] 서버에 올라간 적 있는가
   if(!s.qbox)s.qbox={n:0,ok:0,seen:{}};                          // [V9 추가 3] 퀴즈 상자 기록
   if(s.stat&&typeof s.stat.carbon!=="number")s.stat.carbon=0;
@@ -7315,6 +7352,7 @@ function startAsStudentOnline(name,bio){
           if(S.stat.dur){S.dur=S.stat.dur;delete S.stat.dur}   // [V7] stat 안에 실어둔 내구도 꺼내기
           if(S.stat.ranch){S.ranch=S.stat.ranch;delete S.stat.ranch}  // [V8] 기르던 가축 되찾기
           if(S.stat.vit){restoreVitals(S.stat.vit);delete S.stat.vit}  // [V19] 허기·수분·체온·체력
+          if(typeof S.stat.up==="number"){S.up=S.stat.up;delete S.stat.up}  // [V21] 업데이트 번호
         }
         if(!S.dur)S.dur={};
         /* [V18] 개인 기록의 일차보다 <b>대륙 시계</b>가 우선이다.
@@ -8167,6 +8205,43 @@ function reviveOnEnter(){
    이제 시작 지점 옆에 <b>내 기후의 가축 두 마리를 이미 풀어 놓은 채</b> 시작한다.
    눈앞에서 소가 걸어 다니면 "먹이를 줘야겠다"는 생각이 저절로 든다.
    ══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   [V21 추가] 이미 하던 월드에도 새 내용을 바로 넣어 준다
+   --------------------------------------------------------------------------
+   지금까지 새로 추가한 것(가축·작물 씨앗)은 <b>월드를 처음 만들 때만</b> 주어졌다.
+   그래서 지난 시간에 시작한 학생은 판을 새로 만들지 않는 한 영영 못 받았다.
+   수업 중에 그럴 수는 없다. 이제 접속할 때마다 '무엇이 빠져 있는지' 확인해서
+   빠진 것만 채워 준다. 이미 있는 것은 건드리지 않고, 한 번 채우면 다시 안 준다.
+   UPGRADE 번호를 올리면 다음에 추가하는 내용도 같은 방식으로 배달된다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var UPGRADE=2;
+function applyUpgrades(){
+  if(!S||S.isVisiting)return;
+  if((S.up|0)>=UPGRADE)return;
+  var got=[];
+  /* ① 내 기후의 가축 — 한 마리도 없으면 시작 지점 옆에 풀어 준다 */
+  var hasRanch=false;for(var rk in (S.ranch||{})){hasRanch=true;break}
+  var mine=[];for(var lk in LIVESTOCK)if(LIVESTOCK[lk].b===S.biome)mine.push(lk);
+  mine.forEach(function(k){                       // 가방에 없으면 한 마리씩 채워 준다
+    if(qty(S,"an_"+k)<1&&!hasRanch){add(S,"an_"+k,2);got.push(LIVESTOCK[k].em+" "+LIVESTOCK[k].n)}
+    else if(qty(S,"an_"+k)<1){add(S,"an_"+k,1);got.push(LIVESTOCK[k].em+" "+LIVESTOCK[k].n)}
+  });
+  if(!hasRanch&&mine.length)placeStarterRanch();
+  /* ② 내 기후에서 지을 수 있는 새 작물 씨앗 — 없는 것만 */
+  (BIOME_CROPS[S.biome]||[]).forEach(function(sk){
+    if(qty(S,sk)<1){add(S,sk,3);got.push("🌱 "+(CROP_NAME[sk]||iN(sk)))}
+  });
+  S.up=UPGRADE;
+  if(got.length){
+    logAdd(S,"새 내용이 들어왔습니다: "+got.join(", "));
+    setTimeout(function(){
+      toast("✨ 새 내용이 도착했습니다 — "+got.slice(0,3).join(", ")+(got.length>3?" 외":""),"good");
+      teachOnce("upgrade2","✨ <b>게임이 새로워졌습니다.</b> 하던 판 그대로 이어서 쓸 수 있게 "+
+        "빠진 것만 채워 넣었어요.<br>· <b>"+esc(got.join(", "))+"</b><br>"+
+        "가축은 시작 지점 옆에서 걸어 다니고 있습니다. 먹이와 물을 주면 산물을 내줍니다.");
+    },2000);
+  }
+}
 function placeStarterRanch(){
   if(!S||S.isVisiting)return;
   var mine=[];
@@ -8221,6 +8296,7 @@ function beginWorld(isLoad){
         SE(gx+","+gy+","+gz,35);markDirty(gx,gz);
         S.hasPost=true;
         placeStarterRanch();                                 // [V20] 내 기후의 가축 두 마리를 풀어 놓는다
+        S.up=UPGRADE;                                        // 새 월드는 이미 최신
         if(cloudActive())cloudSaveWorld(true);               // 새 월드 첫 스냅샷
       }else{
         /* 위치가 비었거나 공중이면 지면으로 내려 세운다(클라우드 로드 대응) */
@@ -8230,7 +8306,10 @@ function beginWorld(isLoad){
         if(catchUp&&!S.isVisiting&&catchUp()>60)toast("자리를 비운 사이 시간이 흘렀습니다");
       }
       machineSync();                     // [V8] 놓아 둔 기계·목장을 실제 블록과 맞춘다
-      if(!S.isVisiting)reviveOnEnter();   // [V19] 문 앞에서 죽지 않도록 최소한을 보장
+      if(!S.isVisiting){
+        reviveOnEnter();                 // [V19] 문 앞에서 죽지 않도록 최소한을 보장
+        applyUpgrades();                 // [V21] 하던 판에도 새 내용을 바로 넣어 준다
+      }
       $("load").classList.add("hide");
       $("hud").classList.remove("hide");
       refreshHotbar();updateTabBadge();updateVisitBanner();
