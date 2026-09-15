@@ -724,6 +724,26 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
           </details>
         </div>
 
+        <div class="tcard" id="netCard">
+          <h4>📡 서버 사용량 아끼기 <span class="cnt">무료 한도 월 200만</span></h4>
+          <p class="thint">Supabase 무료 요금제는 <b>실시간 메시지 월 200만 건</b>까지입니다.
+          친구 아바타가 실시간으로 움직이는 데 이 메시지가 쓰입니다.<br>
+          이번 판에서 <b>움직일 때만 보내도록</b> 고쳐 약 1/5로 줄였습니다. 그래도 부족하면
+          아래에서 아바타를 꺼 주세요. <b>무역·건축·나눔·퀴즈는 그대로 작동합니다</b>
+          (친구가 걸어 다니는 모습만 안 보입니다).</p>
+          <div class="trow">
+            <button class="mini" id="t_avaOn">👥 친구 아바타 켜기</button>
+            <button class="mini" id="t_avaOff">🔕 친구 아바타 끄기</button>
+          </div>
+          <p class="thint" style="margin-top:8px"><b>수업 운영 요령</b><br>
+          · 한 반 30명 40분 기준 대략 <b>22만 건</b>을 씁니다 (예전에는 90만 건 · <b>4배 절약</b>)<br>
+          · 이대로면 무료 한도로 <b>월 8회 수업</b>까지 됩니다<br>
+          · 아바타를 끄면 <b>거의 0건</b>이 되어 횟수 제한이 사실상 없어집니다<br>
+          · 쉬는 시간에는 학생들이 <b>브라우저 탭을 닫게</b> 해 주세요 — 켜 두면 계속 나갑니다<br>
+          · 한도를 넘겨도 이번 달은 막히지 않고, 다음 달 1일에 초기화됩니다</p>
+          <p class="note" id="t_netMsg"></p>
+        </div>
+
         <div class="tcard" id="resetCard">
           <h4>🗺 지도 초기화 <span class="cnt">수업 전에만</span></h4>
           <p class="thint">지형과 건축은 학생 개인이 아니라 <b>방 코드 + 기후</b>에 함께 저장됩니다.
@@ -4753,8 +4773,26 @@ var Net=null;                        // 현재 Realtime 인스턴스
 var myNetId="p_"+Math.random().toString(36).slice(2,9);   // 이 세션의 고유 id(동명이인 대비)
 var peers={};                        // { id: {name,x,y,z,yaw, tx,ty,tz,tyaw, last} }  다른 플레이어
 var posAcc=0;                        // 좌표 방송 누적 타이머
-var NET_POS_MS=400;                  // [V5 수정 3] 좌표 방송 주기 100→400ms (30명 접속 트래픽 1/4로 감소; 보간이 매끄럽게 커버)
-var PEER_TIMEOUT=6000;               // 이 시간 이상 소식 없으면 아바타 제거
+/* ══════════════════════════════════════════════════════════════════════════
+   [V22] 실시간 메시지 줄이기 — Supabase 무료 한도(월 200만 건)를 지키려고
+   --------------------------------------------------------------------------
+   좌표 방송은 <b>가만히 서 있어도</b> 0.4초마다 나가고 있었다. 학생은 수업 시간의
+   절반 이상을 서서 화면을 보거나 가방을 열어 두는데, 그동안에도 "나 여기 그대로
+   있어요"를 초당 2.5번씩 보낸 셈이다. 게다가 한 메시지는 같은 대륙 친구 수만큼
+   복사되어 전달되므로, 5명이면 한 번 보낼 때 4건이 계산된다.
+   그래서 세 가지를 바꿨다.
+     ① <b>움직였을 때만</b> 보낸다(제자리면 안 보냄). 살아 있다는 신호는 2.5초에 한 번.
+     ② 주기를 0.4초 → 0.7초로 늘린다(받는 쪽 보간이 이미 부드럽게 메운다).
+     ③ 블록 변경 묶음 주기를 0.05초 → 0.25초로 늘려 나무 한 그루가 한 통에 담기게.
+   합쳐서 대략 <b>1/5</b> 수준으로 줄어든다. 화면에서 느껴지는 차이는 거의 없다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var NET_POS_MS=900;                  // 움직이는 동안의 좌표 방송 주기
+var NET_IDLE_MS=8000;                // 가만히 있을 때 '살아있음'만 알리는 주기
+var NET_ALONE_MS=25000;              // 같은 대륙에 아무도 없으면 이만큼 드물게(받을 사람이 없다)
+var NET_MOVE_EPS=0.25;               // 이만큼도 안 움직였으면 보내지 않는다(칸)
+var NET_YAW_EPS=0.18;                // 시선이 이만큼도 안 돌았으면 보내지 않는다(라디안)
+var PEER_TIMEOUT=22000;              // 이 시간 이상 소식 없으면 아바타 제거(대기 주기보다 넉넉히)
+var netSent=0, netLastX=0, netLastY=0, netLastZ=0, netLastYaw=0, netLastAt=0;
 
 /* 토큰이 갱신되면 열려 있는 실시간 연결에도 새 토큰을 밀어 넣는다 */
 Auth.onToken=function(t){ if(Net)try{Net.setToken(t)}catch(e){} };
@@ -4772,6 +4810,16 @@ function netStart(room,biome){
     try{Net.broadcast("dask",{by:myNetId})}catch(e){}
   };
   Net.connect(room,biome);
+}
+/* 친구 아바타 표시 — 끄면 실시간 메시지가 거의 0이 된다(무역·건축은 그대로) */
+var NET_AVATARS=true;
+try{ if(localStorage.getItem("sixcont_avatars")==="off")NET_AVATARS=false }catch(e){}
+function setAvatars(on){
+  NET_AVATARS=!!on;
+  try{localStorage.setItem("sixcont_avatars",on?"on":"off")}catch(e){}
+  if(!on){peers={};if(typeof peerLabelWrap!=="undefined"&&peerLabelWrap)peerLabelWrap.innerHTML=""}
+  else if(Net&&Net.joined)broadcastPos(true);
+  toast(on?"👥 친구 아바타를 켰습니다":"🔕 친구 아바타를 껐습니다 — 무역과 건축은 그대로입니다",on?"good":"warn");
 }
 function netStop(){
   /* [V8 추가 2] 아무도 줍지 않은 내 나눔은 가방으로 돌려받는다 — 물건이 사라지지 않게 */
@@ -4935,7 +4983,12 @@ function onNetEvent(event,p){
   }else if(event==="pos"){
     if(p.id===myNetId)return;
     var q=peers[p.id];
-    if(!q){ q=peers[p.id]={name:p.name,x:p.x,y:p.y,z:p.z,yaw:p.yaw||0,tx:p.x,ty:p.y,tz:p.z,tyaw:p.yaw||0}; }
+    if(!q){
+      q=peers[p.id]={name:p.name,x:p.x,y:p.y,z:p.z,yaw:p.yaw||0,tx:p.x,ty:p.y,tz:p.z,tyaw:p.yaw||0};
+      /* [V22] 처음 보는 친구 → 내 자리도 곧바로 한 번 알려 준다.
+         평소 주기를 크게 늘려 두었기 때문에 이 인사가 없으면 서로 늦게 보인다. */
+      setTimeout(function(){try{broadcastPos(true)}catch(e){}},120+Math.random()*400);
+    }
     q.name=p.name;                                 // 목표값만 갱신(렌더에서 부드럽게 보간)
     q.tx=p.x;q.ty=p.y;q.tz=p.z;q.tyaw=p.yaw||0;
     q.last=performance.now();
@@ -4979,7 +5032,7 @@ function applyRemoteEdit(x,y,z,b){
    chainBreakTree 가 수십 칸을 부술 때 broadcast 를 연속 호출해 Supabase Realtime
    Rate Limit(플러딩)에 걸려 연결이 끊기던 문제를 해결. NET_EDIT_MS(50ms)마다,
    또는 버퍼가 커지면 한 번의 페이로드로 압축 전송한다. */
-var NET_EDIT_MS=50;                  // 편집 배치 전송 주기
+var NET_EDIT_MS=250;                 // [V22] 편집 배치 전송 주기 50→250ms (나무 한 그루가 한 통에)
 var NET_EDIT_MAXBATCH=64;            // 이 개수를 넘으면 주기와 무관하게 즉시 flush
 var editQueue=[], editAcc=0;
 function netBroadcastEdit(x,y,z,b){
@@ -4998,6 +5051,21 @@ function flushEditQueue(){
 function broadcastPos(force){
   if(!(Net&&Net.joined))return;
   if(S.isVisiting)return;                          // 관전 중엔 내 아바타를 남에게 안 보냄
+  if(!NET_AVATARS)return;                          // 친구 표시를 껐으면 아예 안 보낸다
+  var now=performance.now();
+  if(!force){
+    /* [V22] 지난번 보낸 자리에서 얼마나 움직였나 */
+    var dx=S.pos.x-netLastX, dy=S.pos.y-netLastY, dz=S.pos.z-netLastZ;
+    var dyaw=Math.abs(look.yaw-netLastYaw); while(dyaw>Math.PI)dyaw=Math.abs(dyaw-Math.PI*2);
+    var moved=(dx*dx+dy*dy+dz*dz)>(NET_MOVE_EPS*NET_MOVE_EPS)||dyaw>NET_YAW_EPS;
+    /* [V22] 같은 대륙에 아무도 없으면 받을 사람이 없다 — 아주 드물게만 알린다.
+       새 친구가 들어오면 그쪽 방송을 듣고 곧바로 인사(handshake)하므로 안 늦는다. */
+    var alone=true;for(var pk in peers){alone=false;break}
+    if(alone&&(now-netLastAt)<NET_ALONE_MS)return;
+    /* 제자리면 드물게 — 친구 화면에서 사라지지 않을 만큼만 */
+    if(!alone&&!moved&&(now-netLastAt)<NET_IDLE_MS)return;
+  }
+  netLastX=S.pos.x;netLastY=S.pos.y;netLastZ=S.pos.z;netLastYaw=look.yaw;netLastAt=now;netSent++;
   Net.broadcast("pos",{id:myNetId,name:S.name,
     x:+S.pos.x.toFixed(2),y:+S.pos.y.toFixed(2),z:+S.pos.z.toFixed(2),yaw:+look.yaw.toFixed(3)});
 }
@@ -6283,6 +6351,15 @@ function uiHelp(){
     "<div class='sec'><h3>내 대륙: "+B.n+" ("+B.dk+")</h3><div class='card'>"+
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
+    "<div class='sec'><h3>📡 친구 아바타 <span class='sm'>서버 아끼기</span></h3><div class='card'><p class='eff'>"+
+    "친구가 걸어 다니는 모습을 실시간으로 받아 보고 있습니다. 이 기능은 학교 서버 사용량을 많이 씁니다.<br>"+
+    "선생님이 꺼 달라고 하시면 아래를 눌러 주세요. <b>무역·나눔·건축·퀴즈는 그대로</b> 됩니다."+
+    "</p><div class='chips' style='margin-top:8px'>"+
+    "<span class='chip"+(NET_AVATARS?" ok":"")+"'>지금 "+(NET_AVATARS?"켜짐":"꺼짐")+"</span>"+
+    "</div><div style='margin-top:8px;display:flex;gap:6px'>"+
+    "<button class='mini' onclick='setAvatars(true);drawPanel()'>👥 켜기</button>"+
+    "<button class='mini' onclick='setAvatars(false);drawPanel()'>🔕 끄기</button>"+
+    "</div></div></div>"+
     "<div class='sec'><h3>🌾 내 대륙의 농사와 목축 <span class='sm'>교과서 그대로</span></h3><div class='card'><p class='eff'>"+
     (function(){
       var cr=(BIOME_CROPS[S.biome]||[]).map(function(k){return "<b>"+(CROP_NAME[k]||iN(k))+"</b>"}).join(" · ");
@@ -7033,7 +7110,7 @@ function readKeys(){
   sprint=!!(keys.ShiftLeft||keys.ShiftRight);
 }
 /* ---------- 시작 ---------- */
-var picked=null, assignedBiome=null, teacherRoster=[];
+var picked=null, assignedBiome=null, assignedName=null, teacherRoster=[];   // [V23] 명단에서 확인된 이름
 function buildBoot(){
   /* 기후 띠(위도 단면) — 극(위) → 적도(아래) 순서로 세운다.
      고르는 행위 자체가 "위도가 다르면 기후가 다르다"를 보여 준다. */
@@ -7075,8 +7152,8 @@ function buildBoot(){
     clearTimeout(lookupTimer);
     lookupTimer=setTimeout(studentRosterLookup,450);
   }
-  $("nm").addEventListener("input",function(){assignedBiome=null;unlockPick();refreshStartBtn();scheduleLookup()});
-  $("s_room").addEventListener("input",function(){assignedBiome=null;unlockPick();refreshStartBtn();scheduleLookup()});
+  $("nm").addEventListener("input",function(){assignedBiome=null;assignedName=null;unlockPick();refreshStartBtn();scheduleLookup()});
+  $("s_room").addEventListener("input",function(){assignedBiome=null;assignedName=null;unlockPick();refreshStartBtn();scheduleLookup()});
   $("nm").addEventListener("keydown",function(e){if(e.key==="Enter"&&!$("start").disabled)startAsStudent()});
 
   $("start").addEventListener("click",startAsStudent);
@@ -7100,7 +7177,7 @@ function refreshStartBtn(){
 function studentRosterLookup(){
   var room=normName($("s_room").value),name=normName($("nm").value);
   var info=$("assignInfo"),lat=$("bpick");
-  assignedBiome=null;
+  assignedBiome=null;assignedName=null;
   function open(cls,html){info.className=cls||"";info.innerHTML=html}
   function clear(){info.className="hide";info.innerHTML="";lat.classList.remove("locked");refreshStartBtn()}
   if(!room||!name){clear();return}
@@ -7111,9 +7188,21 @@ function studentRosterLookup(){
     if(err){open("","⚠ 명단 서버에 연결하지 못했습니다. 대륙을 직접 골라 시작할 수 있어요.");
       lat.classList.remove("locked");refreshStartBtn();return}
     if(row&&row.biome&&BIOMES[row.biome]){
-      assignedBiome=row.biome;document.body.dataset.b=row.biome;
+      /* ══════════════════════════════════════════════════════════════════════
+         [V23 수정] 진단코드 B의 진짜 원인 — 조회한 이름과 접속하는 이름이 달랐다
+         ----------------------------------------------------------------------
+         띄어쓰기가 다른 이름(명단 "곽민수" / 학생이 친 "곽 민수")을 <b>조회할 때만</b>
+         구제하고, 정작 서버에 들어갈 때는 학생이 친 이름을 그대로 보냈다.
+         서버는 명단에 없는 이름의 입장을 막으므로 403 이 나는데, 그 이름의 기록은
+         애초에 만들어진 적이 없으니 "서버에 기록이 없다"(코드 B)로 보였다.
+         이제 명단에 적힌 이름을 입력칸에 채워 넣고 그 이름으로 들어간다.
+         ══════════════════════════════════════════════════════════════════════ */
+      var fixedName=(row.name&&row.name!==name);
+      if(fixedName){ name=row.name; $("nm").value=row.name; }
+      assignedBiome=row.biome;assignedName=name;document.body.dataset.b=row.biome;
       open("ok","✅ <b>"+esc(name)+"</b> 학생은 <b style='color:"+BIOMES[row.biome].c+"'>"+bN(row.biome)+
-        "</b> 대륙으로 배정되었습니다.");
+        "</b> 대륙으로 배정되었습니다."+
+        (fixedName?"<br><span style='color:#7a94a5'>명단에 적힌 이름으로 맞추었습니다(띄어쓰기 차이).</span>":""));
       lat.classList.add("locked");
       lat.querySelectorAll(".band").forEach(function(x){
         x.setAttribute("aria-pressed",x.dataset.b===row.biome?"true":"false")});
@@ -7128,6 +7217,9 @@ function startAsStudent(){
   var name=normName($("nm").value)||"개척자";
   var room=normName($("s_room").value);
   var bio=assignedBiome||picked;
+  /* [V23] 명단에 있는 학생이라면 반드시 '명단에 적힌 이름'으로 들어간다 */
+  if(assignedName&&normName(assignedName)!==name)name=normName(assignedName);
+  $("nm").value=name;
   if(!bio)return;
   /* 방 코드가 있으면 반영. 접속 정보는 .env 에서 오므로 여기서 다룰 것이 없다. */
   if(room){MarketCfg.room=room;saveMarketCfg();initMarket();initCloud()}
@@ -7228,13 +7320,23 @@ function diagnoseLock(room,name,cb){
       cb({uid:myUid,tok:hasTok,readable:false,err:e&&e.status?("HTTP "+e.status):String(e)});
     });
 }
+/* 띄어쓰기를 뗀 형태 — 명단에 어떻게 적혀 있을지 짐작해 보여 준다 */
+/* [V23] 다시 시도 = 명단을 먼저 다시 읽어 '정확한 이름'을 받아온 뒤 접속한다.
+   이름 표기 차이로 막힌 경우가 대부분이라, 그냥 재시도하면 같은 결과만 반복된다. */
+function retryWithRoster(){
+  var info=$("assignInfo");
+  if(info)info.innerHTML="명단을 다시 확인하는 중…";
+  studentRosterLookup();
+  setTimeout(function(){ startAsStudent() },900);
+}
+function nameGuess(n){ var t=String(n||"").replace(/\s+/g,""); return t||n }
 function bootNameLocked(name,bio){
   var hasLocal=!!findLocalSlot(MarketCfg.room,name);
   /* [V11 수정] 예전에는 이 기기에 저장이 없으면 '다시 시도' 말고 길이 없어서,
      선생님이 풀어 줄 때까지 학생은 화면만 보고 앉아 있어야 했다.
      이제 저장이 없어도 '이 기기에서 새로 시작'으로 수업에 참여할 수 있다. */
   var btns="<div style='margin-top:9px;display:flex;gap:6px;flex-wrap:wrap'>"+
-    "<button class='mini acc' onclick='startAsStudent()'>다시 시도</button>"+
+    "<button class='mini acc' onclick='retryWithRoster()'>다시 시도</button>"+
     (hasLocal?"<button class='mini' onclick=\"startLocalOnly()\">이 기기에 저장된 것으로 계속하기</button>":
               "<button class='mini' onclick=\"startOfflineFresh()\">이 기기에서 새로 시작하기</button>")+
     "</div>";
@@ -7251,9 +7353,19 @@ function bootNameLocked(name,bio){
            "<br>잠시 뒤 <b>다시 시도</b>를 누르면 될 수도 있습니다.";
     }else if(d.readable&&!d.row){
       code="B";
-      body="서버에 <b>이 이름의 기록이 없습니다</b>. 그러니 '다른 기기가 쓰는 중'이 아닙니다."+
-           "<br>이 컴퓨터의 접속 권한 문제입니다. <b>다시 시도</b>를 한 번 더 눌러 보고,"+
-           "<br>그래도 안 되면 선생님께 <b>👥 전체 학생 계정 초기화</b>를 부탁하세요.";
+      /* [V23] 코드 B 는 '기록이 있는데 잠긴' 상황이 아니라 <b>기록을 만들지 못한</b>
+         상황이다. 지울 기록 자체가 없으므로 계정 초기화는 아무 소용이 없다.
+         예전 안내는 초기화를 권해서 선생님이 반 전체를 날릴 뻔했다. 바로잡는다. */
+      body="서버에 이 이름의 기록이 <b>아직 만들어지지 않았습니다</b>. 잠긴 것이 아니라 "+
+           "<b>입장 자체가 거절</b>된 것입니다."+
+           "<br><b style='color:var(--warn)'>계정 초기화로는 해결되지 않습니다</b>(지울 기록이 없습니다)."+
+           "<br><br>가장 흔한 원인은 <b>명단에 적힌 이름과 지금 친 이름이 다른 것</b>입니다."+
+           "<br>· 띄어쓰기 — 명단 '"+esc(nameGuess(name))+"' / 지금 '"+esc(name)+"'"+
+           "<br>· 동명이인 구분용 숫자, 성 빼고 이름만 쓴 경우"+
+           "<br><br><b>선생님께 부탁드릴 것</b>"+
+           "<br>1. 선생님 화면 <b>명단</b>에서 이 학생 이름을 <b>정확히 그대로</b> 확인"+
+           "<br>2. <b>명단 저장</b>을 한 번 다시 누르기(이름의 숨은 공백이 정리됩니다)"+
+           "<br>3. 학생은 그 이름을 <b>복사해서</b> 붙여넣고 다시 시도";
     }else if(d.mine){
       code="C";
       body="이 기록의 주인은 <b>이 컴퓨터가 맞습니다</b>. 잠깐의 통신 문제이니"+
@@ -7507,6 +7619,11 @@ function initTeacherPane(){
     $("t_wipeLocal").addEventListener("click",wipeLocalSaves);
     $("t_unlockAll").addEventListener("click",unlockAllStudents);
     $("t_preflight").addEventListener("click",preflightCheck);
+    $("t_avaOn").addEventListener("click",function(){
+      setAvatars(true);$("t_netMsg").innerHTML="👥 친구 아바타를 <b>켰습니다</b>. 이 기기에 저장되니 학생 기기에서도 각각 눌러야 합니다.";});
+    $("t_avaOff").addEventListener("click",function(){
+      setAvatars(false);$("t_netMsg").innerHTML="🔕 친구 아바타를 <b>껐습니다</b>. 실시간 메시지가 거의 나가지 않습니다.<br>"+
+        "<b>학생 기기마다 각각 꺼야 효과가 있습니다</b> — 학생 화면 <b>도움말</b>에도 같은 버튼을 넣어 두었습니다.";});
     $("t_sql").value=FIX_SQL;
     $("t_sqlcopy").addEventListener("click",function(){
       var t=$("t_sql");t.select();
