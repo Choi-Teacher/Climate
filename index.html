@@ -762,6 +762,21 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
           <p class="note" id="t_netMsg"></p>
         </div>
 
+        <div class="tcard" id="backupCard">
+          <h4>💾 반 전체 백업 · 복원 <span class="cnt">보험</span></h4>
+          <p class="thint">지금까지 지은 <b>대륙과 건축</b>, 학생들의 <b>가방</b>, <b>반 명단</b>을
+          파일 하나로 내려받습니다. 서버가 멈추거나 다른 Supabase 프로젝트로 옮겨야 할 때,
+          또는 실수로 초기화했을 때 그대로 되돌릴 수 있습니다.<br>
+          <b style="color:var(--warn)">사용량이 걱정되시면 수업 끝나고 한 번씩 내려받아 두세요.</b>
+          파일은 선생님 컴퓨터에만 저장되며 서버 사용량과는 무관합니다.</p>
+          <div class="trow">
+            <button class="mini acc" id="t_backup">💾 백업 내려받기</button>
+            <button class="mini" id="t_restorePick">📂 백업 파일로 복원</button>
+          </div>
+          <input type="file" id="t_restoreFile" accept=".json,application/json" style="display:none">
+          <p class="note" id="t_backupMsg"></p>
+        </div>
+
         <div class="tcard" id="resetCard">
           <h4>🗺 지도 초기화 <span class="cnt">수업 전에만</span></h4>
           <p class="thint">지형과 건축은 학생 개인이 아니라 <b>방 코드 + 기후</b>에 함께 저장됩니다.
@@ -4602,6 +4617,42 @@ Cloud.prototype.deleteOffersOf=function(room,name,cb){
    지도·건축·시드는 그대로 두고 arst 만 바꾼다 — 학생 기기의 옛 가방을 무효로 만드는 표시다. */
 /* [V27] 반 전체의 실시간 설정을 여섯 대륙에 써 넣는다.
    지형·건축·시드·시계는 손대지 않고 net 값만 바꾼다. */
+/* ══════════════════════════════════════════════════════════════════════════
+   [V28] 반 전체 백업 · 복원
+   --------------------------------------------------------------------------
+   왜 만들었나: 사용량 초과로 프로젝트가 멈추거나, 다른 Supabase 프로젝트로 옮겨야
+   하거나, 실수로 초기화했을 때 <b>지금까지 지은 대륙을 되살릴</b> 방법이 있어야 한다.
+   지형·건축·학생 가방·명단을 파일 하나로 내려받고, 그대로 되돌려 놓는다.
+   (사용량 숫자와는 무관하다 — 그건 지운다고 줄지 않는다. 이건 '보험'이다.)
+   ══════════════════════════════════════════════════════════════════════════ */
+Cloud.prototype.dumpRoom=function(room,cb){
+  var self=this,out={v:1,room:room,at:new Date().toISOString(),roster:[],players:[],worlds:[]};
+  var q=self._rest;
+  sbJson(q.call(self,"roster?room=eq."+encodeURIComponent(room)+"&select=name,biome&limit=500"))
+    .then(function(r){out.roster=r||[];
+      return sbJson(q.call(self,"players?room=eq."+encodeURIComponent(room)+"&select=name,biome,inv,stat,pos,day&limit=500"));})
+    .then(function(pl){out.players=pl||[];
+      return sbJson(q.call(self,"worlds?room=eq."+encodeURIComponent(room)+"&select=biome,seed,edits,day&limit=20"));})
+    .then(function(w){out.worlds=w||[];cb(null,out)})
+    ["catch"](function(e){cb(e)});
+};
+Cloud.prototype.restoreRoom=function(room,data,cb){
+  var self=this,steps=[],done=0,fail=0;
+  (data.worlds||[]).forEach(function(w){steps.push(function(next){
+    self.saveWorld(room,{biome:w.biome,seed:w.seed,edits:w.edits,day:w.day||1},function(e){if(e)fail++;next()});
+  })});
+  if((data.roster||[]).length)steps.push(function(next){
+    self.saveRoster(room,data.roster,function(e){if(e)fail++;next()});
+  });
+  (data.players||[]).forEach(function(pr){steps.push(function(next){
+    self.savePlayer(room,{name:pr.name,biome:pr.biome,inv:pr.inv,stat:pr.stat,pos:pr.pos,day:pr.day},
+      function(e){if(e)fail++;next()});
+  })});
+  (function run(){
+    if(done>=steps.length){cb&&cb(fail?("일부 실패("+fail+"건)"):null,{total:steps.length,fail:fail});return}
+    steps[done++](run);
+  })();
+};
 Cloud.prototype.setClassNet=function(room,mode,cb){
   var self=this,i=0,fail=0,made=0,BK=BKEYS.slice();
   (function next(){
@@ -7755,6 +7806,9 @@ function initTeacherPane(){
     $("t_wipeLocal").addEventListener("click",wipeLocalSaves);
     $("t_unlockAll").addEventListener("click",unlockAllStudents);
     $("t_preflight").addEventListener("click",preflightCheck);
+    $("t_backup").addEventListener("click",teacherBackup);
+    $("t_restorePick").addEventListener("click",function(){$("t_restoreFile").click()});
+    $("t_restoreFile").addEventListener("change",teacherRestore);
     $("t_net0").addEventListener("click",function(){pushClassNet(0)});
     $("t_net1").addEventListener("click",function(){pushClassNet(1)});
     $("t_net2").addEventListener("click",function(){pushClassNet(2)});
@@ -7904,6 +7958,59 @@ function preflightCheck(){
             miss.length?("아직 아무도 안 들어간 대륙: "+esc(miss.join("·"))+" (정상입니다)"):"모두 생성됨");
     });
   });
+}
+/* ── [V28] 백업 내려받기 ── */
+function teacherBackup(){
+  var msg=$("t_backupMsg");
+  if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
+  msg.textContent="반 전체를 모으는 중…";
+  CloudSvc.dumpRoom(MarketCfg.room,function(err,data){
+    if(err){msg.textContent="⚠ 백업 실패: "+(err&&err.status?("HTTP "+err.status):String(err));return}
+    var blocks=0;
+    (data.worlds||[]).forEach(function(w){
+      var d=w.edits&&w.edits.d; if(d&&d.length)blocks+=d.length/4;
+    });
+    try{
+      var blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+      var a=document.createElement("a");
+      var d=new Date(), pad=function(n){return(n<10?"0":"")+n};
+      a.href=URL.createObjectURL(blob);
+      a.download="여섯대륙_"+data.room+"_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+
+                 "_"+pad(d.getHours())+pad(d.getMinutes())+".json";
+      document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1000);
+      msg.innerHTML="✅ 백업 파일을 내려받았습니다.<br>"+
+        "대륙 <b>"+(data.worlds||[]).length+"개</b> · 지은 블록 <b>"+Math.round(blocks)+"칸</b> · "+
+        "학생 기록 <b>"+(data.players||[]).length+"명</b> · 명단 <b>"+(data.roster||[]).length+"명</b>"+
+        "<br><span style='color:#7a94a5'>이 파일만 있으면 언제든 되돌릴 수 있습니다. 잘 보관해 주세요.</span>";
+    }catch(e){ msg.textContent="⚠ 파일로 저장하지 못했습니다: "+e; }
+  });
+}
+/* ── [V28] 백업 파일로 복원 ── */
+function teacherRestore(ev){
+  var msg=$("t_backupMsg"), f=ev&&ev.target&&ev.target.files&&ev.target.files[0];
+  ev.target.value="";
+  if(!f)return;
+  if(!(CloudSvc&&CloudSvc.online&&Auth.isTeacher())){msg.textContent="선생님 계정으로 로그인해야 복원할 수 있습니다.";return}
+  var fr=new FileReader();
+  fr.onload=function(){
+    var data=null;
+    try{data=JSON.parse(fr.result)}catch(e){msg.textContent="⚠ 백업 파일을 읽을 수 없습니다.";return}
+    if(!data||!data.worlds){msg.textContent="⚠ 이 게임의 백업 파일이 아닙니다.";return}
+    var here=MarketCfg.room, there=data.room||"?";
+    var warn=(here!==there)?("\n\n⚠ 백업은 방 '"+there+"' 것이고 지금은 '"+here+"' 입니다.\n지금 방으로 옮겨 넣습니다."):"";
+    if(!window.confirm("백업을 되돌립니다.\n\n· 대륙 "+(data.worlds||[]).length+"개(지형·건축)\n· 학생 기록 "+
+      (data.players||[]).length+"명\n· 명단 "+(data.roster||[]).length+"명\n\n"+
+      "지금 서버에 있는 같은 이름의 내용은 덮어씌워집니다."+warn+"\n\n계속할까요?"))return;
+    msg.textContent="복원하는 중… (학생이 모두 나간 상태에서 하세요)";
+    CloudSvc.restoreRoom(here,data,function(err,info){
+      if(err){msg.innerHTML="⚠ 복원 중 일부 실패: "+esc(String(err))+"<br>다시 한 번 눌러 주세요.";return}
+      msg.innerHTML="✅ 복원했습니다 — 총 <b>"+info.total+"</b>건.<br>"+
+        "학생들이 다시 들어오면 예전 대륙과 가방이 그대로 보입니다.";
+      try{if(typeof loadRoster==="function")loadRoster();}catch(e){}
+    });
+  };
+  fr.readAsText(f);
 }
 /* [V27] 반 전체에 실시간 설정을 내려보낸다 */
 var netPushBusy=false;
