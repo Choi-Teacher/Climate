@@ -740,10 +740,19 @@ kbd{font-family:var(--m);font-size:11px;background:#0f1822;border:1px solid var(
           이번 판에서 <b>움직일 때만 보내도록</b> 고쳐 약 1/5로 줄였습니다. 그래도 부족하면
           아래에서 아바타를 꺼 주세요. <b>무역·건축·나눔·퀴즈는 그대로 작동합니다</b>
           (친구가 걸어 다니는 모습만 안 보입니다).</p>
+          <p class="thint" style="background:#fff2f2;border:1.5px solid #f0c2c2;border-radius:12px;padding:10px 12px;color:#8a3232">
+          <b>⚠ 한도를 넘기면 프로젝트가 중단되고 402 오류가 납니다.</b> 아래 버튼은 누르는 즉시
+          <b>반 전체 학생 기기에 적용</b>됩니다(학생이 따로 누를 필요 없음). 접속 중인 학생도 10초 안에 따라옵니다.</p>
           <div class="trow">
-            <button class="mini" id="t_avaOn">👥 친구 아바타 켜기</button>
-            <button class="mini" id="t_avaOff">🔕 친구 아바타 끄기</button>
+            <button class="mini" id="t_net0">👥 평소 · 아바타 켜기</button>
+            <button class="mini acc" id="t_net1">🔕 아바타 끄기 <b>(권장)</b></button>
+            <button class="mini" id="t_net2">📴 실시간 완전 끄기</button>
           </div>
+          <p class="thint" style="margin-top:7px">
+          <b>🔕 아바타 끄기</b> — 친구가 걸어 다니는 모습만 사라집니다.
+          <b>무역·나눔·건축·퀴즈 전부 그대로</b>, 친구가 지은 집도 바로 보입니다. 메시지가 약 <b>1/20</b>로 줄어듭니다.<br>
+          <b>📴 실시간 완전 끄기</b> — 메시지가 <b>0</b>이 됩니다. 친구의 건축은 <b>10초쯤 뒤</b>에 보이고,
+          바닥에 물건을 내려놓는 <b>나눔은 쓸 수 없습니다</b>. 무역소 거래는 그대로 됩니다.</p>
           <p class="thint" style="margin-top:8px"><b>수업 운영 요령</b><br>
           · 한 반 30명 40분 기준 대략 <b>22만 건</b>을 씁니다 (예전에는 90만 건 · <b>4배 절약</b>)<br>
           · 이대로면 무료 한도로 <b>월 8회 수업</b>까지 됩니다<br>
@@ -4591,6 +4600,25 @@ Cloud.prototype.deleteOffersOf=function(room,name,cb){
 };
 /* [V13] 계정 초기화 도장을 여섯 기후 월드에 찍는다.
    지도·건축·시드는 그대로 두고 arst 만 바꾼다 — 학생 기기의 옛 가방을 무효로 만드는 표시다. */
+/* [V27] 반 전체의 실시간 설정을 여섯 대륙에 써 넣는다.
+   지형·건축·시드·시계는 손대지 않고 net 값만 바꾼다. */
+Cloud.prototype.setClassNet=function(room,mode,cb){
+  var self=this,i=0,fail=0,made=0,BK=BKEYS.slice();
+  (function next(){
+    if(i>=BK.length){cb&&cb(fail?("일부 실패("+fail+")"):null,made);return}
+    var b=BK[i++];
+    self.loadWorld(room,b,function(lerr,cur){
+      if(lerr){fail++;next();return}
+      var e=(cur&&cur.edits&&cur.edits.d)?cur.edits:{v:WORLD_FMT,d:[],gen:0,arst:0};
+      e.net=mode|0;
+      self.saveWorld(room,{biome:b,seed:(cur&&cur.seed)||seedFor(room,b),
+        edits:e,day:(cur&&cur.day)||1},function(werr){
+        if(werr)fail++;else made++;
+        next();
+      });
+    });
+  })();
+};
 Cloud.prototype.stampAccountReset=function(room,biomes,cb){
   var self=this,stamp=Math.floor(Date.now()/1000),i=0,fail=0;
   (function next(){
@@ -4637,7 +4665,7 @@ function initCloud(){
    외부 라이브러리(LZString) 의존 없이 오프라인에서도 동작. ========================= */
 /* 32비트로 잘리지 않는 안전한 숫자 변환(도장 값은 초 단위 시각이라 크다) */
 function num0(v){ v=Number(v); return isFinite(v)?v:0 }
-function packEdits(edits,gen,arst){
+function packEdits(edits,gen,arst,netMode){
   var d=[];
   for(var k in edits){
     if(!edits.hasOwnProperty(k))continue;
@@ -4651,7 +4679,7 @@ function packEdits(edits,gen,arst){
      가방만 비울 때 쓴다. 학생 기기의 localStorage 는 선생님이 손댈 수 없으므로,
      이 도장을 보고 학생 쪽이 스스로 옛 가방을 버리게 만든다. */
   /* arst 에 |0 을 쓰면 안 된다 — Date.now() 는 32비트를 넘어 값이 뭉개진다 */
-  return {v:WORLD_FMT,d:d,gen:gen|0,arst:num0(arst)};
+  return {v:WORLD_FMT,d:d,gen:gen|0,arst:num0(arst),net:num0(netMode)};
 }
 /* {"x,y,z":id} 맵의 y 좌표를 통째로 dy 만큼 옮긴다(옛 월드 이사용) */
 function liftMap(m,dy){
@@ -4680,6 +4708,17 @@ function unpackEdits(rec){
 function worldGenOf(wrec){
   var e=wrec&&wrec.edits;
   return (e&&typeof e.gen==="number")?e.gen:0;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   [V27] 반 전체 실시간 설정 — 선생님이 한 번 누르면 모든 학생에게 적용된다
+   --------------------------------------------------------------------------
+   0 = 평소(아바타 켜짐)  1 = 아바타만 끔  2 = 실시간 완전히 끔
+   학생 기기마다 눌러야 했던 것을 대륙(worlds) 기록에 실어 보내 한 번에 맞춘다.
+   접속할 때 읽고, 놀고 있는 중에도 10초마다 확인해 곧바로 따라간다.
+   ══════════════════════════════════════════════════════════════════════════ */
+function worldNetOf(wrec){
+  var e=wrec&&wrec.edits;
+  return (e&&typeof e.net==="number")?e.net:0;
 }
 /* 공유 시계 — 같은 기후는 같은 일차·같은 시각을 쓴다 */
 function worldSecOf(wrec){
@@ -4808,6 +4847,7 @@ Auth.onToken=function(t){ if(Net)try{Net.setToken(t)}catch(e){} };
 
 /* 실시간 채널 시작: 같은 방·기후 학생들과 연결 */
 function netStart(room,biome){
+  if(NET_MODE===2)return;                 // [V27] 선생님이 실시간을 완전히 껐다
   if(!(BACKEND_ON&&MarketCfg.mode==="supabase"))return;   // 오프라인이면 스킵
   netStop();
   peers={};
@@ -4820,16 +4860,32 @@ function netStart(room,biome){
   };
   Net.connect(room,biome);
 }
-/* 친구 아바타 표시 — 끄면 실시간 메시지가 거의 0이 된다(무역·건축은 그대로) */
-var NET_AVATARS=true;
-try{ if(localStorage.getItem("sixcont_avatars")==="off")NET_AVATARS=false }catch(e){}
-function setAvatars(on){
-  NET_AVATARS=!!on;
-  try{localStorage.setItem("sixcont_avatars",on?"on":"off")}catch(e){}
-  if(!on){peers={};if(typeof peerLabelWrap!=="undefined"&&peerLabelWrap)peerLabelWrap.innerHTML=""}
-  else if(Net&&Net.joined)broadcastPos(true);
-  toast(on?"👥 친구 아바타를 켰습니다":"🔕 친구 아바타를 껐습니다 — 무역과 건축은 그대로입니다",on?"good":"warn");
+/* ══════════════════════════════════════════════════════════════════════════
+   [V27] 실시간 사용 단계
+     0 평소      — 친구 아바타가 실시간으로 움직인다(메시지 가장 많음)
+     1 아바타 끔 — 좌표를 주고받지 않는다. 건축·나눔은 그대로 실시간
+     2 완전 끔   — 실시간 연결 자체를 하지 않는다(메시지 0).
+                  친구의 건축은 10초마다 저장을 통해 보이고, 바닥 나눔은 쓸 수 없다.
+   ══════════════════════════════════════════════════════════════════════════ */
+var NET_MODE=0;
+try{ var _nm=localStorage.getItem("sixcont_netmode"); if(_nm!==null)NET_MODE=+_nm||0; }catch(e){}
+var NET_AVATARS=(NET_MODE===0);
+function netModeName(m){return m===2?"실시간 완전 끔":(m===1?"아바타 끔":"평소")}
+/* 선생님 설정(fromServer=true)은 이 기기 설정보다 우선한다 */
+function applyNetMode(m,quiet){
+  m=m|0; if(m===NET_MODE)return;
+  NET_MODE=m; NET_AVATARS=(m===0);
+  try{localStorage.setItem("sixcont_netmode",String(m))}catch(e){}
+  if(m!==0){peers={};if(typeof peerLabelWrap!=="undefined"&&peerLabelWrap)peerLabelWrap.innerHTML=""}
+  if(m===2){ try{netStop()}catch(e){} }
+  else if(S&&!S.isVisiting&&CloudSvc&&CloudSvc.online){
+    try{ if(!(Net&&Net.joined))netStart(S.room,S.biome); else if(m===0)broadcastPos(true); }catch(e){}
+  }
+  if(!quiet)toast(m===0?"👥 친구 아바타를 켰습니다":
+                  (m===1?"🔕 친구 아바타를 껐습니다 — 건축·나눔은 그대로입니다":
+                         "📴 실시간을 껐습니다 — 친구 건축은 잠시 뒤 보입니다"),m===0?"good":"warn");
 }
+function setAvatars(on){ applyNetMode(on?0:1,false); }
 function netStop(){
   /* [V8 추가 2] 아무도 줍지 않은 내 나눔은 가방으로 돌려받는다 — 물건이 사라지지 않게 */
   try{dropReclaimMine()}catch(e){}
@@ -6361,13 +6417,18 @@ function uiHelp(){
     "<p class='eff'>"+B.role+"<br>낮 "+B.day+"°C · 밤 "+B.night+"°C</p>"+
     "<div class='chips' style='margin-top:8px'>"+B.found.map(function(x){return "<span class='chip'>"+x+"</span>"}).join("")+"</div></div></div>"+
     "<div class='sec'><h3>📡 친구 아바타 <span class='sm'>서버 아끼기</span></h3><div class='card'><p class='eff'>"+
-    "친구가 걸어 다니는 모습을 실시간으로 받아 보고 있습니다. 이 기능은 학교 서버 사용량을 많이 씁니다.<br>"+
-    "선생님이 꺼 달라고 하시면 아래를 눌러 주세요. <b>무역·나눔·건축·퀴즈는 그대로</b> 됩니다."+
+    (NET_MODE===0
+      ? "친구가 걸어 다니는 모습이 실시간으로 보입니다."
+      : NET_MODE===1
+        ? "<b>선생님이 친구 아바타를 꺼 두었습니다.</b> 학교 서버 사용량을 아끼기 위한 것입니다.<br>"+
+          "친구가 걸어 다니는 모습만 안 보일 뿐, <b>무역·나눔·건축·퀴즈는 모두 그대로</b>이고 "+
+          "친구가 지은 집도 바로 보입니다."
+        : "<b>선생님이 실시간 연결을 꺼 두었습니다.</b><br>"+
+          "친구가 지은 건물은 <b>10초쯤 뒤</b>에 보입니다. 바닥에 물건을 내려놓는 <b>나눔</b>은 지금 쓸 수 없고, "+
+          "<b>무역소 거래</b>로 주고받으면 됩니다.")+
     "</p><div class='chips' style='margin-top:8px'>"+
-    "<span class='chip"+(NET_AVATARS?" ok":"")+"'>지금 "+(NET_AVATARS?"켜짐":"꺼짐")+"</span>"+
-    "</div><div style='margin-top:8px;display:flex;gap:6px'>"+
-    "<button class='mini' onclick='setAvatars(true);drawPanel()'>👥 켜기</button>"+
-    "<button class='mini' onclick='setAvatars(false);drawPanel()'>🔕 끄기</button>"+
+    "<span class='chip"+(NET_MODE===0?" ok":"")+"'>지금 "+esc(netModeName(NET_MODE))+"</span>"+
+    "<span class='chip'>선생님이 정합니다</span>"+
     "</div></div></div>"+
     "<div class='sec'><h3>🌾 내 대륙의 농사와 목축 <span class='sm'>교과서 그대로</span></h3><div class='card'><p class='eff'>"+
     (function(){
@@ -6760,11 +6821,13 @@ function cloudSaveWorld(force,cb){
       /* [V13] 서버에 찍힌 초기화 도장을 그대로 되돌려 보낸다 —
          빼먹으면 학생이 저장하는 순간 도장이 지워져 초기화가 무효가 된다. */
       var keepArst=Math.max(worldArstOf(cur),num0(S.arst));
+      var keepNet=worldNetOf(cur);                         // [V27] 선생님 설정은 건드리지 않고 되돌려 보낸다
       var sending=Object.keys(pendingEdits);
-      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0,keepArst),day:S.day,sec:S.sec},function(werr){
+      CloudSvc.saveWorld(S.room,{biome:S.biome,seed:useSeed,edits:packEdits(S.edits,S.wgen|0,keepArst,keepNet),day:S.day,sec:S.sec},function(werr){
         cloudBusy=false;cloudDirtyFlag=false;worldDirtyFlag=false;
         /* 올리기에 성공한 칸만 '내 것' 표시를 뗀다. 그 뒤로는 서버가 이긴다. */
         if(!werr)for(var si=0;si<sending.length;si++)delete pendingEdits[sending[si]];
+        applyNetMode(worldNetOf(cur),false);   // [V27] 선생님이 바꿨으면 곧바로 따라간다
         /* [V18] 서버 시계가 나보다 앞서 있으면 맞춘다(먼저 들어온 친구 기준) */
         var cs=worldSecOf(cur);
         if(cs>(S.sec||0)+2){S.sec=cs;S.day=1+Math.floor(cs/DAYSEC)}
@@ -7511,6 +7574,7 @@ function startAsStudentOnline(name,bio){
            친구들과 같은 '○일차'에서 시작한다. */
         var ws=worldSecOf(wrec);
         if(ws>=0){S.sec=ws;S.day=1+Math.floor(ws/DAYSEC)}
+        applyNetMode(worldNetOf(wrec),true);   // [V27] 선생님이 정한 실시간 설정
       }
       /* ══════════════════════════════════════════════════════════════════════
          [V13 수정] "계정을 초기화했는데 가방이 그대로다"
@@ -7691,11 +7755,9 @@ function initTeacherPane(){
     $("t_wipeLocal").addEventListener("click",wipeLocalSaves);
     $("t_unlockAll").addEventListener("click",unlockAllStudents);
     $("t_preflight").addEventListener("click",preflightCheck);
-    $("t_avaOn").addEventListener("click",function(){
-      setAvatars(true);$("t_netMsg").innerHTML="👥 친구 아바타를 <b>켰습니다</b>. 이 기기에 저장되니 학생 기기에서도 각각 눌러야 합니다.";});
-    $("t_avaOff").addEventListener("click",function(){
-      setAvatars(false);$("t_netMsg").innerHTML="🔕 친구 아바타를 <b>껐습니다</b>. 실시간 메시지가 거의 나가지 않습니다.<br>"+
-        "<b>학생 기기마다 각각 꺼야 효과가 있습니다</b> — 학생 화면 <b>도움말</b>에도 같은 버튼을 넣어 두었습니다.";});
+    $("t_net0").addEventListener("click",function(){pushClassNet(0)});
+    $("t_net1").addEventListener("click",function(){pushClassNet(1)});
+    $("t_net2").addEventListener("click",function(){pushClassNet(2)});
     $("t_sql").value=FIX_SQL;
     $("t_sqlcopy").addEventListener("click",function(){
       var t=$("t_sql");t.select();
@@ -7841,6 +7903,27 @@ function preflightCheck(){
         put(true,"대륙 "+(BKEYS.length-miss.length)+"/"+BKEYS.length+" 준비됨",
             miss.length?("아직 아무도 안 들어간 대륙: "+esc(miss.join("·"))+" (정상입니다)"):"모두 생성됨");
     });
+  });
+}
+/* [V27] 반 전체에 실시간 설정을 내려보낸다 */
+var netPushBusy=false;
+function pushClassNet(mode){
+  var msg=$("t_netMsg");
+  if(!(CloudSvc&&CloudSvc.online)){msg.textContent="먼저 선생님 계정으로 로그인하세요.";return}
+  if(!Auth.isTeacher()){msg.textContent="이 설정은 선생님 계정으로만 바꿀 수 있습니다.";return}
+  if(netPushBusy)return;
+  if(mode===2&&!window.confirm("실시간을 완전히 끕니다.\n\n· 서버 메시지가 0이 됩니다\n· 친구가 지은 건물은 10초쯤 뒤에 보입니다\n· 바닥에 물건을 내려놓는 '나눔'은 쓸 수 없습니다\n· 무역소 거래는 그대로 됩니다\n\n계속할까요?"))return;
+  netPushBusy=true;
+  msg.textContent="반 전체에 적용하는 중…";
+  CloudSvc.setClassNet(MarketCfg.room,mode,function(err,made){
+    netPushBusy=false;
+    applyNetMode(mode,true);                       // 선생님 화면도 같은 설정으로
+    if(err){msg.innerHTML="⚠ 일부 대륙에 적용하지 못했습니다("+esc(String(err))+"). 다시 눌러 주세요.";return}
+    msg.innerHTML="✅ <b>"+esc(netModeName(mode))+"</b> — 여섯 대륙 모두에 적용했습니다."+
+      "<br>접속 중인 학생은 <b>10초 안에</b> 자동으로 따라옵니다. 새로 들어오는 학생은 바로 적용됩니다."+
+      (mode===1?"<br>예상 사용량: 한 반 40분에 약 <b>1만 건</b> (예전 90만 건)":"")+
+      (mode===2?"<br>예상 사용량: <b>0건</b>":"")+
+      (mode===0?"<br><span style=\'color:var(--warn)\'>사용량이 다시 늘어납니다. 한도에 여유가 있을 때만 쓰세요.</span>":"");
   });
 }
 var acctBusy=false;
